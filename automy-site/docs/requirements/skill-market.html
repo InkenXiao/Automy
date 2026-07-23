@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>技能市场 · 需求文档 · XIN</title>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/requirements/overview">需求文档</a></li>
+  <li>技能市场</li>
+</nav>
+
+<h1>技能市场</h1>
+
+<p class="text-secondary">提供可复用、可组合的技能生态。用户可低代码自定义技能、从公共市场一键安装、团队内共享,大幅降低 Agent 能力构建成本,让最佳实践(财报解析、合同审查、商机查询)在组织内沉淀与传播。</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">⚡</div>
+  <div class="alert__body">
+    <div class="alert__title">模块定位</div>
+    <div class="alert__desc">本模块定义技能定义模型、低代码编辑器、运行时沙箱、市场浏览、安装与依赖管理、审核与下架六大核心能力,覆盖技能从定义、开发、测试、发布、安装、运行到下架的完整生命周期。</div>
+  </div>
+</div>
+
+<h2>模块概述</h2>
+<p>
+  投资公司内部存在大量可复用的工作流程:财报解析、合同审查、商机查询、会议纪要、监管动态跟踪等。如果没有技能抽象,每个用户都要从零配置 Agent,效率低下且能力无法沉淀,最佳实践难以在团队内传播。
+</p>
+<p>
+  XIN 技能市场让最佳实践可被复用与传播:投研骨干把 "财报解析" 流程封装为技能发布到团队市场,新人一键安装即可获得同等能力;法务专家把 "合同风险审查" 技能发布到公司市场,全员可用。技能支持低代码可视化编排、在线调试、版本管理、运行时沙箱隔离,确保安全可控。
+</p>
+
+<h2>技能分类</h2>
+<table class="table">
+  <thead>
+    <tr><th>分类</th><th>典型技能</th><th>提供方</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>投研</td><td>财务报表解析、IPO 风险分析、尽调报告生成</td><td>官方 + 投研团队</td></tr>
+    <tr><td>法务</td><td>合同风险审查、案例检索、合规比对</td><td>官方 + 法务团队</td></tr>
+    <tr><td>合规</td><td>反洗钱检查、监管动态跟踪、合规审查</td><td>合规团队</td></tr>
+    <tr><td>销售</td><td>CRM 商机查询、客户洞察、销售预测</td><td>官方</td></tr>
+    <tr><td>通用</td><td>会议纪要、邮件起草、文档翻译</td><td>官方 + 社区</td></tr>
+  </tbody>
+</table>
+
+<h2>需求条目</h2>
+
+<!-- REQ-4.1 技能定义模型 -->
+<div class="card" id="REQ-4.1">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-4.1</span>
+        <strong>技能定义模型</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供统一的技能定义模型,每个技能 SHALL 包含元数据、提示词、参数 Schema、工具集、工作流、权限声明六大组成部分;定义 SHALL 同时支持 YAML 声明式与可视化 JSON 两种格式,可互转。</p>
+    <table class="table table-bordered">
+      <thead><tr><th>组成部分</th><th>说明</th><th>示例</th></tr></thead>
+      <tbody>
+        <tr><td>元数据</td><td>name / version / category / description / author / icon</td><td>name: 财务报表解析, version: 2.1.0</td></tr>
+        <tr><td>提示词</td><td>system prompt 与 user prompt 模板,支持变量插值</td><td>"你是资深财务分析师,请分析 {{company}} 的 {{period}} 财报..."</td></tr>
+        <tr><td>参数 Schema</td><td>JSON Schema 定义输入参数</td><td>document(file) / period(string) / metrics(array)</td></tr>
+        <tr><td>工具集</td><td>技能可调用的工具清单</td><td>pdf.extract / knowledge.search / formula.compute</td></tr>
+        <tr><td>工作流</td><td>多步骤编排,支持条件分支与循环</td><td>step1 提取 → step2 识别 → step3 对比</td></tr>
+        <tr><td>权限声明</td><td>技能所需的 MCP 服务、知识库、记忆范围</td><td>需要 wind-data / 内部研究库 / 写入项目记忆</td></tr>
+      </tbody>
+    </table>
+
+    <h4>技能结构示例</h4>
+    <div class="code-block">
+      <div class="code-block__header">
+        <span>YAML</span>
+        <button class="code-block__copy">复制</button>
+      </div>
+<pre><code><span class="token-property">name</span>: <span class="token-string">财务报表解析</span>
+<span class="token-property">version</span>: <span class="token-string">2.1.0</span>
+<span class="token-property">category</span>: <span class="token-string">投研</span>
+<span class="token-property">description</span>: <span class="token-string">自动解析企业年度财务报表</span>
+
+<span class="token-property">input</span>:
+  <span class="token-property">document</span>:
+    <span class="token-property">type</span>: <span class="token-string">file</span>
+    <span class="token-property">accept</span>: [<span class="token-string">.pdf</span>, <span class="token-string">.xlsx</span>]
+
+<span class="token-property">tools</span>:
+  - <span class="token-property">name</span>: <span class="token-string">pdf.extract</span>
+  - <span class="token-property">name</span>: <span class="token-string">knowledge.search</span>
+  - <span class="token-property">name</span>: <span class="token-string">formula.compute</span>
+
+<span class="token-property">workflow</span>:
+  - <span class="token-property">step</span>: <span class="token-string">提取文档文本</span>
+  - <span class="token-property">step</span>: <span class="token-string">识别财务指标</span>
+  - <span class="token-property">step</span>: <span class="token-string">对比历史数据</span>
+  - <span class="token-property">step</span>: <span class="token-string">输出结构化摘要</span></code></pre>
+    </div>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 投研骨干创建 "财务报表解析" 技能<br>
+      <strong>THEN</strong> 系统校验技能定义模型完整性:必须包含 name、version、input、workflow;tools 与 permissions 可选但建议填写;校验通过后保存为草稿,可进入编辑器继续完善。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/skill-market">查看技能市场原型</a></li>
+      <li><a href="#/docs/architecture/skill-system">关联架构:技能系统</a></li>
+      <li><a href="#/docs/requirements/mcp-integration">关联需求:REQ-6.2 服务目录(权限声明)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-4.2 技能编辑器 -->
+<div class="card" id="REQ-4.2">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-4.2</span>
+        <strong>技能编辑器</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供低代码可视化技能编辑器,支持拖拽式工作流编排、模板编写、在线调试、版本管理;SHALL 同时支持 YAML / JSON 源码编辑模式,可视化与源码双向同步。</p>
+    <ul>
+      <li>拖拽编排:可视化画布拖拽节点(工具、条件、循环、LLM 调用、知识检索),连线定义数据流</li>
+      <li>模板编写:内置技能模板库(财报分析、合同审查、会议纪要等),基于模板快速创建</li>
+      <li>在线调试:提供测试环境,可输入测试数据逐步执行技能,查看每步输入输出</li>
+      <li>断点调试:在工作流节点设置断点,单步执行,检查中间变量</li>
+      <li>版本管理:每次保存创建新版本,支持版本对比、回滚、灰度发布</li>
+      <li>源码模式:支持 YAML / JSON 源码编辑,与可视化画布双向同步</li>
+      <li>调试日志:记录每次调试的输入、输出、耗时、Token 消耗</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 投研骨干张三在编辑器中调试 "财务报表解析" 技能<br>
+      <strong>THEN</strong> 张三上传一份测试财报 PDF,点击 "调试" 按钮,系统逐步执行工作流:step1 提取文本(展示提取结果)→ step2 识别财务指标(高亮识别的指标)→ step3 对比历史数据(展示对比表格)→ step4 输出摘要;每步耗时与 Token 消耗实时显示。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/skill-market">查看技能市场原型</a></li>
+      <li><a href="#/docs/architecture/skill-system">关联架构:技能系统</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-4.3 技能运行时沙箱 -->
+<div class="card" id="REQ-4.3">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-4.3</span>
+        <strong>技能运行时沙箱</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 在隔离的沙箱环境中执行技能,限制文件访问、网络请求、内存与 CPU 占用、执行时长;SHALL 禁止技能直接访问宿主文件系统与其他技能数据,确保恶意或异常技能不影响平台稳定性。</p>
+    <ul>
+      <li>文件隔离:技能仅能访问授权的临时工作目录,禁止访问宿主文件系统</li>
+      <li>网络限制:仅允许调用声明中授权的 MCP 服务与外部 API,默认禁止其他网络请求</li>
+      <li>资源限制:单次执行内存 ≤ 512MB,CPU ≤ 1 核,执行时长 ≤ 60 秒(可配置)</li>
+      <li>权限校验:运行前校验技能声明的权限是否被用户授权,未授权的调用被拦截</li>
+      <li>异常处理:技能抛出未捕获异常时,沙箱捕获并优雅降级,返回友好错误信息</li>
+      <li>审计记录:沙箱内所有工具调用、文件访问、网络请求均记录到审计日志</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 一个第三方技能尝试访问 <code>/etc/passwd</code> 文件<br>
+      <strong>THEN</strong> 沙箱拦截该文件访问,返回 "权限拒绝:技能无权访问该路径",并记录安全审计事件 "技能尝试越权文件访问",管理员可在审计日志中查看并下架该技能。
+    </div>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 技能 "财务报表解析" 执行超时(超过 60 秒)<br>
+      <strong>THEN</strong> 沙箱强制终止技能执行,返回 "执行超时,请优化技能或减小输入数据量",已执行的部分结果保留,用户可查看执行日志定位瓶颈步骤。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/docs/architecture/skill-system">关联架构:技能系统</a></li>
+      <li><a href="#/docs/requirements/security-audit">关联需求:REQ-9.3 全链路审计</a></li>
+      <li><a href="#/docs/requirements/security-audit">关联需求:REQ-9.5 提示词安全</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-4.4 技能市场浏览 -->
+<div class="card" id="REQ-4.4">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-4.4</span>
+        <strong>技能市场浏览</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供技能市场浏览界面,支持按分类浏览、关键词搜索、评分排序、使用量排序;每个技能 SHALL 展示详情页,包含功能说明、参数说明、所需权限、版本历史、用户评价、使用统计。</p>
+    <ul>
+      <li>分类浏览:按投研 / 法务 / 合规 / 销售 / 通用分类,支持多级子分类</li>
+      <li>关键词搜索:全文搜索技能名称、描述、标签,支持拼音与同义词</li>
+      <li>排序:按评分、使用量、最新发布、最近更新多种排序方式</li>
+      <li>技能详情页:功能说明、参数说明、所需权限、示例输入输出、版本历史、用户评价</li>
+      <li>提供方标识:区分官方 / 团队 / 社区技能,官方技能标记 "已认证" 徽章</li>
+      <li>使用统计:展示安装数、调用量、平均评分,辅助用户决策</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 新员工王五想找财报分析的技能<br>
+      <strong>THEN</strong> 王五在市场搜索 "财报",系统返回 5 个相关技能,按使用量排序展示;"财务报表解析 v2.1" 排在首位,展示安装数 234、评分 4.8、提供方 "官方 + 投研团队";王五点击进入详情页查看参数说明与示例输出,确认符合需求后点击 "安装"。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/skill-market">查看技能市场原型</a></li>
+      <li><a href="#/docs/requirements/profile">关联需求:REQ-11.3 我的技能管理</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-4.5 技能安装与依赖 -->
+<div class="card" id="REQ-4.5">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-4.5</span>
+        <strong>技能安装与依赖</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 支持一键安装技能到个人空间,安装时 SHALL 解析技能依赖的 MCP 服务、知识库、其他技能,并明确提示用户授权;SHALL 支持技能更新通知与一键升级。</p>
+    <ul>
+      <li>一键安装:点击 "安装" 按钮即装即用,无需复杂配置</li>
+      <li>依赖解析:自动解析技能声明的依赖(MCP 服务、知识库、其他技能)</li>
+      <li>授权提示:安装时弹窗展示技能所需的权限清单,用户逐项授权后才完成安装</li>
+      <li>依赖检查:检查依赖的 MCP 服务用户是否已连接,未连接的提示先连接</li>
+      <li>更新通知:技能发布新版本时,已安装用户收到更新通知</li>
+      <li>一键升级:支持一键升级到最新版本,保留个人配置</li>
+      <li>卸载清理:卸载技能时清理相关配置,但保留已产生的会话数据</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 王五安装 "财务报表解析" 技能<br>
+      <strong>THEN</strong> 系统解析依赖:(1) MCP 服务 wind-data;(2) 知识库 内部研究库;(3) 技能 pdf-text-extract;弹窗展示权限清单 "需要访问 Wind 数据、内部研究库、PDF 提取工具",王五逐项授权后安装完成。
+    </div>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 王五未连接 wind-data MCP 服务<br>
+      <strong>THEN</strong> 安装弹窗提示 "该技能依赖 Wind 数据 MCP 服务,您尚未连接,请先连接",并提供跳转到 MCP 服务目录的链接;王五可先完成连接再回来安装。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/skill-market">查看技能市场原型</a></li>
+      <li><a href="#/docs/requirements/mcp-integration">关联需求:REQ-6.3 用户主动连接</a></li>
+      <li><a href="#/docs/requirements/profile">关联需求:REQ-11.3 我的技能管理</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-4.6 技能审核与下架 -->
+<div class="card" id="REQ-4.6">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-4.6</span>
+        <strong>技能审核与下架</strong>
+      </div>
+      <div>
+        <span class="badge badge-warning">P1</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 对发布到团队市场与公司市场的技能进行管理员审核,审核内容包括功能合规性、安全扫描、权限合理性;SHALL 支持紧急下架违规技能,已安装用户收到通知并自动停用。</p>
+    <ul>
+      <li>审核流程:作者提交发布申请 → 管理员审核(功能 + 安全 + 权限)→ 通过 / 驳回 / 待修改</li>
+      <li>安全扫描:自动扫描技能代码与提示词,检测恶意代码、提示词注入、越权访问</li>
+      <li>权限审查:审查技能声明的权限是否最小化,过度授权的技能驳回</li>
+      <li>紧急下架:管理员可一键下架违规技能,已安装用户立即收到通知,技能自动停用</li>
+      <li>申诉机制:作者对驳回决定可申诉,二次审核由更高级别管理员处理</li>
+      <li>审核日志:所有审核操作记录到审计日志,可追溯</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 管理员发现 "客户洞察分析" 技能存在提示词注入风险<br>
+      <strong>THEN</strong> 管理员点击 "紧急下架",系统立即停用该技能,234 名已安装用户收到站内信通知 "您安装的 '客户洞察分析' 技能因安全原因已被下架,请联系管理员",技能在市场不可见。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/admin">查看管理后台原型</a></li>
+      <li><a href="#/docs/requirements/admin">关联需求:REQ-10.5 市场审核</a></li>
+      <li><a href="#/docs/requirements/security-audit">关联需求:REQ-9.5 提示词安全</a></li>
+    </ul>
+  </div>
+</div>
+
+<h2>验收标准</h2>
+<div class="card">
+  <div class="card-body">
+    <ul>
+      <li>✅ 技能定义模型完整,支持 YAML 与可视化双模式</li>
+      <li>✅ 编辑器支持拖拽编排、在线调试、版本管理</li>
+      <li>✅ 沙箱隔离有效,恶意技能无法越权访问</li>
+      <li>✅ 市场浏览体验流畅,搜索、分类、排序功能正常</li>
+      <li>✅ 一键安装,依赖解析与授权提示清晰</li>
+      <li>✅ 审核流程完整,紧急下架即时生效</li>
+    </ul>
+  </div>
+</div>
+
+<h2>原型参考</h2>
+<p><a href="#/prototype/skill-market" class="card-link">查看技能市场原型</a></p>
+</body>
+</html>

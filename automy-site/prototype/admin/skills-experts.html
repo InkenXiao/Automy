@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>技能与专家管理 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/admin" class="app-nav-item active"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">管理</div>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">📊</span><span class="app-nav-item__label">仪表盘</span></a>
+        <a href="#/prototype/admin/users" class="app-nav-item"><span class="app-nav-item__icon">👥</span><span class="app-nav-item__label">用户管理</span></a>
+        <a href="#/prototype/admin/roles" class="app-nav-item"><span class="app-nav-item__icon">🔑</span><span class="app-nav-item__label">角色权限</span></a>
+        <a href="#/prototype/admin/models" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">模型网关</span></a>
+        <a href="#/prototype/admin/mcp-services" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 服务</span></a>
+        <a href="#/prototype/admin/skills-experts" class="app-nav-item active"><span class="app-nav-item__icon">📦</span><span class="app-nav-item__label">技能与专家</span></a>
+        <a href="#/prototype/admin/audit" class="app-nav-item"><span class="app-nav-item__icon">📜</span><span class="app-nav-item__label">审计日志</span></a>
+        <a href="#/prototype/admin/billing" class="app-nav-item"><span class="app-nav-item__icon">💰</span><span class="app-nav-item__label">计费账单</span></a>
+        <a href="#/prototype/admin/security" class="app-nav-item"><span class="app-nav-item__icon">🔐</span><span class="app-nav-item__label">安全策略</span></a>
+        <a href="#/prototype/admin/market-review" class="app-nav-item"><span class="app-nav-item__icon">🛡</span><span class="app-nav-item__label">市场审核</span></a>
+        <a href="#/prototype/admin/settings" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">系统配置</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">钱</div>
+          <span class="app-nav-item__label">钱七 · 管理员</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div class="app-topbar__title">技能与专家管理</div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">📊 导出报表</button>
+          <button class="btn btn-primary btn-sm">+ 发布技能</button>
+        </div>
+      </div>
+      <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/admin">管理后台</a></li>
+          <li>技能与专家</li>
+        </ul>
+
+        <!-- 技能与专家概览 -->
+        <div class="stat-grid" style="margin-bottom: 16px;">
+          <div class="stat-card">
+            <div class="stat-card__label">技能总数</div>
+            <div class="stat-card__value">186</div>
+            <div class="stat-card__trend stat-card__trend--up">▲ +15 本月</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__label">专家总数</div>
+            <div class="stat-card__value">42</div>
+            <div class="stat-card__trend stat-card__trend--up">▲ +4 本月</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__label">待审核</div>
+            <div class="stat-card__value" style="color: var(--color-warning);">8</div>
+            <div class="stat-card__trend" style="color: var(--color-warning);">⏳ 需跟进处理</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__label">本月新增技能</div>
+            <div class="stat-card__value">15</div>
+            <div class="stat-card__trend stat-card__trend--up">▲ +50% 环比</div>
+          </div>
+        </div>
+
+        <!-- Tab 切换区 -->
+        <div class="flex gap-2" style="margin-bottom: 16px;">
+          <button class="btn btn-primary btn-sm">📦 技能管理</button>
+          <button class="btn btn-outline btn-sm">🤖 专家管理</button>
+        </div>
+
+        <!-- 技能管理列表 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">技能管理列表</div>
+            <div class="flex gap-2">
+              <input type="text" class="input input-sm" placeholder="搜索技能名称..." style="min-width: 200px;" />
+              <select class="select input-sm"><option>全部分类</option><option>投研分析</option><option>法务合规</option><option>文档处理</option><option>数据提取</option></select>
+              <select class="select input-sm"><option>全部状态</option><option>已发布</option><option>待审核</option><option>已下架</option></select>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr><th>技能名称</th><th>分类</th><th>作者</th><th>版本</th><th>安装数</th><th>评分</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="font-medium text-sm">金融文档翻译</div><div class="text-xs text-tertiary">skill.finance-translate</div></td>
+                  <td><span class="badge badge-primary">文档处理</span></td>
+                  <td class="text-sm">张三</td>
+                  <td><code class="text-sm">v1.2.0</code></td>
+                  <td class="text-sm">1,248</td>
+                  <td class="text-sm">⭐ 4.8/5</td>
+                  <td><span class="badge badge-success">已发布</span></td>
+                  <td><button class="btn btn-ghost btn-sm">审核</button><button class="btn btn-ghost btn-sm">下架</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">财报数据提取</div><div class="text-xs text-tertiary">skill.report-extract</div></td>
+                  <td><span class="badge badge-primary">数据提取</span></td>
+                  <td class="text-sm">李四</td>
+                  <td><code class="text-sm">v2.0.1</code></td>
+                  <td class="text-sm">956</td>
+                  <td class="text-sm">⭐ 4.9/5</td>
+                  <td><span class="badge badge-success">已发布</span></td>
+                  <td><button class="btn btn-ghost btn-sm">审核</button><button class="btn btn-ghost btn-sm">下架</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">投资组合分析</div><div class="text-xs text-tertiary">skill.portfolio-analysis</div></td>
+                  <td><span class="badge badge-info">投研分析</span></td>
+                  <td class="text-sm">王五</td>
+                  <td><code class="text-sm">v1.5.3</code></td>
+                  <td class="text-sm">742</td>
+                  <td class="text-sm">⭐ 4.7/5</td>
+                  <td><span class="badge badge-success">已发布</span></td>
+                  <td><button class="btn btn-ghost btn-sm">审核</button><button class="btn btn-ghost btn-sm">下架</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">法律风险扫描</div><div class="text-xs text-tertiary">skill.legal-risk-scan</div></td>
+                  <td><span class="badge badge-warning">法务合规</span></td>
+                  <td class="text-sm">李四</td>
+                  <td><code class="text-sm">v0.9.2</code></td>
+                  <td class="text-sm">328</td>
+                  <td class="text-sm">⭐ 4.6/5</td>
+                  <td><span class="badge badge-warning">待审核</span></td>
+                  <td><button class="btn btn-ghost btn-sm">审核</button><button class="btn btn-ghost btn-sm">下架</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">会议纪要生成</div><div class="text-xs text-tertiary">skill.meeting-minutes</div></td>
+                  <td><span class="badge badge-primary">文档处理</span></td>
+                  <td class="text-sm">陈八</td>
+                  <td><code class="text-sm">v1.0.0</code></td>
+                  <td class="text-sm">512</td>
+                  <td class="text-sm">⭐ 4.5/5</td>
+                  <td><span class="badge badge-success">已发布</span></td>
+                  <td><button class="btn btn-ghost btn-sm">审核</button><button class="btn btn-ghost btn-sm">下架</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">行业研报摘要</div><div class="text-xs text-tertiary">skill.research-summary</div></td>
+                  <td><span class="badge badge-info">投研分析</span></td>
+                  <td class="text-sm">张三</td>
+                  <td><code class="text-sm">v0.8.1</code></td>
+                  <td class="text-sm">186</td>
+                  <td class="text-sm">⭐ 4.2/5</td>
+                  <td><span class="badge badge-secondary">已下架</span></td>
+                  <td><button class="btn btn-ghost btn-sm">审核</button><button class="btn btn-ghost btn-sm">下架</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">债券违约预警</div><div class="text-xs text-tertiary">skill.bond-default-alert</div></td>
+                  <td><span class="badge badge-info">投研分析</span></td>
+                  <td class="text-sm">周九</td>
+                  <td><code class="text-sm">v1.3.0</code></td>
+                  <td class="text-sm">684</td>
+                  <td class="text-sm">⭐ 4.8/5</td>
+                  <td><span class="badge badge-success">已发布</span></td>
+                  <td><button class="btn btn-ghost btn-sm">审核</button><button class="btn btn-ghost btn-sm">下架</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 待审核技能 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">待审核技能 <span class="badge badge-warning">3</span></div>
+            <div class="text-xs text-tertiary">需在 24 小时内完成审核</div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr><th>技能名称</th><th>提交者</th><th>提交时间</th><th>审核类型</th><th>描述摘要</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="font-medium text-sm">法律风险扫描</div><div class="text-xs text-tertiary">skill.legal-risk-scan</div></td>
+                  <td class="text-sm">李四</td>
+                  <td class="text-sm text-tertiary">2026-07-15 14:32</td>
+                  <td><span class="badge badge-primary">新发布</span></td>
+                  <td class="text-sm text-secondary">扫描合同/公告中的法律风险条款,支持 PDF 与 Word</td>
+                  <td><button class="btn btn-primary btn-sm">通过</button><button class="btn btn-ghost btn-sm">拒绝</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">财报数据提取</div><div class="text-xs text-tertiary">skill.report-extract</div></td>
+                  <td class="text-sm">李四</td>
+                  <td class="text-sm text-tertiary">2026-07-15 10:18</td>
+                  <td><span class="badge badge-secondary">版本更新</span></td>
+                  <td class="text-sm text-secondary">v2.0.1: 新增港股报表支持,优化表格识别准确率</td>
+                  <td><button class="btn btn-primary btn-sm">通过</button><button class="btn btn-ghost btn-sm">拒绝</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">新闻舆情监控</div><div class="text-xs text-tertiary">skill.sentiment-monitor</div></td>
+                  <td class="text-sm">陈八</td>
+                  <td class="text-sm text-tertiary">2026-07-14 16:45</td>
+                  <td><span class="badge badge-primary">新发布</span></td>
+                  <td class="text-sm text-secondary">实时监控上市公司新闻舆情,生成情感分析报告</td>
+                  <td><button class="btn btn-primary btn-sm">通过</button><button class="btn btn-ghost btn-sm">拒绝</button></td>
+                </tr>
+                <tr>
+                  <td><div class="font-medium text-sm">投资组合分析</div><div class="text-xs text-tertiary">skill.portfolio-analysis</div></td>
+                  <td class="text-sm">王五</td>
+                  <td class="text-sm text-tertiary">2026-07-14 09:22</td>
+                  <td><span class="badge badge-secondary">版本更新</span></td>
+                  <td class="text-sm text-secondary">v1.5.3: 增加夏普比率与最大回撤指标计算</td>
+                  <td><button class="btn btn-primary btn-sm">通过</button><button class="btn btn-ghost btn-sm">拒绝</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 专家管理列表 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">专家管理列表</div>
+            <div class="flex gap-2">
+              <input type="text" class="input input-sm" placeholder="搜索专家名称..." style="min-width: 200px;" />
+              <select class="select input-sm"><option>全部领域</option><option>投研</option><option>法务</option><option>合规</option><option>财务</option></select>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr><th>专家名称</th><th>领域</th><th>订阅人数</th><th>会话数(本月)</th><th>评分</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #C96500, #FFD700);">投</div><div><div class="font-medium text-sm">投研分析师</div><div class="text-xs text-tertiary">expert.investment-analyst</div></div></div></td>
+                  <td><span class="badge badge-info">投研</span></td>
+                  <td class="text-sm">286</td>
+                  <td class="text-sm">1,452</td>
+                  <td class="text-sm">⭐ 4.9/5</td>
+                  <td><span class="badge badge-success">已上线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">配置</button><button class="btn btn-ghost btn-sm">下线</button></td>
+                </tr>
+                <tr>
+                  <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FF8C00, #FF5D00);">法</div><div><div class="font-medium text-sm">法务顾问</div><div class="text-xs text-tertiary">expert.legal-advisor</div></div></div></td>
+                  <td><span class="badge badge-warning">法务</span></td>
+                  <td class="text-sm">198</td>
+                  <td class="text-sm">968</td>
+                  <td class="text-sm">⭐ 4.8/5</td>
+                  <td><span class="badge badge-success">已上线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">配置</button><button class="btn btn-ghost btn-sm">下线</button></td>
+                </tr>
+                <tr>
+                  <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #F97316, #EF4444);">合</div><div><div class="font-medium text-sm">合规专员</div><div class="text-xs text-tertiary">expert.compliance-officer</div></div></div></td>
+                  <td><span class="badge badge-warning">合规</span></td>
+                  <td class="text-sm">142</td>
+                  <td class="text-sm">624</td>
+                  <td class="text-sm">⭐ 4.7/5</td>
+                  <td><span class="badge badge-success">已上线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">配置</button><button class="btn btn-ghost btn-sm">下线</button></td>
+                </tr>
+                <tr>
+                  <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FF8C00, #FF5D00);">量</div><div><div class="font-medium text-sm">量化交易员</div><div class="text-xs text-tertiary">expert.quant-trader</div></div></div></td>
+                  <td><span class="badge badge-info">投研</span></td>
+                  <td class="text-sm">86</td>
+                  <td class="text-sm">412</td>
+                  <td class="text-sm">⭐ 4.6/5</td>
+                  <td><span class="badge badge-warning">待审核</span></td>
+                  <td><button class="btn btn-ghost btn-sm">配置</button><button class="btn btn-ghost btn-sm">下线</button></td>
+                </tr>
+                <tr>
+                  <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FFD700, #E66800);">财</div><div><div class="font-medium text-sm">财务审计师</div><div class="text-xs text-tertiary">expert.financial-auditor</div></div></div></td>
+                  <td><span class="badge badge-secondary">财务</span></td>
+                  <td class="text-sm">124</td>
+                  <td class="text-sm">528</td>
+                  <td class="text-sm">⭐ 4.8/5</td>
+                  <td><span class="badge badge-success">已上线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">配置</button><button class="btn btn-ghost btn-sm">下线</button></td>
+                </tr>
+                <tr>
+                  <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #6B7280, #374151);">尽</div><div><div class="font-medium text-sm">尽职调查员</div><div class="text-xs text-tertiary">expert.due-diligence</div></div></div></td>
+                  <td><span class="badge badge-info">投研</span></td>
+                  <td class="text-sm">68</td>
+                  <td class="text-sm">236</td>
+                  <td class="text-sm">⭐ 4.5/5</td>
+                  <td><span class="badge badge-secondary">已下线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">配置</button><button class="btn btn-ghost btn-sm">下线</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

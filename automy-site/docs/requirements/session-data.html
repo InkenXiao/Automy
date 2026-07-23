@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>会话数据库设计 · 需求文档 · XIN</title>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/requirements/overview">需求文档</a></li>
+  <li>会话数据库设计</li>
+</nav>
+
+<h1>会话数据库设计</h1>
+
+<p class="text-secondary">会话数据是 XIN 多端协同与主动提醒的数据底座,本文档定义会话、消息、生命周期事件、参与方、推送记录五类核心数据模型,以及跨端续接、检索归档、与记忆系统联动等关键能力,支撑投资公司投研、风控、合规场景下的长期、可追溯、跨端对话体验。</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">🗄</div>
+  <div class="alert__body">
+    <div class="alert__title">模块定位</div>
+    <div class="alert__desc">本模块定义会话数据模型、跨端续接、检索归档与数据架构文档四项需求,是工作台、IM 通道、记忆系统、主动提醒引擎共同依赖的平台基础设施。</div>
+  </div>
+</div>
+
+<h2>模块概述</h2>
+<p>
+  投资公司员工一天内可能在多个端发起会话:上午在飞书群 @XIN 查询 ABC 新能源估值,中午在 Web 工作台继续撰写尽调报告,下午在桌面端打开同会话追问风控问题。传统会话存储仅服务单一渠道,无法承载"一会话多端续接"的真实工作模式。
+</p>
+<p>
+  XIN 通过<strong>统一会话数据模型 + 跨端状态同步 + 冷热分层归档</strong>解决这一问题:Session 抽象承载多端来源与生命周期事件,Message 记录每条消息的来源渠道与工具调用,SessionParticipant 支持多端多 Agent 参与,PushRecord 沉淀主动提醒触达与交互结果。所有数据按热度分层存储,长期未活跃会话自动归档冷存,可恢复,与记忆系统打通形成完整的会话-记忆数据闭环。
+</p>
+
+<div class="card">
+  <div class="card-body">
+    <div class="code-block">
+      <div class="code-block__header">
+        <span>会话数据五大实体</span>
+        <button class="code-block__copy">复制</button>
+      </div>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│  Session 会话                                            │
+│  ├─ id / user_id / title / source / status              │
+│  └─ project_id / created_at / last_active_at            │
+├─────────────────────────────────────────────────────────┤
+│  Message 消息                                             │
+│  ├─ id / session_id / role(user/assistant/tool/system)  │
+│  └─ content / tool_calls / tokens / source_channel      │
+├─────────────────────────────────────────────────────────┤
+│  SessionEvent 生命周期事件                                │
+│  └─ created / paused / resumed / archived / handed_off  │
+├─────────────────────────────────────────────────────────┤
+│  SessionParticipant 参与方                                │
+│  └─ participant_type(user/agent/tool) / participant_ref│
+├─────────────────────────────────────────────────────────┤
+│  PushRecord 主动推送记录                                  │
+│  └─ channel / template_id / status / sent_at            │
+└─────────────────────────────────────────────────────────┘</code></pre>
+    </div>
+  </div>
+</div>
+
+<h2>需求条目</h2>
+
+<!-- REQ-7.1 会话数据模型 -->
+<div class="card" id="REQ-7.1">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.1</span>
+        <strong>会话数据模型</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供完整的会话数据模型,包含 Session(会话)、Message(消息)、SessionEvent(生命周期事件)、SessionParticipant(多端多 Agent 参与方)、PushRecord(主动推送记录)五张核心表;每张表 SHALL 记录来源渠道与时间戳,SHALL 支持多端多 Agent 协同。</p>
+    <table class="table table-bordered">
+      <thead><tr><th>实体</th><th>核心字段</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-primary">Session</span></td><td>id / user_id / title / source / status / project_id / created_at / last_active_at</td><td>承载会话主信息与生命周期</td></tr>
+        <tr><td><span class="badge badge-primary">Message</span></td><td>id / session_id / role / content / tool_calls / tokens_in / tokens_out / source_channel / created_at</td><td>记录每条消息及其工具调用</td></tr>
+        <tr><td><span class="badge badge-primary">SessionEvent</span></td><td>id / session_id / event_type / payload / created_at</td><td>记录会话生命周期事件</td></tr>
+        <tr><td><span class="badge badge-primary">SessionParticipant</span></td><td>id / session_id / participant_type / participant_ref / joined_at</td><td>支持多端多 Agent 参与同一会话</td></tr>
+        <tr><td><span class="badge badge-primary">PushRecord</span></td><td>id / session_id / user_id / channel / template_id / status / sent_at / interacted_at</td><td>沉淀主动推送触达与交互结果</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>来源渠道:web / im_lark / im_wecom / im_dingtalk / desktop 五类</li>
+      <li>会话状态:active / paused / archived / handed_off</li>
+      <li>消息角色:user / assistant / tool / system</li>
+      <li>事件类型:created / paused / resumed / archived / handed_off</li>
+      <li>推送状态:sent / delivered / read / clicked / failed</li>
+      <li>参与方类型:user / agent / tool,可扩展支持多 Agent 协同</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 投资经理张三在飞书发起会话询问"ABC 新能源估值",半小时后在 Web 工作台打开同会话继续追问<br>
+      <strong>THEN</strong> 系统在 Web 工作台显示该会话,每条消息标注来源渠道(飞书 / Web),SessionEvent 记录 handed_off 事件,SessionParticipant 新增 user@web 参与方;后续推送可按用户偏好继续投递到飞书。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/docs/architecture/session-store">关联架构:会话数据库设计</a></li>
+      <li><a href="#/prototype/workspace">查看工作台原型</a></li>
+      <li><a href="#/docs/requirements/workspace">关联需求:REQ-3.1 多会话管理</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-7.2 跨端续接 -->
+<div class="card" id="REQ-7.2">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.2</span>
+        <strong>跨端续接</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 支持同一会话在 Web / IM(飞书 / 企微 / 钉钉)/ 桌面端之间无缝切换继续,所有端 SHALL 实时同步会话状态与消息流,SHALL 在切换时记录 handed_off 事件并显示来源渠道标注。</p>
+    <ul>
+      <li>跨端打开:用户在任意端打开已有会话,系统加载完整历史消息与上下文</li>
+      <li>实时同步:一端发送消息后,其他在线端 1 秒内推送更新</li>
+      <li>来源标注:每条消息显示来源渠道徽标(飞书 / 企微 / 钉钉 / Web / 桌面)</li>
+      <li>切换事件:跨端续接触发 SessionEvent(handed_off),记录前后端与时间</li>
+      <li>上下文保留:跨端续接时记忆与项目上下文不丢失</li>
+      <li>冲突处理:同会话多端同时输入时按时间戳顺序合并,不互相覆盖</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三在飞书发起会话讨论 ABC 新能源估值,半小时后到办公室打开 Web 工作台<br>
+      <strong>THEN</strong> 工作台会话列表显示该会话并标注"来源:飞书",点击打开后完整展示飞书端的 8 条消息(每条带飞书徽标),张三在 Web 继续追问"风控怎么看",消息同步回飞书端可见,SessionEvent 记录 handed_off from im_lark to web。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/docs/architecture/session-store">关联架构:会话数据库设计</a></li>
+      <li><a href="#/prototype/workspace">查看工作台原型</a></li>
+      <li><a href="#/docs/requirements/im-notification">关联需求:REQ-6.5 双向交互</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-7.3 会话检索与归档 -->
+<div class="card" id="REQ-7.3">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.3</span>
+        <strong>会话检索与归档</strong>
+      </div>
+      <div>
+        <span class="badge badge-warning">P1</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 支持按用户、时间范围、关联项目、来源渠道四维检索历史会话;SHALL 对长期未活跃会话自动归档到冷存储,SHALL 支持按需恢复归档会话继续使用。</p>
+    <ul>
+      <li>检索维度:user_id / created_at / project_id / source_channel 组合查询</li>
+      <li>全文检索:支持消息内容语义检索(向量库)与关键词检索</li>
+      <li>自动归档:30 天未活跃会话标记为温,90 天未活跃归档到冷存储(S3)</li>
+      <li>归档恢复:用户可主动恢复归档会话,从冷存储回迁到热存储</li>
+      <li>归档保留:归档会话保留 2 年,超期按合规要求处理</li>
+      <li>性能保障:归档不阻塞在线查询,索引策略优化热点查询</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三在三个月前归档的 ABC 新能源尽调会话需要继续追问<br>
+      <strong>THEN</strong> 张三在工作台"归档"列表找到该会话,点击"恢复",系统从 S3 冷存储回迁到 PostgreSQL 热存储,1 分钟内可继续追问;若三个月内无任何活跃,系统再次自动归档。
+    </div>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 合规审计员李四需要查询张三 2026 Q1 在飞书发起的所有会话<br>
+      <strong>THEN</strong> 李四在审计后台按 user_id=张三 / source_channel=im_lark / created_at=2026-Q1 组合检索,系统返回 12 条会话与 240 条消息,可导出为审计报告。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/docs/architecture/session-store">关联架构:会话数据库设计</a></li>
+      <li><a href="#/prototype/workspace">查看工作台原型</a></li>
+      <li><a href="#/docs/requirements/security-audit">关联需求:REQ-9.3 全链路审计</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-7.4 数据架构文档要求 -->
+<div class="card" id="REQ-7.4">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.4</span>
+        <strong>数据架构文档要求</strong>
+      </div>
+      <div>
+        <span class="badge badge-warning">P1</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 在架构文档区单独章节呈现会话数据架构,SHALL 包含 ER 图、存储分布、索引策略、与记忆系统关系四部分内容;SHALL 与本需求模块保持术语与字段命名一致。</p>
+    <ul>
+      <li>ER 图:Session / Message / SessionEvent / SessionParticipant / PushRecord 五张表及关系</li>
+      <li>存储分布:热数据 PostgreSQL / 冷数据归档 / 向量库 / Redis 缓存四层</li>
+      <li>索引策略:用户+时间、会话+序号、来源渠道、状态+最后活跃四类索引</li>
+      <li>与记忆系统关系:会话消息 → 记忆提取流水线 → 长期记忆库</li>
+      <li>命名一致性:架构文档与需求文档字段命名保持一致</li>
+      <li>版本同步:数据模型变更需同步更新需求与架构两份文档</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 研发工程师在实现会话存储模块时,需要参考 ER 图与索引策略<br>
+      <strong>THEN</strong> 工程师打开架构文档"会话数据库设计"章节,查看五张表的 ER 图、PostgreSQL Schema、索引 DDL 与归档策略,字段命名与本需求文档完全一致,可直接对照实现。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/docs/architecture/session-store">关联架构:会话数据库设计</a></li>
+      <li><a href="#/docs/architecture/data-model">关联架构:数据模型与存储</a></li>
+      <li><a href="#/docs/architecture/memory-system">关联架构:记忆系统设计</a></li>
+    </ul>
+  </div>
+</div>
+
+<h2>关键交互流程</h2>
+
+<details class="collapse" open>
+  <summary><span>跨端续接流程</span></summary>
+  <div class="collapse__body">
+    <ol>
+      <li>用户在 IM(如飞书)发起会话,系统创建 Session,source=im_lark</li>
+      <li>用户在 Web 工作台打开会话列表,看到该会话并标注"来源:飞书"</li>
+      <li>用户在 Web 打开会话,系统加载完整消息与上下文</li>
+      <li>系统触发 SessionEvent(handed_off,from=im_lark,to=web)</li>
+      <li>用户在 Web 继续追问,消息同步回飞书端</li>
+      <li>会话长时间未活跃,系统自动归档到冷存储</li>
+      <li>用户主动恢复归档会话,从冷存储回迁继续使用</li>
+    </ol>
+  </div>
+</details>
+
+<details class="collapse">
+  <summary><span>会话归档与恢复流程</span></summary>
+  <div class="collapse__body">
+    <ol>
+      <li>系统定期扫描 last_active_at,标记 30 天未活跃会话为温</li>
+      <li>90 天未活跃会话触发归档任务,导出到 S3 冷存储</li>
+      <li>热存储删除原始数据,仅保留元数据索引</li>
+      <li>用户在工作台"归档"列表查看归档会话</li>
+      <li>用户点击"恢复",系统从 S3 回迁到 PostgreSQL</li>
+      <li>会话恢复到 active 状态,可继续追问</li>
+      <li>恢复后若 30 天内无活跃,重新进入温数据状态</li>
+    </ol>
+  </div>
+</details>
+
+<h2>验收标准</h2>
+<div class="card">
+  <div class="card-body">
+    <ul>
+      <li>✅ 五张核心表(Session / Message / SessionEvent / SessionParticipant / PushRecord)完整落地</li>
+      <li>✅ 同会话可在 Web / IM / 桌面端无缝切换继续</li>
+      <li>✅ 所有端实时同步会话状态与消息流</li>
+      <li>✅ 每条消息可追溯到来源渠道</li>
+      <li>✅ 长期未活跃会话自动归档到冷存储</li>
+      <li>✅ 归档会话可主动恢复继续使用</li>
+      <li>✅ 架构文档单独章节呈现数据架构</li>
+      <li>✅ 与记忆系统打通形成数据闭环</li>
+    </ul>
+  </div>
+</div>
+
+<h2>原型参考</h2>
+<p>
+  <a href="#/prototype/workspace" class="card-link">查看工作台原型</a>
+</p>
+</body>
+</html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>记忆系统设计 · 技术架构 · XIN</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/architecture/overview">技术架构</a></li>
+  <li>记忆系统设计</li>
+</nav>
+
+<h1>记忆系统设计</h1>
+
+<p class="text-secondary">
+  记忆是 XIN 让 AI 成为「长期伙伴」的核心能力。区别于一次性问答机器人,XIN 通过分层记忆架构,
+  让 Agent 跨会话延续上下文、理解用户偏好、记住项目背景。本章节介绍三层记忆架构、写入流水线、
+  检索策略与遗忘机制,所有设计面向投资公司高强度业务场景。
+</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">🧠</div>
+  <div class="alert__body">
+    <div class="alert__title">设计目标</div>
+    <div class="alert__desc">让 Agent 记住用户偏好 · 跨会话延续项目上下文 · 主动遗忘过期信息 · 数据主权归企业所有</div>
+  </div>
+</div>
+
+<h2>一、三层记忆架构</h2>
+
+<p>XIN 记忆系统采用三层架构:短期(Redis)、工作(会话级)、长期(PG + 向量库)。各层职责清晰、生命周期不同,通过 Memory Manager 统一对外提供接口。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">XIN 三层记忆架构</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+graph TB
+    subgraph "短期记忆 Short-Term Redis"
+        S1["会话上下文\n当前对话消息历史"]
+        S2["临时变量\n中间结果 / 工具结果"]
+        S3["限流计数 / 分布式锁"]
+        S1 & S2 & S3 -->|TTL 24h| S_EXPIRE["自动过期"]
+    end
+    subgraph "工作记忆 Working 会话级"
+        W1["当前会话摘要"]
+        W2["进行中任务状态"]
+        W3["引用的文档/记忆缓存"]
+        W1 -->|会话结束| W_FLUSH["写入长期"]
+    end
+    subgraph "长期记忆 Long-Term PG + Milvus"
+        L1["用户记忆 User\n偏好 / 习惯 / 历史"]
+        L2["项目记忆 Project\n背景 / 决策 / 文档引用"]
+        L3["全局记忆 Global\n公司知识 / 行业事实 / 合规"]
+        L_PG[(PostgreSQL)]
+        L_VEC[(Milvus)]
+        L1 --> L_PG
+        L1 --> L_VEC
+        L2 --> L_PG
+        L2 --> L_VEC
+        L3 --> L_PG
+        L3 --> L_VEC
+    end
+    Agent["Eino ADK Agent"] -->|读写| S1
+    Agent -->|读写| S2
+    Agent -->|读写| S3
+    Agent -->|读写| W1
+    Agent -->|读写| W2
+    Agent -->|读写| W3
+    Agent -->|检索| L1
+    Agent -->|检索| L2
+    Agent -->|检索| L3
+    S1 -.->|压缩摘要提升| W1
+    W1 -.->|会话结束提取事实| L1
+    W1 -.->|提取项目信息| L2
+    </div>
+  </div>
+</div>
+
+<h3>各层职责与生命周期</h3>
+
+<table class="table">
+  <thead><tr><th>层级</th><th>存储</th><th>典型内容</th><th>生命周期</th><th>TTL</th></tr></thead>
+  <tbody>
+    <tr><td><strong>短期记忆</strong></td><td>Redis</td><td>当前会话消息历史、临时变量、工具调用中间结果</td><td>会话进行中</td><td>24 小时</td></tr>
+    <tr><td><strong>工作记忆</strong></td><td>Redis + PG</td><td>会话摘要、进行中任务状态、引用缓存</td><td>会话存续期</td><td>7 天</td></tr>
+    <tr><td><strong>长期记忆 - 用户级</strong></td><td>PG + Milvus</td><td>个人偏好、显式纠正、历史项目摘要</td><td>用户存续期</td><td>永久(可遗忘)</td></tr>
+    <tr><td><strong>长期记忆 - 项目级</strong></td><td>PG + Milvus</td><td>项目背景、关键决策、相关文档引用</td><td>项目存续期 + 1 年</td><td>项目归档后保留</td></tr>
+    <tr><td><strong>长期记忆 - 全局</strong></td><td>PG + Milvus</td><td>公司知识库、行业事实、合规要求</td><td>永久</td><td>显式删除</td></tr>
+  </tbody>
+</table>
+
+<h2>二、记忆数据模型</h2>
+
+<p>XIN 记忆按类型分为三大类:事实(Fact)、偏好(Preference)、事件(Event),每条记忆有结构化字段。</p>
+
+<table class="table">
+  <thead><tr><th>类型</th><th>说明</th><th>示例</th></tr></thead>
+  <tbody>
+    <tr><td><strong>事实 Fact</strong></td><td>客观信息,可被引用与验证</td><td>「ABC 公司 2025 年营收 12 亿元」</td></tr>
+    <tr><td><strong>偏好 Preference</strong></td><td>用户主观偏好或工作习惯</td><td>「该用户偏好简洁的要点式回答」</td></tr>
+    <tr><td><strong>事件 Event</strong></td><td>带时间戳的事件记录</td><td>「2026-07-10 用户决定下投 ABC 公司 A 轮」</td></tr>
+  </tbody>
+</table>
+
+<div class="code-block">
+  <div class="code-block__header">
+    <span>PostgreSQL Schema - memories 表</span>
+    <button class="code-block__copy">复制</button>
+  </div>
+<pre><code><span class="token-keyword">CREATE TABLE</span> memories (
+  id <span class="token-property">VARCHAR</span>(36) <span class="token-keyword">PRIMARY KEY</span>,
+  user_id <span class="token-property">VARCHAR</span>(36) <span class="token-keyword">NOT NULL</span>,
+  user_name <span class="token-property">VARCHAR</span>(64),
+  type <span class="token-property">VARCHAR</span>(32) <span class="token-keyword">NOT NULL</span>,  <span class="token-comment">-- fact / preference / event</span>
+  category <span class="token-property">VARCHAR</span>(64),         <span class="token-comment">-- 行业分类:投研/法务/合规</span>
+  content <span class="token-property">TEXT</span> <span class="token-keyword">NOT NULL</span>,         <span class="token-comment">-- 记忆内容</span>
+  scope <span class="token-property">VARCHAR</span>(32) <span class="token-keyword">NOT NULL</span>,     <span class="token-comment">-- session / project / user / global</span>
+  scope_id <span class="token-property">VARCHAR</span>(36),           <span class="token-comment">-- 项目 ID(项目级记忆)</span>
+  source <span class="token-property">VARCHAR</span>(32),            <span class="token-comment">-- explicit / inferred / conversation / meeting</span>
+  confidence <span class="token-property">FLOAT</span> <span class="token-keyword">DEFAULT</span> <span class="token-number">1.0</span>,  <span class="token-comment">-- 置信度</span>
+  tags <span class="token-property">JSONB</span>,                  <span class="token-comment">-- 标签(行业/公司/部门)</span>
+  vector_id <span class="token-property">VARCHAR</span>(64),          <span class="token-comment">-- Milvus 向量 ID</span>
+  created_at <span class="token-property">TIMESTAMP</span> <span class="token-keyword">DEFAULT</span> <span class="token-function">NOW</span>(),
+  updated_at <span class="token-property">TIMESTAMP</span> <span class="token-keyword">DEFAULT</span> <span class="token-function">NOW</span>(),
+  last_accessed <span class="token-property">TIMESTAMP</span>,        <span class="token-comment">-- 最后访问时间(用于遗忘)</span>
+  access_count <span class="token-property">INT</span> <span class="token-keyword">DEFAULT</span> <span class="token-number">0</span>,    <span class="token-comment">-- 访问次数</span>
+  importance <span class="token-property">FLOAT</span> <span class="token-keyword">DEFAULT</span> <span class="token-number">0.5</span>, <span class="token-comment">-- 重要性评分(0-1)</span>
+  is_deleted <span class="token-property">BOOLEAN</span> <span class="token-keyword">DEFAULT</span> <span class="token-keyword">FALSE</span>
+);
+
+<span class="token-keyword">CREATE INDEX</span> idx_memories_user <span class="token-keyword">ON</span> memories(user_id);
+<span class="token-keyword">CREATE INDEX</span> idx_memories_scope <span class="token-keyword">ON</span> memories(scope, scope_id);
+<span class="token-keyword">CREATE INDEX</span> idx_memories_tags <span class="token-keyword">ON</span> memories <span class="token-keyword">USING</span> GIN(tags);
+<span class="token-keyword">CREATE INDEX</span> idx_memories_type <span class="token-keyword">ON</span> memories(user_id, type, is_deleted);</code></pre>
+</div>
+
+<h2>三、记忆写入流水线</h2>
+
+<p>记忆写入不是简单的 INSERT,而是一条完整的流水线:LLM 提取 → 冲突检测 → 合并/覆盖 → 入库。这条流水线保证记忆的准确性、不冲突、可追溯。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">记忆写入流水线</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+flowchart LR
+    TRIGGER["触发\n会话结束/主动触发"] --> EXTRACT["LLM 提取\n结构化记忆条目"]
+    EXTRACT --> CLASSIFY["分类\n判断层级 user/project/global"]
+    CLASSIFY --> CONFLICT{"冲突检测\n与已有记忆比对"}
+    CONFLICT -->|无冲突| EMBED["向量化\nBGE-M3"]
+    CONFLICT -->|有冲突| MERGE["合并/覆盖\n按策略处理"]
+    MERGE --> EMBED
+    EMBED --> STORE_PG[(PostgreSQL)]
+    EMBED --> STORE_VEC[(Milvus)]
+    STORE_PG --> INDEX["更新索引"]
+    STORE_VEC --> INDEX
+    INDEX --> AUDIT["审计日志\n记录写入"]
+    MERGE -->|覆盖旧记忆| ARCHIVE["归档旧版本\n可追溯"]
+    </div>
+  </div>
+</div>
+
+<h3>流水线各阶段说明</h3>
+
+<table class="table">
+  <thead><tr><th>阶段</th><th>关键动作</th><th>技术实现</th></tr></thead>
+  <tbody>
+    <tr><td>1. 触发</td><td>会话结束、用户主动「记住这个」、定时任务</td><td>事件总线 NATS + 定时 Cron</td></tr>
+    <tr><td>2. LLM 提取</td><td>用专门 Prompt 让 LLM 从对话中提取事实/偏好/事件</td><td>Qwen2.5-72B + 结构化输出</td></tr>
+    <tr><td>3. 分类</td><td>判断记忆归属层级(user/project/global)</td><td>规则 + LLM 混合判定</td></tr>
+    <tr><td>4. 冲突检测</td><td>向量检索相似记忆,判断是否矛盾</td><td>Milvus Top-1 相似度 > 0.92 视为潜在冲突</td></tr>
+    <tr><td>5. 合并/覆盖</td><td>新记忆覆盖旧的、或合并补充</td><td>按类型策略:偏好覆盖、事实合并、事件追加</td></tr>
+    <tr><td>6. 向量化</td><td>生成 BGE-M3 向量</td><td>本地 Embedding 服务</td></tr>
+    <tr><td>7. 入库</td><td>元数据入 PG,向量入 Milvus</td><td>双写事务保证一致性</td></tr>
+    <tr><td>8. 归档</td><td>被覆盖的旧记忆归档,可追溯</td><td>memory_versions 表</td></tr>
+    <tr><td>9. 审计</td><td>记录写入操作到审计日志</td><td>NATS → Audit Service</td></tr>
+  </tbody>
+</table>
+
+<h3>冲突处理策略</h3>
+<div class="card">
+  <div class="card-body">
+    <table class="table">
+      <thead><tr><th>记忆类型</th><th>冲突策略</th><th>示例</th></tr></thead>
+      <tbody>
+        <tr><td>偏好 Preference</td><td>新覆盖旧</td><td>用户从「喜欢详细回答」改为「喜欢简洁回答」</td></tr>
+        <tr><td>事实 Fact</td><td>合并(新旧都保留,标注时间)</td><td>公司营收数据更新,旧数据保留为历史</td></tr>
+        <tr><td>事件 Event</td><td>追加(不冲突)</td><td>不同时间的事件独立保存</td></tr>
+        <tr><td>显式纠正</td><td>强制覆盖 + 标记纠正</td><td>用户主动「不是这样,应该是...」</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2>四、记忆检索策略</h2>
+
+<p>XIN 采用「向量检索 + 关键词检索 + 元数据过滤」的混合检索策略,并通过重排序提升精度。</p>
+
+<div class="card">
+  <div class="card-body">
+    <div class="mermaid">
+flowchart LR
+    Q["当前会话上下文\n生成检索 Query"] --> REWRITE["Query 改写\n指代消解 + 扩展"]
+    REWRITE --> VEC["向量检索\nTop-K=10"]
+    REWRITE --> KW["关键词检索\nBM25 Top-K=10"]
+    VEC --> FUSION["融合排序\nRRF 算法"]
+    KW --> FUSION
+    FUSION --> FILTER["元数据过滤\nscope/user_id/tags"]
+    FILTER --> RERANK["重排序\nBGE-Reranker"]
+    RERANK --> TOP["取 Top-5"]
+    TOP --> INJECT["注入 Agent 上下文"]
+    </div>
+  </div>
+</div>
+
+<h3>检索细节</h3>
+<table class="table">
+  <thead><tr><th>环节</th><th>方法</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Query 生成</td><td>当前会话最近 3 轮 + 用户长期意图</td><td>避免单轮 Query 信息不足</td></tr>
+    <tr><td>Query 改写</td><td>指代消解 + HyDE 假设文档</td><td>「他」→ 具体人名,提升召回</td></tr>
+    <tr><td>向量检索</td><td>Milvus HNSW,Top-K=10</td><td>语义相似召回</td></tr>
+    <tr><td>关键词检索</td><td>BM25,Top-K=10</td><td>专有名词、代码精确匹配</td></tr>
+    <tr><td>融合排序</td><td>RRF(Reciprocal Rank Fusion)</td><td>向量与关键词结果融合</td></tr>
+    <tr><td>元数据过滤</td><td>scope / user_id / tags</td><td>权限隔离,只能看自己的记忆</td></tr>
+    <tr><td>重排序</td><td>BGE-Reranker-v2 Cross-Encoder</td><td>精排提升 Top-K 精度</td></tr>
+    <tr><td>结果数量</td><td>Top-5 注入上下文</td><td>避免上下文过长</td></tr>
+    <tr><td>引用标注</td><td>每条记忆带 ID + 时间</td><td>Agent 回答时可引用记忆来源</td></tr>
+  </tbody>
+</table>
+
+<h2>五、遗忘机制</h2>
+
+<p>记忆系统不能只增不减,必须有遗忘机制,否则长期记忆会被低价值信息淹没。XIN 采用三种遗忘策略组合:</p>
+
+<div class="grid grid-cols-3">
+  <div class="card"><div class="card-body">
+    <h4>⏰ 时间衰减</h4>
+    <p class="text-sm text-secondary">基于 Ebbinghaus 遗忘曲线,长期未访问的记忆重要性递减。超过 6 个月未访问且 importance &lt; 0.3 的记忆自动归档。</p>
+    <p class="text-sm">公式:<code>score = importance × decay(now - last_accessed)</code></p>
+  </div></div>
+  <div class="card"><div class="card-body">
+    <h4>✏ 显式纠正</h4>
+    <p class="text-sm text-secondary">用户主动纠正的错误记忆,标记为「已纠正」并降低 confidence。同一主题多次纠正的反向旧记忆,归档处理。</p>
+  </div></div>
+  <div class="card"><div class="card-body">
+    <h4>🗑 主动删除</h4>
+    <p class="text-sm text-secondary">用户在「记忆管理」界面主动删除,软删除标记 is_deleted,30 天后物理删除。删除前需二次确认,操作审计留存。</p>
+  </div></div>
+</div>
+
+<h3>遗忘执行策略</h3>
+<div class="code-block">
+<pre><code><span class="token-comment"># 遗忘策略配置</span>
+<span class="token-property">forgetting</span>:
+  <span class="token-property">time_decay</span>:
+    <span class="token-property">enabled</span>: <span class="token-keyword">true</span>
+    <span class="token-property">half_life_days</span>: <span class="token-number">90</span>           <span class="token-comment"># 90 天半衰期</span>
+    <span class="token-property">archive_threshold</span>: <span class="token-number">0.3</span>        <span class="token-comment"># 重要性低于 0.3 归档</span>
+    <span class="token-property">archive_after_days</span>: <span class="token-number">180</span>      <span class="token-comment"># 180 天未访问触发评估</span>
+  <span class="token-property">explicit_correction</span>:
+    <span class="token-property">confidence_drop</span>: <span class="token-number">0.5</span>          <span class="token-comment"># 纠正后置信度降一半</span>
+    <span class="token-property">archive_after_corrections</span>: <span class="token-number">3</span>  <span class="token-comment"># 同主题 3 次纠正归档旧记忆</span>
+  <span class="token-property">active_delete</span>:
+    <span class="token-property">soft_delete_days</span>: <span class="token-number">30</span>          <span class="token-comment"># 软删除 30 天后物理删除</span>
+    <span class="token-property">require_confirm</span>: <span class="token-keyword">true</span>          <span class="token-comment"># 需二次确认</span>
+    <span class="token-property">audit_retain</span>: <span class="token-number">5</span>               <span class="token-comment"># 删除操作审计保留 5 年</span>
+  <span class="token-property">scheduled_task</span>:
+    <span class="token-property">cron</span>: <span class="token-string">"0 3 * * *"</span>              <span class="token-comment"># 每天凌晨 3 点执行</span></code></pre>
+</div>
+
+<h2>六、用户场景示例</h2>
+
+<div class="card">
+  <div class="card-body">
+    <h4>📋 投研分析师记忆示例</h4>
+    <div class="code-block">
+<pre><code><span class="token-comment">// 用户级记忆 - 偏好</span>
+{
+  <span class="token-property">"id"</span>: <span class="token-string">"mem-001"</span>,
+  <span class="token-property">"user_id"</span>: <span class="token-string">"user-zhang"</span>,
+  <span class="token-property">"type"</span>: <span class="token-string">"preference"</span>,
+  <span class="token-property">"content"</span>: <span class="token-string">"用户偏好简洁的要点式回答,关注财务风险点"</span>,
+  <span class="token-property">"scope"</span>: <span class="token-string">"user"</span>,
+  <span class="token-property">"source"</span>: <span class="token-string">"inferred"</span>,
+  <span class="token-property">"confidence"</span>: <span class="token-number">0.85</span>,
+  <span class="token-property">"tags"</span>: [<span class="token-string">"回答风格"</span>, <span class="token-string">"投研"</span>]
+}
+
+<span class="token-comment">// 项目级记忆 - 事件</span>
+{
+  <span class="token-property">"id"</span>: <span class="token-string">"mem-002"</span>,
+  <span class="token-property">"user_id"</span>: <span class="token-string">"user-zhang"</span>,
+  <span class="token-property">"type"</span>: <span class="token-string">"event"</span>,
+  <span class="token-property">"content"</span>: <span class="token-string">"2026-07-10 决定下投 ABC 新能源 A 轮,金额 5000 万"</span>,
+  <span class="token-property">"scope"</span>: <span class="token-string">"project"</span>,
+  <span class="token-property">"scope_id"</span>: <span class="token-string">"proj-abc-investment"</span>,
+  <span class="token-property">"source"</span>: <span class="token-string">"conversation"</span>,
+  <span class="token-property">"confidence"</span>: <span class="token-number">1.0</span>,
+  <span class="token-property">"tags"</span>: [<span class="token-string">"投资决策"</span>, <span class="token-string">"ABC公司"</span>, <span class="token-string">"A轮"</span>]
+}
+
+<span class="token-comment">// 全局记忆 - 事实</span>
+{
+  <span class="token-property">"id"</span>: <span class="token-string">"mem-003"</span>,
+  <span class="token-property">"user_id"</span>: <span class="token-string">"system"</span>,
+  <span class="token-property">"type"</span>: <span class="token-string">"fact"</span>,
+  <span class="token-property">"content"</span>: <span class="token-string">"公司投委会每周三下午 2 点召开,需提前 1 天提交材料"</span>,
+  <span class="token-property">"scope"</span>: <span class="token-string">"global"</span>,
+  <span class="token-property">"source"</span>: <span class="token-string">"explicit"</span>,
+  <span class="token-property">"confidence"</span>: <span class="token-number">1.0</span>,
+  <span class="token-property">"tags"</span>: [<span class="token-string">"投委会"</span>, <span class="token-string">"流程"</span>]
+}</code></pre>
+    </div>
+  </div>
+</div>
+
+<h2>七、技术选型</h2>
+<table class="table">
+  <thead><tr><th>组件</th><th>选型</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>短期记忆</td><td>Redis 7</td><td>低延迟,支持 TTL,数据结构丰富</td></tr>
+    <tr><td>向量数据库</td><td>Milvus 2.x</td><td>HNSW 索引,十亿级向量,分布式</td></tr>
+    <tr><td>元数据存储</td><td>PostgreSQL 15+</td><td>JSONB 标签、GIN 索引、分区表</td></tr>
+    <tr><td>嵌入模型</td><td>BGE-M3</td><td>中文优化,1024 维,本地部署</td></tr>
+    <tr><td>重排序</td><td>BGE-Reranker-v2</td><td>Cross-Encoder,精排提升精度</td></tr>
+    <tr><td>记忆提取 LLM</td><td>Qwen2.5-72B</td><td>结构化输出能力强</td></tr>
+    <tr><td>冲突检测</td><td>Milvus 相似度 + LLM 判定</td><td>向量相似度 > 0.92 触发 LLM 复核</td></tr>
+  </tbody>
+</table>
+
+<h2>八、隐私与合规</h2>
+
+<div class="alert alert-warning">
+  <div class="alert__icon">🔒</div>
+  <div class="alert__body">
+    <div class="alert__title">记忆数据保护</div>
+    <div class="alert__desc">记忆数据高度敏感,涉及用户偏好与项目信息,XIN 提供多层保护:</div>
+  </div>
+</div>
+
+<ul>
+  <li><strong>权限隔离</strong>:用户只能检索自己的 user 级记忆;project 级记忆按项目成员访问;global 级全员可见</li>
+  <li><strong>存储加密</strong>:记忆内容字段 AES-256 加密存储,密钥由 KMS 管理</li>
+  <li><strong>导出与删除</strong>:用户可随时导出全部记忆(JSON),也可一键清除(软删除 30 天后物理删除)</li>
+  <li><strong>审计可追溯</strong>:每次记忆读/写/删除操作都记录到审计日志,带 trace_id 关联</li>
+  <li><strong>数据保留期</strong>:项目归档后保留 1 年,用户离职后保留 6 个月(可配置),合规要求 5 年</li>
+</ul>
+
+<h2>下一章</h2>
+<p><a href="#/docs/architecture/knowledge-base" class="card-link">知识库与 RAG →</a></p>
+
+<script>
+  (function() {
+    function initMermaid() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+      try { window.mermaid.run({ querySelector: '.mermaid' }); } catch(e) { console.error('mermaid render error:', e); }
+    }
+    if (window.mermaid) { initMermaid(); }
+    else {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+      s.onload = initMermaid;
+      document.head.appendChild(s);
+    }
+  })();
+</script>
+</body>
+</html>

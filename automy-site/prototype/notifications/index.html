@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>通知中心 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">通知中心</span>
+        <button class="app-sidebar__new" title="刷新">↻</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/notifications" class="app-nav-item active"><span class="app-nav-item__icon">🔔</span><span class="app-nav-item__label">通知中心</span><span class="app-nav-item__count">7</span></a>
+        <a href="#/prototype/im-channels" class="app-nav-item"><span class="app-nav-item__icon">📢</span><span class="app-nav-item__label">IM 通道</span></a>
+        <a href="#/prototype/profile" class="app-nav-item"><span class="app-nav-item__icon">👤</span><span class="app-nav-item__label">用户中心</span></a>
+<a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">分类筛选</div>
+        <a class="app-nav-item active"><span class="app-nav-item__icon">📥</span><span class="app-nav-item__label">全部</span></a>
+        <a class="app-nav-item"><span class="app-nav-item__icon">✅</span><span class="app-nav-item__label">任务完成</span></a>
+        <a class="app-nav-item"><span class="app-nav-item__icon">⏰</span><span class="app-nav-item__label">主动提醒</span></a>
+        <a class="app-nav-item"><span class="app-nav-item__icon">📋</span><span class="app-nav-item__label">审批待办</span></a>
+        <a class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">系统</span></a>
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">来源</div>
+        <a class="app-nav-item"><span class="app-nav-item__icon">💬</span><span class="app-nav-item__label">飞书</span></a>
+        <a class="app-nav-item"><span class="app-nav-item__icon">📱</span><span class="app-nav-item__label">企业微信</span></a>
+        <a class="app-nav-item"><span class="app-nav-item__icon">📲</span><span class="app-nav-item__label">钉钉</span></a>
+        <a class="app-nav-item"><span class="app-nav-item__icon">✉</span><span class="app-nav-item__label">站内信</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div>
+          <div class="app-topbar__title">通知中心</div>
+          <div class="text-xs text-tertiary">聚合飞书 / 企微 / 站内信全渠道消息</div>
+        </div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">⚙ 通知偏好</button>
+          <button class="btn btn-primary btn-sm">✓ 标记全部已读</button>
+        </div>
+      </div>
+
+      <div style="padding: 20px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb" style="margin-bottom: 16px;">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li>通知中心</li>
+        </ul>
+
+        <!-- 统计卡 -->
+        <div class="stat-grid" style="margin-bottom: 20px;">
+          <div class="stat-card"><div class="stat-card__label">未读通知</div><div class="stat-card__value" style="color: var(--color-primary);">7</div><div class="stat-card__trend stat-card__trend--up">▲ 待处理</div></div>
+          <div class="stat-card"><div class="stat-card__label">今日新通知</div><div class="stat-card__value">18</div><div class="stat-card__trend stat-card__trend--up">▲ +5</div></div>
+          <div class="stat-card"><div class="stat-card__label">待办提醒</div><div class="stat-card__value" style="color: var(--color-warning);">3</div><div class="stat-card__trend" style="color: var(--color-warning);">⏳ 需跟进</div></div>
+          <div class="stat-card"><div class="stat-card__label">本周推送次数</div><div class="stat-card__value">126</div><div class="stat-card__trend stat-card__trend--up">▲ +12%</div></div>
+        </div>
+
+        <!-- Tab 切换 -->
+        <div class="tabs" style="margin-bottom: 16px;">
+          <div class="tab-item active">全部 (18)</div>
+          <div class="tab-item">任务完成 (6)</div>
+          <div class="tab-item">主动提醒 (5)</div>
+          <div class="tab-item">审批待办 (4)</div>
+          <div class="tab-item">系统 (3)</div>
+        </div>
+
+        <!-- 通知列表 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">通知列表</div>
+            <div class="flex gap-2">
+              <select class="select" style="height: 32px; font-size: 13px;"><option>全部来源</option><option>飞书</option><option>企业微信</option><option>钉钉</option><option>站内信</option></select>
+              <select class="select" style="height: 32px; font-size: 13px;"><option>全部状态</option><option>未读</option><option>已读</option></select>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light); background: var(--color-primary-light);">
+              <div style="font-size:22px; flex-shrink:0;">✅</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">ABC新能源尽调报告已生成</div><span class="badge badge-primary">未读</span></div>
+                <div class="text-sm text-secondary">您于 09:32 提交的「关联交易异常分析」任务已完成,报告含 3 级风险评级,共 18 页。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">💬 飞书</span><span class="text-xs text-tertiary">5 分钟前 · 任务完成</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-primary btn-sm">查看详情</button><button class="btn btn-ghost btn-sm">跳转会话</button><button class="btn btn-ghost btn-sm">忽略</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light); background: var(--color-primary-light);">
+              <div style="font-size:22px; flex-shrink:0;">⏰</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">15 分钟后有尽调会议</div><span class="badge badge-primary">未读</span></div>
+                <div class="text-sm text-secondary">「ABC新能源投决会预审」将于 10:00 在 3 楼会议室 A 开始,参与人:张三、李四、王五。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">💬 飞书</span><span class="text-xs text-tertiary">10 分钟前 · 主动提醒</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-primary btn-sm">查看详情</button><button class="btn btn-ghost btn-sm">忽略</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light); background: var(--color-warning-light);">
+              <div style="font-size:22px; flex-shrink:0;">📋</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">XYZ 投资协议待审批</div><span class="badge badge-warning">待审批</span></div>
+                <div class="text-sm text-secondary">法务部李四提交的《XYZ 科技 B 轮投资协议》第 3 章条款修订,请于今日内完成审批。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">📱 企业微信</span><span class="text-xs text-tertiary">1 小时前 · 审批待办</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-primary btn-sm">立即审批</button><button class="btn btn-ghost btn-sm">忽略</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light);">
+              <div style="font-size:22px; flex-shrink:0;">📊</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">您的月度使用报告已就绪</div><span class="badge badge-secondary">已读</span></div>
+                <div class="text-sm text-secondary">6 月您共发起 142 次会话,消耗 2.3M tokens,主要分布于投研分析与文档翻译场景。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">✉ 站内信</span><span class="text-xs text-tertiary">2 小时前 · 系统</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-ghost btn-sm">查看详情</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light);">
+              <div style="font-size:22px; flex-shrink:0;">✅</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">Q2 销售数据分析完成</div><span class="badge badge-secondary">已读</span></div>
+                <div class="text-sm text-secondary">销售分析师已完成 Q2 销售数据多维度分析,识别 3 个高潜力商机,报告已归档至知识库。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">💬 飞书</span><span class="text-xs text-tertiary">3 小时前 · 任务完成</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-ghost btn-sm">查看详情</button><button class="btn btn-ghost btn-sm">跳转会话</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light); background: var(--color-primary-light);">
+              <div style="font-size:22px; flex-shrink:0;">🔔</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">半导体行业研究报告已更新</div><span class="badge badge-primary">未读</span></div>
+                <div class="text-sm text-secondary">您关注的「半导体设备赛道」研究库新增 2 篇深度报告,来自 Wind 研究与中金公司。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">✉ 站内信</span><span class="text-xs text-tertiary">5 小时前 · 主动提醒</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-ghost btn-sm">查看详情</button><button class="btn btn-ghost btn-sm">忽略</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light);">
+              <div style="font-size:22px; flex-shrink:0;">📋</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">投决会纪要待您确认</div><span class="badge badge-secondary">已读</span></div>
+                <div class="text-sm text-secondary">7 月 10 日投决会纪要已由会议助手整理完成,请确认决议事项无误后归档。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">📱 企业微信</span><span class="text-xs text-tertiary">昨天 16:20 · 审批待办</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-ghost btn-sm">查看详情</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light);">
+              <div style="font-size:22px; flex-shrink:0;">🔧</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">系统将于今晚 22:00 进行维护</div><span class="badge badge-secondary">已读</span></div>
+                <div class="text-sm text-secondary">预计停机 30 分钟,期间会话与工具调用将暂时不可用,请提前保存工作内容。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">✉ 站内信</span><span class="text-xs text-tertiary">昨天 10:00 · 系统</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-ghost btn-sm">查看详情</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid var(--color-border-light);">
+              <div style="font-size:22px; flex-shrink:0;">✅</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">客户商机跟进提醒已发送</div><span class="badge badge-secondary">已读</span></div>
+                <div class="text-sm text-secondary">已向销售部赵六推送 5 条高优先级商机跟进提醒,涉及 ABC、XYZ 等 3 个客户。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">💬 飞书</span><span class="text-xs text-tertiary">昨天 09:15 · 任务完成</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-ghost btn-sm">查看详情</button></div>
+            </div>
+
+            <div style="display:flex; gap:12px; padding:14px 16px;">
+              <div style="font-size:22px; flex-shrink:0;">⏰</div>
+              <div style="flex:1; min-width:0;">
+                <div class="flex justify-between items-center" style="margin-bottom:4px;"><div class="font-medium">明日 09:00 法务评审会提醒</div><span class="badge badge-secondary">已读</span></div>
+                <div class="text-sm text-secondary">「ABC新能源法律意见书评审」将于明日 09:00 召开,请提前阅读相关文档。</div>
+                <div class="flex items-center gap-3" style="margin-top:6px;"><span class="chip">💬 飞书</span><span class="text-xs text-tertiary">2 天前 · 主动提醒</span></div>
+              </div>
+              <div class="flex gap-2" style="flex-shrink:0;"><button class="btn btn-ghost btn-sm">查看详情</button></div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="flex justify-center items-center" style="margin-top: 16px; gap: 8px;">
+          <button class="btn btn-ghost btn-sm">← 上一页</button>
+          <span class="text-sm text-tertiary">第 1 / 2 页 · 共 18 条</span>
+          <button class="btn btn-ghost btn-sm">下一页 →</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

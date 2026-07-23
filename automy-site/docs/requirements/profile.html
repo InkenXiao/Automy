@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>用户中心 · 需求文档 · XIN</title>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/requirements/overview">需求文档</a></li>
+  <li>用户中心</li>
+</nav>
+
+<h1>用户中心</h1>
+
+<p class="text-secondary">用户个人空间,集中管理档案、画像、技能、订阅、MCP 连接、偏好与安全配置。是普通员工日常维护个人信息与掌控自身数据主权的核心入口,也是查看个人记忆画像、管理 API Token 与安全设置的统一界面。</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">👤</div>
+  <div class="alert__body">
+    <div class="alert__title">模块定位</div>
+    <div class="alert__desc">本模块定义普通用户视角的全部能力:个人资料(REQ-11.1)、画像主页(REQ-11.2)、我的技能管理(REQ-11.3)、我的订阅管理(REQ-11.4)、我的连接管理(REQ-11.5)、偏好设置(REQ-11.6)。</div>
+  </div>
+</div>
+
+<h2>模块概述</h2>
+<p>
+  XIN 坚持 <strong>"用户数据主权归属用户"</strong> 原则:用户产生的记忆、偏好、订阅记录均归用户所有,用户可随时查看、编辑、导出、删除。用户中心是这一原则的落地界面,让投资公司员工对自身数据有完全的可见性与可控性。
+</p>
+<p>
+  用户中心同时承担个性化入口职责:用户在此配置偏好(回复风格、关注赛道、默认模型),这些偏好将影响 Companion 记忆写入、专家订阅个性化、工作台默认参数。所有配置变更实时生效,无需重启服务。
+</p>
+
+<h2>用户中心导航</h2>
+<table class="table table-bordered">
+  <thead><tr><th>功能模块</th><th>需求编号</th><th>核心能力</th><th>优先级</th></tr></thead>
+  <tbody>
+    <tr><td>个人资料</td><td><span class="badge badge-primary">REQ-11.1</span></td><td>基本信息、联系方式、头像、SSO 同步</td><td><span class="badge badge-success">P0</span></td></tr>
+    <tr><td>画像主页</td><td><span class="badge badge-primary">REQ-11.2</span></td><td>事实/偏好/事件三类记忆可视化、编辑、导出、删除</td><td><span class="badge badge-success">P0</span></td></tr>
+    <tr><td>我的技能</td><td><span class="badge badge-primary">REQ-11.3</span></td><td>已安装技能列表、更新、卸载、配置</td><td><span class="badge badge-success">P0</span></td></tr>
+    <tr><td>我的订阅</td><td><span class="badge badge-primary">REQ-11.4</span></td><td>已订阅专家、订阅管理、使用统计、账单</td><td><span class="badge badge-success">P0</span></td></tr>
+    <tr><td>我的连接</td><td><span class="badge badge-primary">REQ-11.5</span></td><td>已连接 MCP 服务、授权管理、撤销、使用统计</td><td><span class="badge badge-success">P0</span></td></tr>
+    <tr><td>偏好设置</td><td><span class="badge badge-primary">REQ-11.6</span></td><td>主题、语言、默认模型、回复风格、通知</td><td><span class="badge badge-warning">P1</span></td></tr>
+  </tbody>
+</table>
+
+<h2>需求条目</h2>
+
+<!-- REQ-11.1 个人资料 -->
+<div class="card" id="REQ-11.1">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-11.1</span>
+        <strong>个人资料</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供个人资料管理界面,展示用户基本信息、联系方式、头像;SHALL 支持头像上传与预设头像选择;SHALL 与 SSO/HR 系统同步权威字段(姓名、工号、部门、职位);SHALL 允许用户编辑非权威字段(联系方式、个性签名)。</p>
+    <ul>
+      <li>基本信息:姓名、工号、部门、职位、邮箱、入职日期(来自 SSO/HR,只读)</li>
+      <li>联系方式:手机号、企业微信、内部 IM 账号(可编辑)</li>
+      <li>头像:支持上传(JPG/PNG,≤2MB)或选择预设头像</li>
+      <li>个性签名:自由文本,≤100 字</li>
+      <li>资料同步:SSO 登录后自动同步 HR 系统权威字段,字段变更显示"来自 HR"标记</li>
+      <li>资料可见性:用户可配置哪些字段对同事可见(如手机号仅本部门可见)</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 投研部研究员张三入职后首次登录 XIN<br>
+      <strong>THEN</strong> 系统通过 SSO 同步 HR 信息,张三的姓名、工号 EMP-2026-0123、部门"投研部·新能源组"、职位"高级研究员"、邮箱 zhangsan@corp.com 已自动填充且只读;张三上传个人头像,补充企业微信 zhangsan_wx,设置个性签名"专注新能源赛道研究",保存后资料卡片在同事查看时正确展示。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/profile">查看用户中心原型</a></li>
+      <li><a href="#/docs/requirements/auth-rbac">关联需求:REQ-1.1 SSO 单点登录</a></li>
+      <li><a href="#/docs/requirements/auth-rbac">关联需求:REQ-1.2 组织架构同步</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-11.2 画像主页 -->
+<div class="card" id="REQ-11.2">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-11.2</span>
+        <strong>画像主页</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供画像主页,可视化展示用户的长期记忆画像,按事实、偏好、事件三类分组展示;SHALL 支持单条记忆的查看、编辑、删除;SHALL 支持导出画像为 JSON / Markdown;SHALL 支持按类型、时间、来源筛选记忆条目。</p>
+    <table class="table table-bordered">
+      <thead><tr><th>记忆类型</th><th>展示形式</th><th>典型示例</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-info">事实</span></td><td>卡片列表(属性 + 值)</td><td>职位:高级研究员 / 团队:新能源组</td></tr>
+        <tr><td><span class="badge badge-success">偏好</span></td><td>标签云 + 详情</td><td>关注赛道:新能源、半导体 / 回复风格:详细</td></tr>
+        <tr><td><span class="badge badge-warning">事件</span></td><td>时间线</td><td>2026-07-10 完成某新能源公司财报分析</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>三类可视化:事实(卡片网格)、偏好(标签云)、事件(时间线),直观展示用户画像</li>
+      <li>单条编辑:点击任意记忆条目,可编辑内容、修改类型、添加备注</li>
+      <li>批量删除:勾选多条记忆,一键删除(二次确认)</li>
+      <li>导出画像:导出为 JSON(完整结构)或 Markdown(可读报告),含时间戳与签名</li>
+      <li>来源追溯:每条记忆展示来源(对话/手动/技能写入)与写入时间</li>
+      <li>记忆统计:展示记忆总数、各类占比、近 30 天新增趋势</li>
+      <li>清除范围:支持按时间范围、类型、来源批量清除记忆</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三想查看自己的完整画像并导出备份<br>
+      <strong>THEN</strong> 张三进入画像主页,看到三类记忆:事实 18 条(职位、团队、工号等)、偏好 12 条(关注赛道:新能源、半导体、储能;回复风格:详细;默认报告格式:PDF)、事件 45 条(近期研究报告、会议纪要处理);点击"导出 Markdown",系统生成包含时间戳与用户签名的画像报告下载到本地。
+    </div>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 张三发现画像中有一条错误偏好"关注赛道:房地产"(系误判写入)<br>
+      <strong>THEN</strong> 张三在该条记忆上点击"编辑",将类型改为"已忽略"或直接点击"删除",二次确认后该条记忆从画像中移除,后续 Companion 不再基于该偏好生成回复;操作记录到记忆审计日志。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/profile">查看用户中心原型</a></li>
+      <li><a href="#/docs/requirements/companion">关联需求:REQ-2.2 长期记忆库(事实/偏好/事件)</a></li>
+      <li><a href="#/docs/requirements/companion">关联需求:REQ-2.5 记忆写入与遗忘</a></li>
+      <li><a href="#/docs/requirements/security-audit">关联需求:REQ-9.2 数据隔离(用户记忆隔离)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-11.3 我的技能管理 -->
+<div class="card" id="REQ-11.3">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-11.3</span>
+        <strong>我的技能管理</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供"我的技能"管理界面,展示用户已安装的技能列表;SHALL 支持技能更新、卸载、配置;SHALL 展示技能使用统计与版本信息;SHALL 对卸载操作进行依赖检查与二次确认。</p>
+    <ul>
+      <li>已安装列表:展示技能名称、版本、来源(市场/团队/自创)、安装时间、最近使用时间</li>
+      <li>技能更新:检测新版本,一键更新;展示版本变更说明</li>
+      <li>技能卸载:卸载前检查依赖(是否有专家订阅依赖该技能),有依赖时提示用户</li>
+      <li>技能配置:为技能配置参数(如"财务报表解析"的默认会计准则、报告模板路径)</li>
+      <li>使用统计:展示每个技能的调用次数、成功率、平均耗时、最近 30 天趋势</li>
+      <li>技能启停:临时禁用某个技能(不卸载,暂停使用)</li>
+      <li>权限审查:展示技能声明的权限点(文件访问、网络调用、MCP 工具调用)</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三不再使用"会议纪要模板"技能,希望卸载<br>
+      <strong>THEN</strong> 张三在"我的技能"找到该技能,点击"卸载";系统检查依赖,发现无专家订阅依赖该技能,弹出二次确认"卸载后将无法在会话中调用,确定卸载?";张三确认后技能卸载,操作记录到审计日志;若该技能被某专家订阅依赖,系统提示"该技能被已订阅专家'行政助理'依赖,卸载前请先取消相关订阅"。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/profile">查看用户中心原型</a></li>
+      <li><a href="#/docs/requirements/skill-market">关联需求:REQ-4.5 技能安装与依赖</a></li>
+      <li><a href="#/docs/requirements/skill-market">关联需求:REQ-4.6 技能审核与下架</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-11.4 我的订阅管理 -->
+<div class="card" id="REQ-11.4">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-11.4</span>
+        <strong>我的订阅管理</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供"我的订阅"管理界面,展示用户已订阅的专家 Agent 列表;SHALL 支持取消订阅、查看订阅详情;SHALL 展示订阅使用统计(调用次数、Token 消耗、成本);SHALL 提供账单明细与历史账单查询。</p>
+    <ul>
+      <li>已订阅专家列表:展示专家名称、Persona、订阅时间、个性化状态</li>
+      <li>订阅详情:查看专家绑定的技能集、MCP 服务、知识库、记忆策略</li>
+      <li>取消订阅:取消订阅后专家不再出现在工作台快捷入口,但历史会话保留</li>
+      <li>个性化配置:重新配置订阅时的个性化参数(如关注赛道、回复风格)</li>
+      <li>使用统计:按月展示每个订阅专家的调用次数、Token 消耗、平均响应时长</li>
+      <li>成本明细:展示本月各订阅产生的成本,按部门配额分摊展示</li>
+      <li>历史账单:查询历史月份的账单明细,支持导出 Excel</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三想查看本月专家订阅的使用情况与成本<br>
+      <strong>THEN</strong> 张三进入"我的订阅",看到已订阅 3 个专家:"投研助理"(调用 45 次,¥128)、"法务顾问"(调用 12 次,¥45)、"合规审查员"(调用 8 次,¥32);总成本 ¥205,在部门配额 ¥500 内;张三发现"法务顾问"使用较少,考虑取消订阅,点击"取消订阅",二次确认后取消,下月不再计费。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/profile">查看用户中心原型</a></li>
+      <li><a href="#/docs/requirements/expert-market">关联需求:REQ-5.3 专家订阅与个性化</a></li>
+      <li><a href="#/docs/requirements/admin">关联需求:REQ-10.4 模型配置(成本统计)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-11.5 我的连接管理 -->
+<div class="card" id="REQ-11.5">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-11.5</span>
+        <strong>我的连接管理</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供"我的连接"管理界面,展示用户已授权连接的 MCP 服务列表;SHALL 支持查看授权范围、撤销授权;SHALL 展示连接使用统计;SHALL 在撤销授权前进行依赖检查(是否有专家/技能依赖该连接)。</p>
+    <ul>
+      <li>已连接 MCP 列表:展示服务名称、连接时间、授权范围(工具列表、数据范围)</li>
+      <li>授权详情:查看该连接授予的工具调用权限、数据访问范围、写入权限</li>
+      <li>撤销授权:撤销前检查依赖,若有专家/技能依赖该连接,提示用户先处理依赖</li>
+      <li>使用统计:展示每个连接的调用次数、调用工具、Token 消耗、最近调用时间</li>
+      <li>权限审查:定期提示用户审查已授权连接,确认是否仍需要(默认每 90 天提示)</li>
+      <li>连接日志:查看该连接的调用历史(只展示元数据,不展示具体数据内容)</li>
+      <li>风险提示:对高权限连接(如写操作、敏感数据访问)标记风险等级</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三不再需要访问 Wind 数据 MCP 服务,希望撤销授权<br>
+      <strong>THEN</strong> 张三在"我的连接"找到"Wind 数据"连接,查看授权范围(行情查询、财务数据查询),点击"撤销授权";系统检查依赖,发现"投研助理"专家依赖该连接,提示"撤销后'投研助理'将无法调用 Wind 数据,是否继续?";张三确认后授权撤销,该连接的所有 Token 失效,操作记录到 MCP 审计日志。
+    </div>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 系统检测到"客户 CRM"连接已 120 天未调用<br>
+      <strong>THEN</strong> 系统在用户中心首页与邮件中提示张三"连接'客户 CRM'已 120 天未使用,建议审查并撤销授权以降低风险";张三点击提示进入连接管理,确认后撤销该连接。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/profile">查看用户中心原型</a></li>
+      <li><a href="#/docs/requirements/mcp-integration">关联需求:REQ-6.3 用户主动连接</a></li>
+      <li><a href="#/docs/requirements/mcp-integration">关联需求:REQ-6.4 运行时管控(授权管理)</a></li>
+      <li><a href="#/docs/requirements/security-audit">关联需求:REQ-9.3 全链路审计(MCP 审计)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-11.6 偏好设置 -->
+<div class="card" id="REQ-11.6">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-11.6</span>
+        <strong>偏好设置</strong>
+      </div>
+      <div>
+        <span class="badge badge-warning">P1</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供偏好设置界面,允许用户配置主题、语言、默认模型、回复风格、关注领域、通知设置;SHALL 实时生效,无需重新登录;SHALL 将偏好同步到 Companion 长期记忆与专家订阅个性化配置。</p>
+    <table class="table table-bordered">
+      <thead><tr><th>偏好类别</th><th>可选项</th><th>影响范围</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge">主题</span></td><td>浅色 / 深色 / 跟随系统</td><td>全站界面主题</td></tr>
+        <tr><td><span class="badge badge-info">语言</span></td><td>简体中文 / English</td><td>界面语言</td></tr>
+        <tr><td><span class="badge badge-success">默认模型</span></td><td>从可用模型列表选择</td><td>新建会话默认模型</td></tr>
+        <tr><td><span class="badge badge-warning">回复风格</span></td><td>简洁 / 详细 / 正式 / 轻松</td><td>Companion 与专家回复风格</td></tr>
+        <tr><td><span class="badge badge-danger">关注领域</span></td><td>赛道(新能源/半导体/医药...)+ 业务方向</td><td>Companion 偏好记忆、专家个性化</td></tr>
+        <tr><td><span class="badge">关注条款</span></td><td>法务相关重点关注条款</td><td>法务顾问专家个性化</td></tr>
+        <tr><td><span class="badge">默认参数</span></td><td>估值模型、报告格式、会计准则</td><td>技能默认参数</td></tr>
+        <tr><td><span class="badge badge-info">通知设置</span></td><td>邮件 / 企业微信,频率(实时/日报/周报)</td><td>系统通知渠道</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>实时生效:偏好保存后立即生效,无需重新登录或刷新页面</li>
+      <li>偏好同步:回复风格、关注领域同步写入 Companion 长期记忆的偏好类</li>
+      <li>专家个性化:关注领域、关注条款同步到已订阅专家的个性化配置</li>
+      <li>偏好继承:部门级默认偏好(如投研部默认关注新能源),用户可覆盖</li>
+      <li>偏好导入:支持从同事导出偏好配置(JSON)快速导入</li>
+      <li>偏好重置:一键重置为系统默认偏好</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三希望切换深色主题并将默认模型改为成本更低的内部模型<br>
+      <strong>THEN</strong> 张三在偏好设置中选择主题"深色",界面立即切换为深色;在"默认模型"下拉中选择"内部模型-研究型"(自部署,成本为商用模型的 1/10);保存后新建会话默认使用该内部模型,预计本月个人成本从 ¥128 降至 ¥18;偏好变更同步到 Companion 记忆。
+    </div>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 张三配置关注领域为"新能源、储能、半导体"<br>
+      <strong>THEN</strong> 系统将该偏好写入 Companion 长期记忆偏好类;后续张三与"投研助理"专家对话时,专家主动推荐这三个赛道的最新研报;偏好也同步到画像主页的偏好标签云。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/profile">查看用户中心原型</a></li>
+      <li><a href="#/docs/requirements/companion">关联需求:REQ-2.3 偏好学习</a></li>
+      <li><a href="#/docs/requirements/expert-market">关联需求:REQ-5.3 专家订阅与个性化</a></li>
+      <li><a href="#/docs/requirements/integration">关联需求:REQ-8.2 多模型支持(默认模型)</a></li>
+    </ul>
+  </div>
+</div>
+
+<h2>安全设置(附加)</h2>
+<div class="card">
+  <div class="card-body">
+    <p>用户中心还提供以下安全配置入口,与 <a href="#/docs/requirements/security-audit">安全合规模块</a> 联动:</p>
+    <ul>
+      <li><strong>修改密码</strong>:定期修改密码(同步 SSO 密码策略)</li>
+      <li><strong>多因素认证</strong>:开启 TOTP 二次验证(支持企业微信扫码)</li>
+      <li><strong>登录设备</strong>:查看与管理登录设备,支持远程下线</li>
+      <li><strong>登录历史</strong>:查看最近 30 天登录记录(IP、设备、时间)</li>
+      <li><strong>API Token</strong>:创建、权限范围、有效期、使用记录、撤销(详见 <a href="#/docs/requirements/integration">REQ-8.3 第三方工具扩展</a>)</li>
+    </ul>
+  </div>
+</div>
+
+<h2>验收标准</h2>
+<div class="card">
+  <div class="card-body">
+    <ul>
+      <li>✅ 个人资料支持 SSO 同步权威字段与用户编辑非权威字段</li>
+      <li>✅ 画像主页支持事实/偏好/事件三类可视化、编辑、导出、删除</li>
+      <li>✅ 我的技能支持更新、卸载(含依赖检查)、配置、使用统计</li>
+      <li>✅ 我的订阅支持取消订阅、使用统计、成本明细、历史账单</li>
+      <li>✅ 我的连接支持授权范围查看、撤销(含依赖检查)、定期审查提示</li>
+      <li>✅ 偏好设置实时生效,同步 Companion 记忆与专家个性化</li>
+    </ul>
+  </div>
+</div>
+
+<h2>原型参考</h2>
+<p><a href="#/prototype/profile" class="card-link">查看用户中心原型</a></p>
+</body>
+</html>

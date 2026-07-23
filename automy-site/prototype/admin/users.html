@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>用户与组织管理 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/admin" class="app-nav-item active"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">管理</div>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">📊</span><span class="app-nav-item__label">仪表盘</span></a>
+        <a href="#/prototype/admin/users" class="app-nav-item active"><span class="app-nav-item__icon">👥</span><span class="app-nav-item__label">用户管理</span></a>
+        <a href="#/prototype/admin/roles" class="app-nav-item"><span class="app-nav-item__icon">🔑</span><span class="app-nav-item__label">角色权限</span></a>
+        <a href="#/prototype/admin/models" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">模型网关</span></a>
+        <a href="#/prototype/admin/mcp-services" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 服务</span></a>
+        <a href="#/prototype/admin/skills-experts" class="app-nav-item"><span class="app-nav-item__icon">📦</span><span class="app-nav-item__label">技能与专家</span></a>
+        <a href="#/prototype/admin/audit" class="app-nav-item"><span class="app-nav-item__icon">📜</span><span class="app-nav-item__label">审计日志</span></a>
+        <a href="#/prototype/admin/billing" class="app-nav-item"><span class="app-nav-item__icon">💰</span><span class="app-nav-item__label">计费账单</span></a>
+        <a href="#/prototype/admin/security" class="app-nav-item"><span class="app-nav-item__icon">🔐</span><span class="app-nav-item__label">安全策略</span></a>
+        <a href="#/prototype/admin/market-review" class="app-nav-item"><span class="app-nav-item__icon">🛡</span><span class="app-nav-item__label">市场审核</span></a>
+        <a href="#/prototype/admin/settings" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">系统配置</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">钱</div>
+          <span class="app-nav-item__label">钱七 · 管理员</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div class="app-topbar__title">用户与组织管理</div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">📥 导入</button>
+          <button class="btn btn-primary btn-sm">+ 邀请用户</button>
+        </div>
+      </div>
+      <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/admin">管理后台</a></li>
+          <li>用户管理</li>
+        </ul>
+
+        <div class="grid" style="grid-template-columns: 220px 1fr; gap: 16px;">
+          <!-- 组织架构树 -->
+          <aside class="card" style="height: fit-content;">
+            <div class="card-header"><div class="card-title text-sm">组织架构</div></div>
+            <div class="card-body" style="padding: 8px;">
+              <a class="app-nav-item text-sm"><span>🏢</span><span>信投资</span></a>
+              <a class="app-nav-item text-sm" style="padding-left: 28px;"><span>📊</span><span>投研部 (12)</span></a>
+              <a class="app-nav-item active text-sm" style="padding-left: 28px;"><span>⚖</span><span>法务部 (8)</span></a>
+              <a class="app-nav-item text-sm" style="padding-left: 28px;"><span>🛡</span><span>合规部 (6)</span></a>
+              <a class="app-nav-item text-sm" style="padding-left: 28px;"><span>🎯</span><span>销售部 (15)</span></a>
+              <a class="app-nav-item text-sm" style="padding-left: 28px;"><span>💻</span><span>IT 部 (10)</span></a>
+              <a class="app-nav-item text-sm" style="padding-left: 28px;"><span>💰</span><span>财务部 (7)</span></a>
+            </div>
+          </aside>
+
+          <!-- 用户列表 -->
+          <div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">法务部 · 用户列表 (8)</div>
+                <div class="flex gap-2">
+                  <input type="text" class="input input-sm" placeholder="搜索用户..." style="min-width: 180px;" />
+                  <button class="btn btn-outline btn-sm">筛选</button>
+                </div>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <table class="table">
+                  <thead>
+                    <tr><th>用户</th><th>部门</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #C96500, #FFD700);">李</div><div><div class="font-medium text-sm">李四</div><div class="text-xs text-tertiary">lisi@automy.cn</div></div></div></td>
+                      <td class="text-sm">法务部</td>
+                      <td><span class="badge badge-primary">法务顾问</span></td>
+                      <td><span class="badge badge-success">在线</span></td>
+                      <td class="text-sm text-tertiary">3 分钟前</td>
+                      <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                    </tr>
+                    <tr>
+                      <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FF8C00, #FF5D00);">陈</div><div><div class="font-medium text-sm">陈八</div><div class="text-xs text-tertiary">chenba@automy.cn</div></div></div></td>
+                      <td class="text-sm">法务部</td>
+                      <td><span class="badge badge-secondary">法务专员</span></td>
+                      <td><span class="badge badge-secondary">离线</span></td>
+                      <td class="text-sm text-tertiary">2 小时前</td>
+                      <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                    </tr>
+                    <tr>
+                      <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FF8C00, #FF5D00);">周</div><div><div class="font-medium text-sm">周九</div><div class="text-xs text-tertiary">zhoujiu@automy.cn</div></div></div></td>
+                      <td class="text-sm">法务部</td>
+                      <td><span class="badge badge-warning">部门主管</span></td>
+                      <td><span class="badge badge-success">在线</span></td>
+                      <td class="text-sm text-tertiary">15 分钟前</td>
+                      <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                    </tr>
+                    <tr>
+                      <td><div class="flex items-center gap-2"><div class="avatar avatar-sm" style="background: linear-gradient(135deg, #F97316, #EF4444);">吴</div><div><div class="font-medium text-sm">吴十</div><div class="text-xs text-tertiary">wushi@automy.cn</div></div></div></td>
+                      <td class="text-sm">法务部</td>
+                      <td><span class="badge badge-secondary">法务专员</span></td>
+                      <td><span class="badge badge-danger">已禁用</span></td>
+                      <td class="text-sm text-tertiary">7 天前</td>
+                      <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 新增/编辑用户表单 -->
+            <div class="card" style="margin-top: 16px;">
+              <div class="card-header"><div class="card-title">编辑用户 · 李四</div></div>
+              <div class="card-body">
+                <div class="grid grid-cols-2" style="gap: 16px;">
+                  <div class="form-group"><label class="form-label">姓名</label><input type="text" class="input" value="李四" /></div>
+                  <div class="form-group"><label class="form-label">邮箱</label><input type="email" class="input" value="lisi@automy.cn" /></div>
+                  <div class="form-group"><label class="form-label">部门</label><select class="select"><option>法务部</option><option>投研部</option><option>合规部</option></select></div>
+                  <div class="form-group"><label class="form-label">角色</label><select class="select"><option>法务顾问</option><option>法务专员</option><option>部门主管</option></select></div>
+                  <div class="form-group"><label class="form-label">套餐</label><select class="select"><option>Pro</option><option>Basic</option><option>Enterprise</option></select></div>
+                  <div class="form-group"><label class="form-label">状态</label>
+                    <div class="flex gap-3">
+                      <label class="radio text-sm"><input type="radio" name="st" checked> 启用</label>
+                      <label class="radio text-sm"><input type="radio" name="st"> 禁用</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex gap-2" style="margin-top: 8px;">
+                  <button class="btn btn-primary">保存</button>
+                  <button class="btn btn-ghost">重置密码</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

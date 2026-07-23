@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>主动提醒规则 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">IM 通道</span>
+        <button class="app-sidebar__new" title="新建规则">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/notifications" class="app-nav-item"><span class="app-nav-item__icon">🔔</span><span class="app-nav-item__label">通知中心</span></a>
+        <a href="#/prototype/im-channels" class="app-nav-item active"><span class="app-nav-item__icon">📢</span><span class="app-nav-item__label">IM 通道</span></a>
+        <a href="#/prototype/profile" class="app-nav-item"><span class="app-nav-item__icon">👤</span><span class="app-nav-item__label">用户中心</span></a>
+<a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">通道管理</div>
+        <a href="#/prototype/im-channels" class="app-nav-item"><span class="app-nav-item__icon">🔗</span><span class="app-nav-item__label">通道配置</span></a>
+        <a href="#/prototype/im-channels/template-editor" class="app-nav-item"><span class="app-nav-item__icon">📝</span><span class="app-nav-item__label">通知模板</span></a>
+        <a href="#/prototype/im-channels/reminder-rules" class="app-nav-item active"><span class="app-nav-item__icon">⏰</span><span class="app-nav-item__label">主动提醒规则</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div>
+          <div class="app-topbar__title">主动提醒规则</div>
+          <div class="text-xs text-tertiary">编排场景触发与时间触发规则,智能推送提醒</div>
+        </div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">📊 触发统计</button>
+          <button class="btn btn-primary btn-sm">+ 新建规则</button>
+        </div>
+      </div>
+
+      <div style="padding: 20px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb" style="margin-bottom: 16px;">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/im-channels">IM 通道</a></li>
+          <li>主动提醒规则</li>
+        </ul>
+
+        <!-- 顶部说明 -->
+        <div class="alert alert-info" style="margin-bottom: 16px;">
+          <div class="alert__body">
+            <div class="alert__title">主动提醒引擎</div>
+            <div class="alert__desc">支持「场景触发」(事件状态变更)与「时间触发」(定时/周期)两类规则,可编排过滤条件、渠道降级与节流策略,实现精准触达。</div>
+          </div>
+        </div>
+
+        <!-- 规则列表 -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <div class="card-title">规则列表</div>
+            <div class="flex gap-2">
+              <select class="select" style="height:32px; font-size:13px;"><option>全部状态</option><option>启用</option><option>停用</option></select>
+              <select class="select" style="height:32px; font-size:13px;"><option>全部类型</option><option>场景触发</option><option>时间触发</option></select>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr><th>规则名</th><th>触发类型</th><th>触发条件</th><th>渠道</th><th>状态</th><th>今日触发</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="font-medium">尽调任务完成提醒</td>
+                  <td><span class="badge badge-primary">场景触发</span></td>
+                  <td class="text-sm text-secondary">任务 status = completed</td>
+                  <td><span class="chip">💬 飞书</span></td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td class="text-sm font-medium">12 次</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+                <tr style="background: var(--color-primary-light);">
+                  <td class="font-medium">会议前 15 分钟提醒</td>
+                  <td><span class="badge badge-warning">时间触发</span></td>
+                  <td class="text-sm text-secondary">calendar 事件前 15min</td>
+                  <td><span class="chip">💬 飞书</span></td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td class="text-sm font-medium">8 次</td>
+                  <td><button class="btn btn-outline btn-sm">编辑中</button></td>
+                </tr>
+                <tr>
+                  <td class="font-medium">审批超时催办</td>
+                  <td><span class="badge badge-warning">时间触发</span></td>
+                  <td class="text-sm text-secondary">审批 pending &gt; 24h</td>
+                  <td><span class="chip">📱 企微</span></td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td class="text-sm font-medium">3 次</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+                <tr>
+                  <td class="font-medium">文档更新通知</td>
+                  <td><span class="badge badge-primary">场景触发</span></td>
+                  <td class="text-sm text-secondary">知识库文档更新</td>
+                  <td><span class="chip">✉ 站内信</span></td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td class="text-sm font-medium">25 次</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+                <tr>
+                  <td class="font-medium">周报提醒</td>
+                  <td><span class="badge badge-warning">时间触发</span></td>
+                  <td class="text-sm text-secondary">每周五 17:00</td>
+                  <td><span class="chip">💬 飞书</span></td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td class="text-sm font-medium">0 次</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+                <tr>
+                  <td class="font-medium">长期未交互回访</td>
+                  <td><span class="badge badge-warning">时间触发</span></td>
+                  <td class="text-sm text-secondary">7 天无会话</td>
+                  <td><span class="chip">✉ 站内信</span></td>
+                  <td><span class="badge badge-secondary">停用</span></td>
+                  <td class="text-sm text-tertiary">—</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 规则编辑面板 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">规则编辑 · 会议前 15 分钟提醒</div>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost btn-sm">🧪 试运行</button>
+              <button class="btn btn-primary btn-sm">启用规则</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+
+              <!-- 触发条件 -->
+              <div style="border:1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px;">
+                <div class="font-medium" style="margin-bottom: 10px;">⏱ 触发条件</div>
+                <div style="margin-bottom: 10px;">
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">触发类型</label>
+                  <div class="flex gap-3">
+                    <label class="checkbox"><input type="radio" name="ttype"> 场景触发</label>
+                    <label class="checkbox"><input type="radio" name="ttype" checked> 时间触发</label>
+                  </div>
+                </div>
+                <div style="margin-bottom: 10px;">
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">事件源</label>
+                  <select class="select" style="width:100%;"><option>日历 (Calendar)</option><option>任务 (Task)</option><option>审批 (Approval)</option><option>知识库 (KB)</option></select>
+                </div>
+                <div>
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">条件表达式</label>
+                  <textarea class="textarea" style="width:100%; font-family: var(--font-mono); font-size:12px; min-height:60px;">会议开始时间 - 当前时间 &lt;= 15min 且 有会议参与人</textarea>
+                </div>
+              </div>
+
+              <!-- 过滤条件 -->
+              <div style="border:1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px;">
+                <div class="font-medium" style="margin-bottom: 10px;">🔧 过滤条件</div>
+                <div class="flex items-center justify-between" style="padding: 6px 0;">
+                  <span class="text-sm">仅工作日(周一至周五)</span>
+                  <label class="switch"><input type="checkbox" checked><span class="switch__track"><span class="switch__thumb"></span></span></label>
+                </div>
+                <div class="flex items-center justify-between" style="padding: 6px 0; border-top:1px solid var(--color-border-light);">
+                  <span class="text-sm">仅工作时间 (09:00 - 18:00)</span>
+                  <label class="switch"><input type="checkbox" checked><span class="switch__track"><span class="switch__thumb"></span></span></label>
+                </div>
+                <div style="padding: 6px 0; border-top:1px solid var(--color-border-light);">
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">仅特定类型会议</label>
+                  <div class="flex gap-2" style="flex-wrap:wrap;">
+                    <span class="chip" style="background: var(--color-primary-light); color: var(--color-primary-active);">投决会 ✕</span>
+                    <span class="chip" style="background: var(--color-primary-light); color: var(--color-primary-active);">尽调评审 ✕</span>
+                    <span class="chip">+ 法务评审</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 渠道与模板 -->
+              <div style="border:1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px;">
+                <div class="font-medium" style="margin-bottom: 10px;">📢 渠道 & 文案</div>
+                <div style="margin-bottom: 10px;">
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">渠道选择(优先级降级)</label>
+                  <div class="flex gap-2" style="flex-wrap:wrap;">
+                    <span class="chip" style="background: var(--color-primary-light); color: var(--color-primary-active);">1. 飞书(优先) ✕</span>
+                    <span class="chip" style="background: var(--color-primary-light); color: var(--color-primary-active);">2. 企微(降级) ✕</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">文案模板</label>
+                  <select class="select" style="width:100%;"><option>会议提醒 (tpl_meeting_reminder)</option><option>任务完成通知</option><option>审批待办</option></select>
+                </div>
+              </div>
+
+              <!-- 节流策略 -->
+              <div style="border:1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px;">
+                <div class="font-medium" style="margin-bottom: 10px;">🎚 节流策略</div>
+                <div style="margin-bottom: 10px;">
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">每用户每日上限</label>
+                  <div class="flex items-center gap-3">
+                    <div class="progress" style="flex:1;"><div class="progress__bar" style="width: 40%; background: var(--color-warning);"></div></div>
+                    <span class="text-sm font-medium">2 / 5 条</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">静默时段</label>
+                  <div class="text-sm">22:00 - 08:00 <span class="badge badge-secondary" style="margin-left:6px;">降级站内信</span></div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="alert alert-success" style="margin-top: 14px;">
+              <div class="alert__body">
+                <div class="alert__title">试运行结果</div>
+                <div class="alert__desc">匹配到 2 条待提醒事件:① 10:00 ABC新能源投决会预审(张三);② 14:00 法务评审会(李四)。预计将通过飞书推送。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

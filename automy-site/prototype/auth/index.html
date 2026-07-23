@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>登录 · XIN</title>
+</head>
+<body>
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="auth-card__logo">
+      <div style="width: 64px; height: 64px; background: var(--gradient-primary); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-primary);">
+        <span style="font-size: 32px; font-weight: 900; color: white;">A</span>
+      </div>
+      <div class="auth-card__title">XIN 信</div>
+      <div class="auth-card__subtitle">企业级自主智能体平台</div>
+    </div>
+
+    <div class="tabs tabs-pills" data-tabs>
+      <button class="tab-item active" data-tab="login">账号登录</button>
+      <button class="tab-item" data-tab="sso">SSO 登录</button>
+    </div>
+
+    <div data-tab-content="login" class="tab-content active">
+      <div class="form-group">
+        <label class="form-label">用户名</label>
+        <input type="text" class="input input-lg" placeholder="请输入用户名" value="zhangsan" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码</label>
+        <input type="password" class="input input-lg" placeholder="请输入密码" value="••••••••" />
+      </div>
+      <div class="flex justify-between items-center" style="margin-bottom: 24px;">
+        <label class="checkbox">
+          <input type="checkbox" checked />
+          <span>记住我</span>
+        </label>
+        <a href="#" class="text-sm text-primary">忘记密码?</a>
+      </div>
+      <a href="#/prototype/workspace" class="btn btn-primary btn-lg btn-block">
+        登录 XIN
+      </a>
+    </div>
+
+    <div data-tab-content="sso" class="tab-content">
+      <div style="text-align: center; padding: 24px 0;">
+        <p class="text-secondary text-sm" style="margin-bottom: 24px;">点击下方按钮跳转到企业 SSO 完成身份认证</p>
+        <a href="#/prototype/workspace" class="btn btn-secondary btn-lg btn-block">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2H3a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><polyline points="7 11 11 15 21 5"/></svg>
+          通过企业 SSO 登录
+        </a>
+        <div class="divider-text">或</div>
+        <a href="#/prototype/workspace" class="btn btn-ghost btn-lg btn-block">作为访客继续</a>
+      </div>
+    </div>
+
+    <div style="margin-top: 32px; text-align: center;">
+      <p class="text-tertiary text-xs">
+        © 2026 XIN 信 · 仅限企业内部使用<br>
+        登录即代表同意 <a href="#" class="text-primary">使用条款</a> 与 <a href="#" class="text-primary">隐私政策</a>
+      </p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

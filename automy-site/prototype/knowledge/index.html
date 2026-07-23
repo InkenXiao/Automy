@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>知识库 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item active"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/notifications" class="app-nav-item"><span class="app-nav-item__icon">🔔</span><span class="app-nav-item__label">通知中心</span></a>
+        <a href="#/prototype/im-channels" class="app-nav-item"><span class="app-nav-item__icon">📢</span><span class="app-nav-item__label">IM 通道</span></a>
+        <a href="#/prototype/profile" class="app-nav-item"><span class="app-nav-item__icon">👤</span><span class="app-nav-item__label">用户中心</span></a>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">知识库</div>
+        <a href="#/prototype/knowledge" class="app-nav-item active"><span class="app-nav-item__icon">📄</span><span class="app-nav-item__label">文档列表</span></a>
+        <a href="#/prototype/knowledge/search-test" class="app-nav-item"><span class="app-nav-item__icon">🔍</span><span class="app-nav-item__label">检索测试</span></a>
+        <a href="#/prototype/knowledge/pipeline" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">处理流水线</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="app-frame__main">
+      <div class="app-frame__body" style="padding: 24px;">
+    <!-- 顶部 -->
+    <div class="flex justify-between items-center" style="margin-bottom: 20px;">
+      <div>
+        <h2 style="margin-bottom: 4px;">知识库</h2>
+        <p class="text-sm text-secondary">文档统一管理、向量化检索与项目级引用</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm">📤 导入</button>
+        <button class="btn btn-primary btn-sm">+ 上传文档</button>
+      </div>
+    </div>
+
+    <!-- 知识库分类卡片 -->
+    <div class="grid grid-cols-4" style="gap: 16px; margin-bottom: 24px;">
+      <div class="knowledge-card">
+        <div class="knowledge-card__icon">📊</div>
+        <div class="knowledge-card__title">财报库</div>
+        <div class="knowledge-card__count">236 份 · 已索引 218</div>
+      </div>
+      <div class="knowledge-card">
+        <div class="knowledge-card__icon" style="background: linear-gradient(135deg, #C96500, #FFD700);">⚖</div>
+        <div class="knowledge-card__title">合同库</div>
+        <div class="knowledge-card__count">142 份 · 已索引 142</div>
+      </div>
+      <div class="knowledge-card">
+        <div class="knowledge-card__icon" style="background: linear-gradient(135deg, #FFD700, #FF8C00);">📚</div>
+        <div class="knowledge-card__title">研报库</div>
+        <div class="knowledge-card__count">489 份 · 已索引 472</div>
+      </div>
+      <div class="knowledge-card">
+        <div class="knowledge-card__icon" style="background: linear-gradient(135deg, #F97316, #EF4444);">📝</div>
+        <div class="knowledge-card__title">纪要库</div>
+        <div class="knowledge-card__count">78 份 · 已索引 76</div>
+      </div>
+    </div>
+
+    <!-- 主体: 左侧分类树 + 右侧文档列表 -->
+    <div class="grid" style="grid-template-columns: 220px 1fr; gap: 16px; min-height: 420px;">
+
+      <!-- 左侧分类树 -->
+      <aside class="card" style="height: fit-content;">
+        <div class="card-body" style="padding: 12px;">
+          <div class="text-xs text-tertiary uppercase" style="padding: 8px 12px 4px;">分类</div>
+          <a class="app-nav-item active" style="display: block;">📄 全部文档 <span class="app-nav-item__count">945</span></a>
+          <a class="app-nav-item" style="display: block;">📊 财务报表 <span class="app-nav-item__count">236</span></a>
+          <a class="app-nav-item" style="display: block;">⚖ 合同文件 <span class="app-nav-item__count">142</span></a>
+          <a class="app-nav-item" style="display: block;">📈 研究报告 <span class="app-nav-item__count">489</span></a>
+          <a class="app-nav-item" style="display: block;">📝 会议纪要 <span class="app-nav-item__count">78</span></a>
+          <a class="app-nav-item" style="display: block;">💡 内部备忘 <span class="app-nav-item__count">32</span></a>
+
+          <div class="text-xs text-tertiary uppercase" style="padding: 16px 12px 4px;">来源</div>
+          <a class="app-nav-item" style="display: block;">☁ 飞书云文档</a>
+          <a class="app-nav-item" style="display: block;">💾 企业网盘</a>
+          <a class="app-nav-item" style="display: block;">📧 邮件附件</a>
+          <a class="app-nav-item" style="display: block;">⬆ 本地上传</a>
+
+          <div class="text-xs text-tertiary uppercase" style="padding: 16px 12px 4px;">标签</div>
+          <div style="padding: 4px 12px 12px; display: flex; flex-wrap: wrap; gap: 4px;">
+            <span class="chip chip-hover">投研</span>
+            <span class="chip chip-hover">新能源</span>
+            <span class="chip chip-hover">半导体</span>
+            <span class="chip chip-hover">IPO</span>
+            <span class="chip chip-hover">尽调</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 右侧文档列表 -->
+      <div>
+        <!-- 搜索与筛选 -->
+        <div class="flex gap-2" style="margin-bottom: 16px;">
+          <input type="text" class="form-input" placeholder="🔍 语义搜索:输入关键词或自然语言问题..." style="flex: 1;" />
+          <button class="btn btn-outline btn-sm">高级筛选</button>
+          <button class="btn btn-ghost btn-sm">⊞ 卡片</button>
+          <button class="btn btn-ghost btn-sm">☰ 列表</button>
+        </div>
+
+        <!-- 索引状态提示 -->
+        <div class="prototype-banner" style="margin-bottom: 16px;">
+          <span class="prototype-banner__icon">ℹ</span>
+          <span>共 945 份文档,已向量化索引 908 份(96%)。剩余 37 份正在后台处理,预计 5 分钟内完成。</span>
+        </div>
+
+        <!-- 文档列表 -->
+        <div class="doc-list">
+
+          <div class="doc-item">
+            <div class="doc-item__icon">📊</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">ABC新能源_2025年度财务报告.pdf</div>
+              <div class="doc-item__meta">12.4 MB · 财务报表 · 已索引 · 上传于 2026-07-08</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">⚖</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">XYZ投资协议_主合同_v3.docx</div>
+              <div class="doc-item__meta">3.2 MB · 合同文件 · 已索引 · 上传于 2026-07-10</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">📈</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">2026Q2_半导体行业研究报告.pdf</div>
+              <div class="doc-item__meta">8.7 MB · 研究报告 · 已索引 · 上传于 2026-07-05</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">📝</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">ABC新能源_投决会纪要_20260710.docx</div>
+              <div class="doc-item__meta">0.5 MB · 会议纪要 · 已索引 · 上传于 2026-07-10</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">📊</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">DEF科技_尽调财务底稿.xlsx</div>
+              <div class="doc-item__meta">5.6 MB · 财务报表 · 已索引 · 上传于 2026-07-03</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">⚖</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">ABC新能源_法律意见书_最终版.pdf</div>
+              <div class="doc-item__meta">3.2 MB · 合同文件 · 已索引 · 上传于 2026-07-12</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">📈</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">2026_新能源汽车行业月度跟踪_Wind.pdf</div>
+              <div class="doc-item__meta">2.1 MB · 研究报告 · 已索引 · 上传于 2026-07-01</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">💡</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">投资策略_2026H2_内部备忘.md</div>
+              <div class="doc-item__meta">12 KB · 内部备忘 · 已索引 · 上传于 2026-06-28</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">📊</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">GHI医疗_2024年审计报告.pdf</div>
+              <div class="doc-item__meta">15.8 MB · 财务报表 · 索引中(67%) · 上传于 2026-07-14</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-warning">索引中</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+          <div class="doc-item">
+            <div class="doc-item__icon">📈</div>
+            <div class="doc-item__body">
+              <div class="doc-item__title">半导体设备_国产替代_深度研究.pdf</div>
+              <div class="doc-item__meta">6.4 MB · 研究报告 · 已索引 · 上传于 2026-06-25</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-success">已解析</span>
+              <button class="btn btn-ghost btn-sm">⋯</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 分页 -->
+        <div class="flex justify-between items-center" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border-light);">
+          <div class="text-xs text-tertiary">显示 1-10 / 共 945 份</div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" disabled>← 上一页</button>
+            <button class="btn btn-primary btn-sm" style="min-width: 32px;">1</button>
+            <button class="btn btn-ghost btn-sm" style="min-width: 32px;">2</button>
+            <button class="btn btn-ghost btn-sm" style="min-width: 32px;">3</button>
+            <span class="text-tertiary" style="padding: 6px 4px;">…</span>
+            <button class="btn btn-ghost btn-sm" style="min-width: 32px;">95</button>
+            <button class="btn btn-ghost btn-sm">下一页 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

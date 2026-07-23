@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>检索测试 · 知识库 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item active"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">知识库</div>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📄</span><span class="app-nav-item__label">文档列表</span></a>
+        <a href="#/prototype/knowledge/search-test" class="app-nav-item active"><span class="app-nav-item__icon">🔍</span><span class="app-nav-item__label">检索测试</span></a>
+        <a href="#/prototype/knowledge/pipeline" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">处理流水线</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div class="app-topbar__title">检索测试</div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">历史查询</button>
+        </div>
+      </div>
+      <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/knowledge">知识库</a></li>
+          <li>检索测试</li>
+        </ul>
+
+        <div class="grid" style="grid-template-columns: 1fr 280px; gap: 16px;">
+          <div>
+            <!-- 搜索框 -->
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-body">
+                <div class="flex gap-2">
+                  <input type="text" class="input input-lg" value="ABC新能源关联交易异常情况" style="flex: 1;" />
+                  <button class="btn btn-primary">🔍 检索</button>
+                </div>
+                <div class="text-xs text-tertiary" style="margin-top: 8px;">耗时 86ms · 命中 4 条 · 向量模型 bge-m3</div>
+              </div>
+            </div>
+
+            <!-- 检索结果 -->
+            <div class="text-xs text-tertiary uppercase" style="margin-bottom: 8px;">检索结果 (4)</div>
+
+            <div class="card" style="margin-bottom: 12px;">
+              <div class="card-body">
+                <div class="flex items-center gap-2" style="margin-bottom: 8px;">
+                  <span class="badge badge-success">Top 1</span>
+                  <span class="font-medium text-sm">ABC新能源_2025年度财务报告.pdf</span>
+                  <span class="text-xs text-tertiary">· P3</span>
+                  <a href="#/prototype/knowledge/pipeline" class="text-xs" style="color: var(--color-primary); margin-left: auto;">跳转原文 →</a>
+                </div>
+                <div class="text-sm text-secondary" style="background: var(--color-bg-subtle); padding: 10px; border-radius: 6px; margin-bottom: 8px;">
+                  报告期内,公司<mark>关联交易</mark>金额合计 <mark>2.4 亿元</mark>,占营业收入 20.0%,主要为向母公司采购原材料......
+                </div>
+                <div class="flex items-center gap-3">
+                  <div style="flex: 1;">
+                    <div class="flex justify-between text-xs text-tertiary" style="margin-bottom: 2px;"><span>置信度</span><span>0.94</span></div>
+                    <div class="progress progress-sm"><div class="progress__bar" style="width: 94%;"></div></div>
+                  </div>
+                  <span class="chip">财报库</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 12px;">
+              <div class="card-body">
+                <div class="flex items-center gap-2" style="margin-bottom: 8px;">
+                  <span class="badge badge-primary">Top 2</span>
+                  <span class="font-medium text-sm">ABC新能源_投决会纪要_20260710.docx</span>
+                  <span class="text-xs text-tertiary">· P2</span>
+                  <a href="#/prototype/knowledge/pipeline" class="text-xs" style="color: var(--color-primary); margin-left: auto;">跳转原文 →</a>
+                </div>
+                <div class="text-sm text-secondary" style="background: var(--color-bg-subtle); padding: 10px; border-radius: 6px; margin-bottom: 8px;">
+                  投决会决议:鉴于 <mark>关联交易</mark>同比 +180%,要求项目组在 7 月 20 日前完成供应商资质审查......
+                </div>
+                <div class="flex items-center gap-3">
+                  <div style="flex: 1;">
+                    <div class="flex justify-between text-xs text-tertiary" style="margin-bottom: 2px;"><span>置信度</span><span>0.88</span></div>
+                    <div class="progress progress-sm"><div class="progress__bar" style="width: 88%;"></div></div>
+                  </div>
+                  <span class="chip">纪要库</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 12px;">
+              <div class="card-body">
+                <div class="flex items-center gap-2" style="margin-bottom: 8px;">
+                  <span class="badge badge-primary">Top 3</span>
+                  <span class="font-medium text-sm">ABC新能源_法律意见书_最终版.pdf</span>
+                  <span class="text-xs text-tertiary">· P12</span>
+                  <a href="#/prototype/knowledge/pipeline" class="text-xs" style="color: var(--color-primary); margin-left: auto;">跳转原文 →</a>
+                </div>
+                <div class="text-sm text-secondary" style="background: var(--color-bg-subtle); padding: 10px; border-radius: 6px; margin-bottom: 8px;">
+                  经核查,标的公司与母公司间的 <mark>关联交易</mark>定价公允性存疑,建议补充独立财务顾问意见......
+                </div>
+                <div class="flex items-center gap-3">
+                  <div style="flex: 1;">
+                    <div class="flex justify-between text-xs text-tertiary" style="margin-bottom: 2px;"><span>置信度</span><span>0.79</span></div>
+                    <div class="progress progress-sm"><div class="progress__bar" style="width: 79%; background: var(--color-warning);"></div></div>
+                  </div>
+                  <span class="chip">合同库</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 兜底提示 -->
+            <div class="alert alert-warning">
+              <span class="alert__icon">💡</span>
+              <div class="alert__body">
+                <div class="alert__title">未命中高置信结果</div>
+                <div class="alert__desc">Top 4 置信度 0.42,低于阈值 0.5,已触发兜底策略:转交通用大模型生成,并提示"以下内容未来源于知识库"。</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧:检索参数 -->
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-header"><div class="card-title">检索参数</div></div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label class="form-label">Top-K</label>
+                  <input type="number" class="input input-sm" value="5" min="1" max="20" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">相似度阈值</label>
+                  <input type="range" min="0" max="1" step="0.05" value="0.5" style="width: 100%;" />
+                  <div class="text-xs text-tertiary" style="margin-top: 4px;">当前:0.50</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">检索策略</label>
+                  <select class="select input-sm"><option>向量 + 关键词混合</option><option>纯向量</option><option>纯关键词</option></select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label">过滤条件</label>
+                  <div class="flex flex-column" style="gap: 6px;">
+                    <label class="checkbox text-sm"><input type="checkbox" checked> 财报库</label>
+                    <label class="checkbox text-sm"><input type="checkbox" checked> 纪要库</label>
+                    <label class="checkbox text-sm"><input type="checkbox" checked> 合同库</label>
+                    <label class="checkbox text-sm"><input type="checkbox"> 研报库</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div class="card-title">过滤标签</div></div>
+              <div class="card-body">
+                <div class="flex flex-wrap gap-1" style="margin-bottom: 12px;">
+                  <span class="chip chip-hover">投研</span>
+                  <span class="chip chip-hover">新能源</span>
+                  <span class="chip chip-hover">ABC</span>
+                </div>
+                <div class="text-xs text-tertiary" style="margin-bottom: 4px;">密级过滤</div>
+                <select class="select input-sm"><option>全部可见</option><option>机密及以下</option><option>仅公开</option></select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

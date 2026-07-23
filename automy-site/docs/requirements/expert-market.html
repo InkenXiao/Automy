@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>专家 Agent 市场 · 需求文档 · XIN</title>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/requirements/overview">需求文档</a></li>
+  <li>专家 Agent 市场</li>
+</nav>
+
+<h1>专家 Agent 市场</h1>
+
+<p class="text-secondary">预置领域专家智能体,订阅即用。投资分析、法务、HR、会议纪要、文档摘要、数据查询等开箱即用的专家,持续学习迭代,让业务员工无需从零配置即可获得专业 AI 协助。</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">🤖</div>
+  <div class="alert__body">
+    <div class="alert__title">模块定位</div>
+    <div class="alert__desc">本模块定义专家 Agent 模型(Persona + 技能集 + MCP + 知识库 + 记忆策略)、预置专家清单、订阅与个性化、专家市场浏览四大能力,让投资公司各业务角色快速获得领域专家级 AI 服务。</div>
+  </div>
+</div>
+
+<h2>模块概述</h2>
+<p>
+  不同业务场景需要不同专业能力的 Agent:投研经理需要懂财务分析与估值,法务需要懂合同审查与合规,HR 需要懂员工关系与劳动法。若让每位用户自行配置领域专家,门槛极高且效果参差——业务员工难以编写专业提示词,也难以选择合适的知识库与 MCP 服务。
+</p>
+<p>
+  XIN 由官方与各业务团队预置高质量专家 Agent,用户订阅即可获得专业服务。每个专家是一个完整的 Agent 配置包,包含 Persona(角色设定)、技能集、MCP 服务连接、领域知识库、记忆策略,开箱即用。专家还会持续迭代,订阅用户自动获得更新。
+</p>
+
+<h2>需求条目</h2>
+
+<!-- REQ-5.1 专家 Agent 模型 -->
+<div class="card" id="REQ-5.1">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-5.1</span>
+        <strong>专家 Agent 模型</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供统一的专家 Agent 模型,每个专家 SHALL 由 Persona、技能集、MCP 服务、知识库、记忆策略五大要素构成;专家定义 SHALL 支持版本管理与持续迭代,订阅用户自动获得新版本。</p>
+    <table class="table table-bordered">
+      <thead><tr><th>要素</th><th>说明</th><th>示例(投研分析师)</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge">Persona 角色设定</span></td><td>系统提示词,定义专家角色、能力边界、行为规范</td><td>"你是资深投资分析师,擅长行业分析、企业估值、尽调..."</td></tr>
+        <tr><td><span class="badge badge-info">技能集</span></td><td>专家绑定的技能清单</td><td>财务报表解析、IPO 风险分析、尽调报告生成</td></tr>
+        <tr><td><span class="badge badge-success">MCP 服务</span></td><td>专家可连接的企业系统</td><td>Wind 金融数据、内部研究库、企业邮箱</td></tr>
+        <tr><td><span class="badge badge-warning">知识库</span></td><td>挂载的领域专业知识库</td><td>行业研究报告库、估值模型库、案例库</td></tr>
+        <tr><td><span class="badge badge-danger">记忆策略</span></td><td>专家特有的记忆结构与默认偏好</td><td>记忆类型:偏好(投资风格) + 事件(决策记录)</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>Persona:系统提示词 + 能力边界声明 + 行为规范 + 安全约束</li>
+      <li>技能集:绑定 1-N 个技能,按场景自动选择调用</li>
+      <li>MCP 服务:声明所需 MCP 服务,用户订阅时授权连接</li>
+      <li>知识库:挂载 1-N 个领域知识库,专家自动检索引用</li>
+      <li>记忆策略:定义专家的记忆类型、TTL、置信度阈值</li>
+      <li>版本管理:专家每次更新创建新版本,订阅用户可一键升级</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 投资经理张三订阅 "投研分析师" 专家<br>
+      <strong>THEN</strong> 系统为张三实例化专家:加载 Persona 提示词、绑定 3 个技能(财报解析 / IPO 风险 / 尽调报告)、提示张三授权 Wind 数据与内部研究库 MCP 服务、挂载行业研究知识库、初始化记忆策略(默认关注张三已关注的赛道)。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/expert-market">查看专家市场原型</a></li>
+      <li><a href="#/docs/architecture/agent-runtime">关联架构:Agent 运行时</a></li>
+      <li><a href="#/docs/requirements/skill-market">关联需求:REQ-4.1 技能定义模型</a></li>
+      <li><a href="#/docs/requirements/companion">关联需求:REQ-2.2 长期记忆库</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-5.2 预置专家 -->
+<div class="card" id="REQ-5.2">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-5.2</span>
+        <strong>预置专家</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 至少预置以下 6 类专家:投资分析、法务、HR、会议纪要、文档摘要、数据查询;每个预置专家 SHALL 由官方或对应业务团队维护,持续迭代优化;SHALL 提供专家能力说明、适用场景、使用示例。</p>
+    <table class="table table-striped">
+      <thead>
+        <tr><th>专家</th><th>领域</th><th>核心能力</th><th>绑定技能</th><th>提供方</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>📈 投资分析师</td><td>投研</td><td>行业分析、企业估值、尽调报告</td><td>财报解析、IPO 风险、尽调报告生成</td><td>官方 + 投研团队</td></tr>
+        <tr><td>⚖ 法务顾问</td><td>法务</td><td>合同审查、风险条款、合规咨询</td><td>合同风险审查、案例检索、合规比对</td><td>法务团队</td></tr>
+        <tr><td>👥 HR 顾问</td><td>HR</td><td>员工关系、劳动法咨询、政策解读</td><td>政策检索、合同审查、案例检索</td><td>HR 团队</td></tr>
+        <tr><td>🎙 会议助手</td><td>通用</td><td>录音转写、纪要生成、待办管理</td><td>语音转写、纪要模板、待办提取</td><td>官方</td></tr>
+        <tr><td>📄 文档摘要专家</td><td>通用</td><td>长文档摘要、要点提取、多文档对比</td><td>PDF 提取、摘要生成、对比分析</td><td>官方</td></tr>
+        <tr><td>🔍 数据查询专家</td><td>数据</td><td>自然语言查数据、可视化、导出</td><td>SQL 生成、数据查询、图表生成</td><td>官方</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>能力说明:每个专家展示能力清单、适用场景、不适用场景</li>
+      <li>使用示例:提供 3-5 个典型对话示例,帮助用户理解专家能力</li>
+      <li>持续迭代:专家版本每季度至少更新一次,优化提示词与技能组合</li>
+      <li>反馈机制:用户可对专家回答评分与反馈,反馈用于优化</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 法务员工王五订阅 "法务顾问" 专家<br>
+      <strong>THEN</strong> 王五获得一个懂合同审查、合规咨询的专家,可上传合同 PDF 让专家识别风险条款,可提问 "劳动合同解除的法定情形有哪些" 获得基于法律知识库的专业回答,所有回答附带法规引用。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/expert-market">查看专家市场原型</a></li>
+      <li><a href="#/docs/requirements/skill-market">关联需求:REQ-4.4 技能市场浏览</a></li>
+      <li><a href="#/docs/requirements/knowledge">关联需求:REQ-7.1 文档接入(知识库挂载)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-5.3 专家订阅与个性化 -->
+<div class="card" id="REQ-5.3">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-5.3</span>
+        <strong>专家订阅与个性化</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 支持用户订阅多个专家,每个专家在用户空间内独立维护记忆与个性化配置;SHALL 支持基于用户偏好的专家微调(如调整回复风格、关注重点);订阅关系 SHALL 支持随时取消,取消后保留历史会话但停止记忆更新。</p>
+    <ul>
+      <li>多专家订阅:用户可同时订阅多个专家,在工作台切换使用</li>
+      <li>独立记忆:每个专家在用户空间内独立维护记忆,不互相干扰</li>
+      <li>个性化微调:用户可对订阅的专家进行个性化配置(回复风格、关注重点、默认参数)</li>
+      <li>记忆继承:用户级偏好记忆被所有订阅专家共享,专家级记忆独立</li>
+      <li>试用机制:支持 7 天免费试用,试用期内功能完整,满意后正式订阅</li>
+      <li>取消订阅:随时取消,历史会话保留,记忆停止更新,30 天后清理专家级记忆</li>
+      <li>更新通知:专家发布新版本时通知已订阅用户,可一键升级</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三同时订阅 "投资分析师" 与 "法务顾问" 两个专家<br>
+      <strong>THEN</strong> 两个专家在张三空间内独立运行:投资分析师记忆张三关注的赛道与估值偏好,法务顾问记忆张三关注的合同条款;张三的用户级偏好(如回复风格简洁)被两个专家共享应用;张三可在工作台切换专家继续不同主题的对话。
+    </div>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 张三取消订阅 "法务顾问"<br>
+      <strong>THEN</strong> 法务顾问在张三空间内停用,张三无法再调用该专家;历史会话保留可查看,但专家级记忆停止更新,30 天后自动清理;张三可随时重新订阅恢复。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/expert-market">查看专家市场原型</a></li>
+      <li><a href="#/docs/requirements/companion">关联需求:REQ-2.3 偏好学习</a></li>
+      <li><a href="#/docs/requirements/profile">关联需求:REQ-11.4 我的订阅管理</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-5.4 专家市场 -->
+<div class="card" id="REQ-5.4">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-5.4</span>
+        <strong>专家市场浏览与评论</strong>
+      </div>
+      <div>
+        <span class="badge badge-warning">P1</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供专家市场浏览界面,支持按领域分类浏览、关键词搜索、订阅量排序;每个专家 SHALL 展示详情页,包含能力说明、适用场景、技能清单、知识库、订阅数、评分、用户评论;SHALL 支持用户对专家进行评分与评论。</p>
+    <ul>
+      <li>分类浏览:按投研 / 法务 / 合规 / HR / 通用分类,支持多级子分类</li>
+      <li>关键词搜索:全文搜索专家名称、能力描述、标签</li>
+      <li>排序:按订阅量、评分、最新发布、最近更新排序</li>
+      <li>专家详情页:能力说明、适用场景、绑定技能、所需 MCP 与知识库、订阅数、评分、评论</li>
+      <li>评分与评论:用户可对已订阅专家评分(1-5 星)与撰写评论,辅助他人决策</li>
+      <li>提供方标识:区分官方 / 业务团队 / 社区专家,官方与业务团队专家标记 "已认证"</li>
+      <li>使用统计:展示订阅数、调用次数、平均评分</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 新员工赵六想找法务方面的专家<br>
+      <strong>THEN</strong> 赵六在专家市场按 "法务" 分类浏览,看到 "法务顾问" 专家,展示订阅数 156、评分 4.7、提供方 "法务团队";赵六进入详情页查看能力说明(合同审查 / 合规咨询 / 案例检索)、绑定技能、所需 MCP 服务,阅读 3 条用户评论后决定订阅。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/expert-market">查看专家市场原型</a></li>
+      <li><a href="#/docs/requirements/profile">关联需求:REQ-11.4 我的订阅管理</a></li>
+      <li><a href="#/docs/requirements/admin">关联需求:REQ-10.5 市场审核</a></li>
+    </ul>
+  </div>
+</div>
+
+<h2>订阅与计费模式</h2>
+<details class="collapse" open>
+  <summary><span>订阅模式</span></summary>
+  <div class="collapse__body">
+    <ul>
+      <li><strong>免费专家</strong>:会议助手、文档摘要等通用专家免费使用</li>
+      <li><strong>按月订阅</strong>:投资分析师 ¥199/月,法务顾问 ¥299/月</li>
+      <li><strong>团队订阅</strong>:部门/团队统一订阅,价格优惠</li>
+      <li><strong>企业版</strong>:全公司订阅所有专家,统一计费</li>
+    </ul>
+  </div>
+</details>
+
+<h2>验收标准</h2>
+<div class="card">
+  <div class="card-body">
+    <ul>
+      <li>✅ 专家 Agent 模型完整,五大要素配置清晰</li>
+      <li>✅ 至少 6 类预置专家可用,能力说明与示例齐全</li>
+      <li>✅ 多专家订阅独立记忆,个性化微调生效</li>
+      <li>✅ 市场浏览流畅,评分评论功能正常</li>
+      <li>✅ 订阅、试用、取消流程完整</li>
+    </ul>
+  </div>
+</div>
+
+<h2>原型参考</h2>
+<p><a href="#/prototype/expert-market" class="card-link">查看专家市场原型</a></p>
+</body>
+</html>
