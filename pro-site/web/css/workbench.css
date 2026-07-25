@@ -1528,6 +1528,29 @@ li:hover > .wr-item-edit { display: block; }
   font-size: 12px; background: rgba(255,255,255,0.15);
   padding: 6px 14px; border-radius: 16px;
   border: 1px solid rgba(255,255,255,0.2);
+  display: flex; align-items: center; gap: 6px;
+}
+.pp-header-r { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.pp-project-switch { display: flex; align-items: center; gap: 6px; }
+.pp-project-switch select {
+  font-size: 12px; padding: 5px 8px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.15);
+  color: #fff; cursor: pointer; max-width: 180px;
+}
+.pp-project-switch select option { color: #1f2937; }
+.pp-header .date-range input[type="date"] {
+  background: transparent; color: #fff; border: none;
+  font-size: 12px; cursor: pointer; color-scheme: dark;
+}
+.pp-editable-title:focus,
+.pp-editable-inline:focus {
+  outline: 2px solid rgba(255,255,255,0.6); border-radius: 4px;
+  background: rgba(255,255,255,0.12);
+}
+.pp-editable-inline { display: inline-block; min-width: 40px; }
+.pp-editable-title:empty::before,
+.pp-editable-inline:empty::before {
+  content: attr(data-placeholder); opacity: 0.5;
 }
 
 /* Stats Bar */
@@ -1876,7 +1899,10 @@ li:hover > .wr-item-edit { display: block; }
   z-index: 5; pointer-events: none;
 }
 .pp-today-line::before {
-  content: '今天'; position: absolute; top: 4px; left: -20px;
+  content: ''; /* 日期标签改由 JS 动态渲染 (.pp-today-label) */
+}
+.pp-today-label {
+  position: absolute; top: 4px; left: -22px;
   font-size: 9px; color: var(--color-danger); font-weight: 700;
   background: #fff; padding: 2px 5px; border-radius: 3px;
   border: 1px solid var(--color-danger); white-space: nowrap;
@@ -2564,4 +2590,72 @@ li:hover > .wr-item-edit { display: block; }
   font-weight: 700;
   padding: 4px 0;
   min-height: 28px;
+}
+
+/* ==========================================================================
+   富文本/Markdown 编辑器 (rt- 前缀) · 用于会议纪要/议程简介
+   ========================================================================== */
+.rt-toolbar {
+  display: flex; gap: 6px; align-items: center;
+  margin-bottom: 8px;
+}
+.rt-toolbar button {
+  font-size: 12px; padding: 3px 10px; border-radius: 4px;
+  border: 1px solid var(--color-border); background: var(--color-bg-elevated);
+  color: var(--color-text-secondary); cursor: pointer;
+}
+.rt-toolbar button.active {
+  background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+}
+.rt-toolbar .rt-hint {
+  font-size: 11px; color: var(--color-text-tertiary); margin-left: auto;
+}
+.rt-preview {
+  font-size: 13px; line-height: 1.7; color: var(--color-text);
+  min-height: 80px; word-break: break-word;
+}
+.rt-preview:empty::before {
+  content: attr(data-placeholder); color: var(--color-text-tertiary);
+}
+.rt-preview h1, .rt-preview h2, .rt-preview h3 { margin: 8px 0 4px; line-height: 1.4; }
+.rt-preview h1 { font-size: 18px; }
+.rt-preview h2 { font-size: 16px; }
+.rt-preview h3 { font-size: 14px; }
+.rt-preview ul, .rt-preview ol { margin: 4px 0; padding-left: 22px; }
+.rt-preview li { margin: 2px 0; }
+.rt-preview code {
+  background: var(--color-bg-inset, #f1f5f9); padding: 1px 5px;
+  border-radius: 3px; font-size: 12px;
+}
+.rt-preview pre {
+  background: #f1f5f9; padding: 8px 10px; border-radius: 6px;
+  overflow-x: auto; font-size: 12px;
+}
+.rt-preview pre code { background: none; padding: 0; }
+.rt-preview blockquote {
+  border-left: 3px solid var(--color-border); margin: 6px 0;
+  padding: 2px 10px; color: var(--color-text-secondary);
+}
+.rt-preview a { color: var(--color-primary); }
+.rt-preview table { border-collapse: collapse; margin: 6px 0; }
+.rt-preview th, .rt-preview td { border: 1px solid var(--color-border); padding: 4px 8px; }
+.rt-editor {
+  width: 100%; min-height: 160px; font-family: inherit; font-size: 13px;
+  line-height: 1.6; padding: 8px 10px; border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); resize: vertical; outline: none;
+}
+.rt-editor:focus { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-light); }
+.rt-editor[hidden] { display: none; }
+.rt-preview[hidden] { display: none; }
+
+/* ==========================================================================
+   每周任务 · 看板拖拽 (需求 #7)
+   ========================================================================== */
+.task-item[draggable="true"] { cursor: grab; }
+.task-item.dragging { opacity: 0.45; transform: rotate(1deg); }
+.kanban__column-body.drag-over {
+  background: var(--color-primary-light, #eff6ff);
+  outline: 2px dashed var(--color-primary-border, #93c5fd);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
 }

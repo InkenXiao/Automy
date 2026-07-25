@@ -108,6 +108,33 @@ const API = {
   },
 
   /* ------------------------------------------------------------------
+     项目元信息
+     ------------------------------------------------------------------ */
+  getProjects() {
+    return this.get('/projects/');
+  },
+
+  getActiveProject() {
+    return this.get('/projects/active');
+  },
+
+  createProject(data) {
+    return this.post('/projects/', data);
+  },
+
+  updateProject(id, data) {
+    return this.put(`/projects/${id}`, data);
+  },
+
+  activateProject(id) {
+    return this.patch(`/projects/${id}/activate`);
+  },
+
+  deleteProject(id) {
+    return this.del(`/projects/${id}`);
+  },
+
+  /* ------------------------------------------------------------------
      进度计划任务
      ------------------------------------------------------------------ */
   getProgressTasks(params = {}) {

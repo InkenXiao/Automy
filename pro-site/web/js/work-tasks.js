@@ -177,7 +177,7 @@ const WorkTasks = {
     const isDone = task.status === 'done' || task.status === 'completed' || task.status === '已完成';
 
     return `
-      <div class="task-item" data-task-id="${task.id}">
+      <div class="task-item" draggable="true" data-task-id="${task.id}" title="拖拽卡片可跨列改变状态, 或在列内重排">
         <div class="task-item__header">
           <div class="task-item__name">${App.escapeHtml(task.name || '')}</div>
           ${sourceBadge}
@@ -254,6 +254,151 @@ const WorkTasks = {
         }
       });
     });
+
+    // 拖拽 (HTML5 DnD): 跨列改状态 + 列内重排
+    this.bindDnD(container);
+  },
+
+  /* ------------------------------------------------------------------
+   * 拖拽逻辑 (需求 #7)
+   * ---------------------------------------------------------------- */
+  // 列状态英文 -> 后端中文状态值
+  STATUS_FROM_COL: { 'todo': '待开始', 'in_progress': '进行中', 'done': '已完成' },
+
+  bindDnD(container) {
+    // 拖动的卡片 id
+    let draggedId = null;
+
+    const cards = container.querySelectorAll('.task-item[draggable="true"]');
+    const bodies = container.querySelectorAll('.kanban__column-body');
+
+    cards.forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        draggedId = card.getAttribute('data-task-id');
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        // Firefox 需要 setData 才能触发拖拽
+        try { e.dataTransfer.setData('text/plain', draggedId); } catch (_) {}
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        draggedId = null;
+        // 清理可能残留的 drag-over 高亮
+        bodies.forEach(b => b.classList.remove('drag-over'));
+      });
+    });
+
+    bodies.forEach(body => {
+      body.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        body.classList.add('drag-over');
+      });
+      body.addEventListener('dragleave', (e) => {
+        // 仅当离开整个列体时移除高亮 (避免子元素切换误触)
+        if (!body.contains(e.relatedTarget)) {
+          body.classList.remove('drag-over');
+        }
+      });
+      body.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        body.classList.remove('drag-over');
+        if (!draggedId) return;
+        const targetStatus = body.getAttribute('data-status');
+        // 计算插入位置: 找到光标所在位置最近的兄弟卡片
+        const beforeId = this._dropBeforeId(body, e.clientY);
+        await this._applyDrop(draggedId, targetStatus, beforeId);
+      });
+    });
+  },
+
+  /**
+   * 根据光标 Y 坐标, 返回该列中应当插入到哪张卡片之前(的 id)
+   * 若为 null 表示插入到列末尾
+   */
+  _dropBeforeId(body, clientY) {
+    const cards = [...body.querySelectorAll('.task-item:not(.dragging)')];
+    for (const card of cards) {
+      const rect = card.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (clientY < mid) {
+        return card.getAttribute('data-task-id');
+      }
+    }
+    return null;
+  },
+
+  /**
+   * 应用拖拽结果:
+   * 1. 调整本地 this.tasks 顺序与 status
+   * 2. 重排目标列的 sort_order (0..n)
+   * 3. 逐条 PUT 到后端 (status + sort_order)
+   * 4. 重新渲染看板
+   */
+  async _applyDrop(draggedId, targetColStatus, beforeId) {
+    const dragged = this.tasks.find(t => String(t.id) === String(draggedId));
+    if (!dragged) return;
+    const newStatus = this.STATUS_FROM_COL[targetColStatus] || dragged.status;
+
+    // 从原位置移除
+    const arr = this.tasks.filter(t => String(t.id) !== String(draggedId));
+    // 更新状态
+    dragged.status = newStatus;
+
+    // 重新插入到目标位置 (按列分组顺序重建整段顺序)
+    // 先按列: 收集三列卡片顺序
+    const colStatus = (s) => {
+      if (s === 'todo' || s === '待开始' || !s) return '待开始';
+      if (s === 'in_progress' || s === '进行中') return '进行中';
+      if (s === 'done' || s === 'completed' || s === '已完成') return '已完成';
+      return '待开始';
+    };
+    const groups = { '待开始': [], '进行中': [], '已完成': [] };
+    arr.forEach(t => { groups[colStatus(t.status)].push(t); });
+
+    const targetGroup = groups[newStatus];
+    if (beforeId == null) {
+      targetGroup.push(dragged);
+    } else {
+      const idx = targetGroup.findIndex(t => String(t.id) === String(beforeId));
+      if (idx < 0) {
+        targetGroup.push(dragged);
+      } else {
+        targetGroup.splice(idx, 0, dragged);
+      }
+    }
+
+    // 合并三列, 重新生成 this.tasks
+    this.tasks = [...groups['待开始'], ...groups['进行中'], ...groups['已完成']];
+
+    // 计算每列新的 sort_order 并收集需要持久化的变更
+    const updates = [];
+    ['待开始', '进行中', '已完成'].forEach(status => {
+      groups[status].forEach((t, i) => {
+        if (String(t.id) === String(draggedId)) {
+          // 拖动的卡片: status 与 sort_order 都可能变化
+          updates.push({ id: t.id, status, sort_order: i });
+        } else if (t.sort_order !== i) {
+          // 其余卡片: 仅当 sort_order 变化时更新
+          updates.push({ id: t.id, status, sort_order: i });
+        }
+        t.sort_order = i;
+      });
+    });
+
+    // 先本地渲染, 给用户即时反馈
+    this.renderKanban(this.tasks);
+
+    // 持久化 (逐条 PUT; 失败不阻断, 仅提示)
+    if (updates.length === 0) return;
+    try {
+      await Promise.all(updates.map(u => API.updateWorkTask(u.id, { status: u.status, sort_order: u.sort_order })));
+      App.showToast('已保存排序与状态', 'success', 1500);
+    } catch (err) {
+      App.showToast(`部分保存失败: ${err.message}`, 'error');
+      // 失败时重新加载以同步后端真实状态
+      this.loadTasks(this.currentWeekStart);
+    }
   },
 
   /** 导出每周工作任务看板为 PDF (看板多列转单列, 便于阅读) */

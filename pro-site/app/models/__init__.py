@@ -20,6 +20,7 @@ __all__ = [
     "MeetingItem",
     "Module",
     "Phase",
+    "Project",
     "ProgressTask",
     "WeeklyReport",
     "WeeklyKpi",

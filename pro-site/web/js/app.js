@@ -8,6 +8,7 @@ const App = {
   state: {
     modules: [],     // 模块列表
     phases: [],      // 阶段列表
+    project: null,   // 当前激活项目元信息 (进度计划执行图)
     currentWeek: '', // 当前选择的周次 (格式 YYYY-Www)
     currentView: 'progress-plan'
   },
@@ -24,6 +25,7 @@ const App = {
     try {
       await this.loadModules();
       await this.loadPhases();
+      await this.loadActiveProject();
     } catch (err) {
       this.showToast(`加载基础数据失败: ${err.message}`, 'error');
     }
@@ -33,6 +35,9 @@ const App = {
     ProgressPlan.init();
     WorkTasks.init();
     Meeting.init();
+
+    // 触发默认视图(进度计划)的首次加载, 避免首屏主区域空白
+    this.switchView(this.state.currentView);
   },
 
   /** 绑定左侧导航切换 */
@@ -114,6 +119,13 @@ const App = {
   async loadPhases() {
     const data = await API.getPhases();
     this.state.phases = Array.isArray(data) ? data : (data.items || []);
+  },
+
+  /** 加载当前激活项目元信息到全局状态 (无项目时后端会幂等创建默认项目) */
+  async loadActiveProject() {
+    const data = await API.getActiveProject();
+    this.state.project = data || null;
+    return this.state.project;
   },
 
   /** 根据 id 取模块信息 */
@@ -256,6 +268,27 @@ const App = {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+  },
+
+  /** 格式化为简写日期 M/D (如 7/23), 用于今天线标签等 */
+  formatShortDate(dateStr) {
+    const d = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(d.getTime())) return '';
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  },
+
+  /** 将 Markdown 文本渲染为 HTML (用于富文本预览) */
+  renderMarkdown(md) {
+    if (!md) return '';
+    try {
+      if (typeof window.marked === 'undefined') {
+        // marked 未加载时退化为转义文本 + 换行
+        return this.escapeHtml(md).replace(/\n/g, '<br>');
+      }
+      return window.marked.parse(String(md), { breaks: true, gfm: true });
+    } catch (e) {
+      return this.escapeHtml(String(md)).replace(/\n/g, '<br>');
+    }
   },
 
   /**

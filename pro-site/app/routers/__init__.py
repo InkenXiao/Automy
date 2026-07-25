@@ -3,6 +3,7 @@ from app.routers import (
     modules,
     phases,
     progress_tasks,
+    projects,
     weekly_reports,
     work_tasks,
 )
@@ -11,6 +12,7 @@ __all__ = [
     "modules",
     "phases",
     "progress_tasks",
+    "projects",
     "weekly_reports",
     "work_tasks",
 ]

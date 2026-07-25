@@ -270,6 +270,17 @@ const Meeting = {
         this.exportPdf();
         break;
     }
+
+    // 富文本编辑器工具栏按钮 (编辑/预览/保存)
+    const rtEl = e.target.closest('[data-rt-action]');
+    if (rtEl) {
+      const act = rtEl.dataset.rtAction;
+      if (act === 'edit' || act === 'preview') {
+        this.switchRtMode(act);
+      } else if (act === 'save') {
+        this.saveRtContent();
+      }
+    }
   },
 
   /** 双击: 进入议程页 */
@@ -282,28 +293,21 @@ const Meeting = {
   },
 
   /* ------------------------------------------------------------------
-   * 右栏详情: 会议纪要 / 议程简介
+   * 右栏详情: 会议纪要 / 议程简介 (富文本 Markdown 编辑 + 预览)
    * ---------------------------------------------------------------- */
-  /** 选中会议 → 右栏显示会议纪要(仅 description) */
+  /** 选中会议 → 右栏显示会议纪要(仅 description, 支持 Markdown) */
   selectMeeting(id) {
     const m = this.state.meetings.find(x => String(x.id) === String(id));
     if (!m) return;
     this.state.selectedMeeting = m;
     this.state.currentMeeting = null;
     this.renderList();
-
-    App.showDetail(`
-      <div class="detail-panel__header">
-        <div class="detail-panel__title">📝 会议纪要</div>
-        <div class="detail-panel__meta">${App.escapeHtml(m.title || '')} · ${App.escapeHtml(m.meet_date || '')}</div>
-      </div>
-      <div class="detail-panel__body">
-        <div class="detail-editable detail-editable--lg" contenteditable="true" data-field="description" data-placeholder="请输入会议纪要、描述或总结...">${App.escapeHtml(m.description || '')}</div>
-      </div>
-    `);
+    this.renderRichPanel('meeting', m.id, '📝 会议纪要',
+      `${App.escapeHtml(m.title || '')} · ${App.escapeHtml(m.meet_date || '')}`,
+      m.description || '', '请输入会议纪要、描述或总结（支持 Markdown）...');
   },
 
-  /** 选中议程项 → 右栏显示内容简介(仅 description) */
+  /** 选中议程项 → 右栏显示内容简介(仅 description, 支持 Markdown) */
   selectItem(itemId) {
     const m = this.state.currentMeeting;
     if (!m) return;
@@ -311,16 +315,106 @@ const Meeting = {
     if (!it) return;
     this.state.selectedItem = it;
     this.renderDetail(m);
+    this.renderRichPanel('item', it.id, '📋 议程内容简介',
+      `${App.escapeHtml(it.theme || '(未命名)')} · 议程 #${it.id}`,
+      it.description || '', '请输入该议程项的内容简介（支持 Markdown）...');
+  },
 
+  /**
+   * 渲染富文本 Markdown 编辑器面板到右栏
+   * @param {'meeting'|'item'} kind  - 编辑的是会议纪要还是议程简介
+   * @param {number|string} rtId     - 会议 id 或议程项 id
+   * @param {string} panelTitle      - 面板标题
+   * @param {string} panelMeta       - 面板副标题
+   * @param {string} value           - 当前 Markdown 内容
+   * @param {string} placeholder     - 编辑器占位提示
+   */
+  renderRichPanel(kind, rtId, panelTitle, panelMeta, value, placeholder) {
     App.showDetail(`
       <div class="detail-panel__header">
-        <div class="detail-panel__title">📋 议程内容简介</div>
-        <div class="detail-panel__meta">${App.escapeHtml(it.theme || '(未命名)')} · 议程 #${it.id}</div>
+        <div class="detail-panel__title">${panelTitle}</div>
+        <div class="detail-panel__meta">${panelMeta}</div>
       </div>
-      <div class="detail-panel__body">
-        <div class="detail-editable detail-editable--lg" contenteditable="true" data-item-field="description" data-item-id="${it.id}" data-placeholder="请输入该议程项的内容简介...">${App.escapeHtml(it.description || '')}</div>
+      <div class="detail-panel__body" data-rt-kind="${kind}" data-rt-id="${rtId}">
+        <div class="rt-toolbar">
+          <button class="rt-btn active" data-rt-action="edit" title="编辑 Markdown 源码">✏️ 编辑</button>
+          <button class="rt-btn" data-rt-action="preview" title="预览渲染效果">👁️ 预览</button>
+          <span class="rt-hint">支持 Markdown 语法</span>
+          <button class="rt-btn rt-save" data-rt-action="save" title="保存">💾 保存</button>
+        </div>
+        <textarea class="rt-editor" data-rt-target="editor" placeholder="${App.escapeHtml(placeholder)}">${App.escapeHtml(value)}</textarea>
+        <div class="rt-preview" data-rt-target="preview" hidden></div>
       </div>
     `);
+    // 初始进入编辑模式时同步一次预览内容(供切换时使用)
+    this._syncRtPreview();
+  },
+
+  /** 同步编辑器内容到预览区 */
+  _syncRtPreview() {
+    const editor = document.querySelector('[data-rt-target="editor"]');
+    const preview = document.querySelector('[data-rt-target="preview"]');
+    if (!editor || !preview) return;
+    const md = editor.value || '';
+    preview.innerHTML = md ? App.renderMarkdown(md) : `<div style="color:var(--color-text-tertiary);font-size:12px;">${App.escapeHtml(editor.placeholder || '')}</div>`;
+  },
+
+  /** 切换富文本编辑器模式: 'edit' | 'preview' */
+  switchRtMode(mode) {
+    const editor = document.querySelector('[data-rt-target="editor"]');
+    const preview = document.querySelector('[data-rt-target="preview"]');
+    if (!editor || !preview) return;
+    if (mode === 'preview') {
+      this._syncRtPreview();
+      editor.hidden = true;
+      preview.hidden = false;
+    } else {
+      editor.hidden = false;
+      preview.hidden = true;
+    }
+    document.querySelectorAll('.rt-toolbar .rt-btn[data-rt-action]').forEach(b => {
+      const act = b.dataset.rtAction;
+      b.classList.toggle('active', act === mode);
+    });
+  },
+
+  /** 保存富文本编辑器内容到后端 */
+  async saveRtContent() {
+    const body = document.querySelector('.detail-panel__body[data-rt-kind]');
+    if (!body) return;
+    const kind = body.dataset.rtKind;
+    const rtId = body.dataset.rtId;
+    const editor = body.querySelector('[data-rt-target="editor"]');
+    if (!editor) return;
+    const value = editor.value;
+
+    try {
+      if (kind === 'meeting') {
+        // 会议纪要
+        const m = this.state.selectedMeeting || this.state.meetings.find(x => String(x.id) === String(rtId));
+        await API.updateMeeting(rtId, { description: value });
+        if (m) {
+          m.description = value;
+          const inList = this.state.meetings.find(x => String(x.id) === String(rtId));
+          if (inList) inList.description = value;
+        }
+      } else {
+        // 议程简介
+        const m = this.state.currentMeeting;
+        if (!m) throw new Error('未找到当前会议');
+        await API.updateMeetingItem(m.id, rtId, { description: value });
+        const it = (m.items || []).find(x => String(x.id) === String(rtId));
+        if (it) it.description = value;
+        if (this.state.selectedItem && String(this.state.selectedItem.id) === String(rtId)) {
+          this.state.selectedItem.description = value;
+        }
+      }
+      // 保存后停留在当前模式, 刷新预览
+      this._syncRtPreview();
+      App.showToast('已保存', 'success', 1500);
+    } catch (err) {
+      App.showToast(`保存失败: ${err.message}`, 'error');
+    }
   },
 
   /* ------------------------------------------------------------------
@@ -333,15 +427,15 @@ const Meeting = {
       this._focusSnapshot = cell.textContent.trim();
       return;
     }
-    // 右栏编辑字段
-    const el = e.target.closest('[data-field]') || e.target.closest('[data-item-field]');
+    // 右栏编辑字段(会议元信息: 主题/日期/时间/地点/主持人/参会人员)
+    const el = e.target.closest('[data-field]');
     if (el) {
       this._focusSnapshot = el.textContent.trim();
     }
   },
 
   async handleBlur(e) {
-    // 议程项单元格失焦
+    // 议程项单元格失焦(中栏议程表格)
     const cell = e.target.closest('.mt-cell[data-k]');
     if (cell) {
       const m = this.state.currentMeeting;
@@ -363,30 +457,8 @@ const Meeting = {
       return;
     }
 
-    // 议程项内容简介失焦(右栏)
-    const itemEl = e.target.closest('[data-item-field]');
-    if (itemEl) {
-      const itemId = itemEl.dataset.itemId;
-      const field = itemEl.dataset.itemField;
-      const val = itemEl.textContent.trim();
-      if (val !== this._focusSnapshot) {
-        try {
-          await API.updateMeetingItem(this.state.currentMeeting.id, itemId, { [field]: val });
-          const it = (this.state.currentMeeting.items || []).find(x => String(x.id) === String(itemId));
-          if (it) it[field] = val;
-          if (this.state.selectedItem && String(this.state.selectedItem.id) === String(itemId)) {
-            this.state.selectedItem[field] = val;
-          }
-          App.showToast('已保存', 'success', 1500);
-        } catch (err) {
-          App.showToast(`保存失败: ${err.message}`, 'error');
-        }
-      }
-      this._focusSnapshot = null;
-      return;
-    }
-
-    // 会议元信息失焦(中栏议程页 + 右栏纪要)
+    // 会议元信息失焦(中栏议程页: 主题/日期/时间/地点/主持人/参会人员)
+    // 注: description 字段已改由富文本编辑器处理, 不再走 contenteditable
     const el = e.target.closest('[data-field]');
     if (!el) return;
     const field = el.dataset.field;

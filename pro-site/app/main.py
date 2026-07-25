@@ -12,6 +12,7 @@ from app.routers import (
     modules,
     phases,
     progress_tasks,
+    projects,
     weekly_reports,
     work_tasks,
 )
@@ -40,6 +41,7 @@ for router in [
     modules.router,
     phases.router,
     progress_tasks.router,
+    projects.router,
     weekly_reports.router,
     work_tasks.router,
 ]:

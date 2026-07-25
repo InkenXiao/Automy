@@ -19,34 +19,13 @@ const ProgressPlan = {
   // 被隐藏的阶段 (图例点击)
   hiddenPhases: new Set(),
 
-  // 项目周期: 2026-07-01 ~ 2026-12-31, 共 184 天
-  PROJECT_START: new Date('2026-06-30T16:00:00Z'),  // 2026-07-01 UTC+8
-  TOTAL_DAYS: 184,
-
-  // 月份定义 (start/end 为相对 2026-07-01 的天数偏移, 0-based)
-  MONTHS: [
-    { name: '2026年7月',  start: 0,   end: 30  },
-    { name: '8月',         start: 31,  end: 61  },
-    { name: '9月',         start: 62,  end: 91  },
-    { name: '10月',        start: 92,  end: 122 },
-    { name: '11月',        start: 123, end: 152 },
-    { name: '12月',        start: 153, end: 183 }
-  ],
-  // 双周迭代 (12 个)
-  BIWEEKS: [
-    { label: '迭代1\n7/1-7/14',   start: 0,   end: 13  },
-    { label: '迭代2\n7/15-7/31',  start: 14,  end: 30  },
-    { label: '迭代3\n8/1-8/14',   start: 31,  end: 44  },
-    { label: '迭代4\n8/15-8/31',  start: 45,  end: 61  },
-    { label: '迭代5\n9/1-9/14',   start: 62,  end: 75  },
-    { label: '迭代6\n9/15-9/30',  start: 76,  end: 91  },
-    { label: '迭代7\n10/1-10/14', start: 92,  end: 105 },
-    { label: '迭代8\n10/15-10/31',start: 106, end: 122 },
-    { label: '迭代9\n11/1-11/14', start: 123, end: 136 },
-    { label: '迭代10\n11/15-11/30',start: 137,end: 152 },
-    { label: '迭代11\n12/1-12/15',start: 153, end: 167 },
-    { label: '迭代12\n12/16-12/31',start: 168,end: 183 }
-  ],
+  // 时间轴参数 (由 initTimeline() 根据当前项目周期动态生成, 支持多项目)
+  project: null,        // 当前项目元信息 {id,name,title,based_doc,start_date,end_date}
+  projects: [],         // 全部项目列表 (供头部下拉切换)
+  PROJECT_START: null,  // 项目起始日 (本地午夜 Date)
+  TOTAL_DAYS: 184,      // 项目总天数
+  MONTHS: [],           // 月份定义 [{name, start, end}] (start/end 为相对起始日的天数偏移)
+  BIWEEKS: [],          // 双周迭代 [{label, start, end}]
 
   /* ------------------------------------------------------------------
    * 初始化
@@ -56,7 +35,11 @@ const ProgressPlan = {
   },
 
   /** 切换到此视图时触发 */
-  onShow() {
+  async onShow() {
+    // 确保项目元信息已加载 (后端在无项目时会幂等创建默认项目)
+    if (!this.project) {
+      await this.ensureProject();
+    }
     if (this.tasks.length === 0) {
       this.loadTasks();
     } else {
@@ -64,12 +47,91 @@ const ProgressPlan = {
     }
   },
 
+  /** 加载当前激活项目 + 全部项目列表, 并重建时间轴 */
+  async ensureProject() {
+    try {
+      const [active, all] = await Promise.all([
+        API.getActiveProject(),
+        API.getProjects(),
+      ]);
+      App.state.project = active;
+      this.project = active;
+      this.projects = Array.isArray(all) ? all : [];
+      this.initTimeline();
+    } catch (err) {
+      App.showToast(`加载项目信息失败: ${err.message}`, 'error');
+    }
+  },
+
+  /** 根据当前项目的 start_date/end_date 动态生成时间轴参数 */
+  initTimeline() {
+    const p = this.project;
+    if (!p || !p.start_date || !p.end_date) {
+      this.PROJECT_START = null;
+      this.TOTAL_DAYS = 1;
+      this.MONTHS = [];
+      this.BIWEEKS = [];
+      return;
+    }
+    // 本地午夜起始, 避免 dateToDay 因时区偏移
+    const start = new Date(p.start_date + 'T00:00:00');
+    const end = new Date(p.end_date + 'T00:00:00');
+    this.PROJECT_START = start;
+    this.TOTAL_DAYS = Math.max(1, Math.round((end - start) / 86400000) + 1);
+    this.MONTHS = this.buildMonths(start, end);
+    this.BIWEEKS = this.buildBiweeks(start, end);
+  },
+
+  /** 按月切分, 返回 [{name, start, end}] (start/end 为相对起始日的偏移) */
+  buildMonths(start, end) {
+    const months = [];
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    const startYear = start.getFullYear();
+    while (cur <= end) {
+      const mStart = new Date(cur.getFullYear(), cur.getMonth(), 1);
+      const mEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0); // 月末
+      const so = Math.max(0, Math.round((mStart - start) / 86400000));
+      const eo = Math.min(this.TOTAL_DAYS - 1, Math.round((mEnd - start) / 86400000));
+      const name = cur.getFullYear() === startYear && months.length === 0
+        ? `${cur.getFullYear()}年${cur.getMonth() + 1}月`
+        : `${cur.getMonth() + 1}月`;
+      months.push({ name, start: so, end: eo });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return months;
+  },
+
+  /** 从起始日按 14 天一段切分双周迭代, 末段不足 14 天并入最后一段 */
+  buildBiweeks(start, end) {
+    const list = [];
+    let idx = 1;
+    let cur = new Date(start);
+    while (cur <= end) {
+      const segStart = new Date(cur);
+      let segEnd = new Date(cur);
+      segEnd.setDate(segEnd.getDate() + 13); // 14 天 (含首日)
+      if (segEnd > end) segEnd = new Date(end);
+      const so = Math.round((segStart - start) / 86400000);
+      const eo = Math.round((segEnd - start) / 86400000);
+      const fmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+      list.push({
+        label: `迭代${idx}\n${fmt(segStart)}-${fmt(segEnd)}`,
+        start: so,
+        end: eo,
+      });
+      idx++;
+      cur = new Date(segEnd);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return list;
+  },
+
   /* ------------------------------------------------------------------
    * 工具函数
    * ---------------------------------------------------------------- */
-  /** 把日期字符串 (YYYY-MM-DD) 转为相对 2026-07-01 的天数偏移 (0-based) */
+  /** 把日期字符串 (YYYY-MM-DD) 转为相对项目起始日的天数偏移 (0-based) */
   dateToDay(dateStr) {
-    if (!dateStr) return 0;
+    if (!dateStr || !this.PROJECT_START) return 0;
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return 0;
     const diff = Math.round((d - this.PROJECT_START) / 86400000);
@@ -83,6 +145,7 @@ const ProgressPlan = {
 
   /** 计算今天的偏移天数 (基于实际当前日期, 限制在 [0, TOTAL_DAYS-1]) */
   todayDay() {
+    if (!this.PROJECT_START) return 0;
     const now = new Date();
     const diff = Math.round((now - this.PROJECT_START) / 86400000);
     return Math.max(0, Math.min(this.TOTAL_DAYS - 1, diff));
@@ -128,19 +191,37 @@ const ProgressPlan = {
     const msCount = this.tasks.filter(t => t.is_milestone || t.status === 'milestone').length;
     const taskCount = this.tasks.length - msCount;
     const biweekCount = this.BIWEEKS.length;
+    const weekCount = Math.max(1, Math.round(this.TOTAL_DAYS / 7));
+    const p = this.project || {};
+    const projTitle = p.title || '项目进度计划执行图';
+    const projBasedDoc = p.based_doc || '';
+    const projStart = p.start_date ? App.formatDate(p.start_date) : '';
+    const projEnd = p.end_date ? App.formatDate(p.end_date) : '';
+    const projectId = p.id || '';
+    const projectOptions = (this.projects.length ? this.projects : (p.id ? [p] : []))
+      .map(pr => `<option value="${pr.id}" ${String(pr.id) === String(projectId) ? 'selected' : ''}>${App.escapeHtml(pr.name || pr.title || ('项目#' + pr.id))}</option>`).join('');
 
     view.innerHTML = `
       <div class="pp-container">
         <div class="pp-header">
           <div>
-            <h1>信投 AI 2.0 项目进度计划执行图</h1>
+            <h1 class="pp-editable-title" contenteditable="true" data-pfield="title" data-placeholder="项目进度计划执行图标题">${App.escapeHtml(projTitle)}</h1>
             <div class="subtitle">
-              <span>📅 基于《20260710信投AI2.0项目进度计划V2.3》</span>
+              <span>📅 基于《<span class="pp-editable-inline" contenteditable="true" data-pfield="based_doc" data-placeholder="文档名称">${App.escapeHtml(projBasedDoc)}</span>》</span>
               <span>⚡ ${phaseCount}阶段 · ${biweekCount}迭代 · ${msCount}里程碑 · ${taskCount}项任务</span>
-              <span>🔍 点击任务查看详情, 勾选标记完成</span>
             </div>
           </div>
-          <div class="date-range">2026年7月1日 — 2026年12月31日</div>
+          <div class="pp-header-r">
+            <div class="pp-project-switch">
+              <select id="pp-project-select" title="切换项目">${projectOptions}</select>
+              <button class="pp-btn" id="pp-new-project-btn" title="新建项目">＋ 新建项目</button>
+            </div>
+            <div class="date-range">
+              <input type="date" id="pp-proj-start" value="${projStart}" title="项目开始日期">
+              <span>—</span>
+              <input type="date" id="pp-proj-end" value="${projEnd}" title="项目结束日期">
+            </div>
+          </div>
         </div>
 
         <div class="pp-stats-bar" id="pp-stats-bar">
@@ -170,8 +251,8 @@ const ProgressPlan = {
             <div class="progress-bar"><div class="progress-fill" id="pp-prog-total" style="width:0%;background:linear-gradient(90deg,#2563eb,#10b981)"></div></div>
           </div>
           <div class="pp-stat-item">
-            <div class="num" style="background:linear-gradient(135deg,#ef4444,#f87171);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">26</div>
-            <div class="label">周（约6个月）</div>
+            <div class="num" style="background:linear-gradient(135deg,#ef4444,#f87171);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${weekCount}</div>
+            <div class="label">周（约${Math.round(weekCount / 4.3)}个月）</div>
           </div>
         </div>
 
@@ -306,10 +387,13 @@ const ProgressPlan = {
     bg.innerHTML = html;
   },
 
-  /** 渲染今天线 */
+  /** 渲染今天线 (红色竖线 + 当天日期简写标签, 如 7/23) */
   renderTodayLine() {
     const line = document.getElementById('pp-today-line');
-    if (line) line.style.left = this.dayToPct(this.todayDay()) + '%';
+    if (!line) return;
+    line.style.left = this.dayToPct(this.todayDay()) + '%';
+    // 日期标签 (替代原 CSS 固定文案 "今天")
+    line.innerHTML = `<div class="pp-today-label">${App.formatShortDate()}</div>`;
   },
 
   /* ------------------------------------------------------------------
@@ -504,6 +588,61 @@ const ProgressPlan = {
    * 绑定事件
    * ---------------------------------------------------------------- */
   bindEvents() {
+    // ---- 项目元信息编辑 (标题/基于文档 contenteditable blur 保存) ----
+    document.querySelectorAll('[data-pfield]').forEach(el => {
+      if (el.tagName === 'INPUT') return; // 日期用 change 单独处理
+      const field = el.dataset.pfield;
+      let snapshot = el.textContent.trim();
+      el.addEventListener('focus', () => { snapshot = el.textContent.trim(); });
+      el.addEventListener('blur', async () => {
+        const val = el.textContent.trim();
+        if (val === snapshot) return;
+        snapshot = val;
+        await this.saveProjectField(field, val);
+      });
+    });
+
+    // 项目周期日期 (开始/结束) change → 保存并重建时间轴
+    const projStart = document.getElementById('pp-proj-start');
+    const projEnd = document.getElementById('pp-proj-end');
+    if (projStart) {
+      projStart.addEventListener('change', async () => {
+        await this.saveProjectField('start_date', projStart.value);
+        this.initTimeline();
+        this.renderTimelineHeaders();
+        this.renderGridBg();
+        this.renderTodayLine();
+        this.renderTasks();
+      });
+    }
+    if (projEnd) {
+      projEnd.addEventListener('change', async () => {
+        await this.saveProjectField('end_date', projEnd.value);
+        this.initTimeline();
+        this.renderTimelineHeaders();
+        this.renderGridBg();
+        this.renderTodayLine();
+        this.renderTasks();
+      });
+    }
+
+    // 项目切换
+    const projSelect = document.getElementById('pp-project-select');
+    if (projSelect) {
+      projSelect.addEventListener('change', async () => {
+        const newId = projSelect.value;
+        if (!newId || (this.project && String(this.project.id) === String(newId))) return;
+        await API.activateProject(newId);
+        this.tasks = []; // 切换项目后重新加载任务
+        await this.ensureProject();
+        this.loadTasks();
+      });
+    }
+
+    // 新建项目
+    const newProjBtn = document.getElementById('pp-new-project-btn');
+    if (newProjBtn) newProjBtn.addEventListener('click', () => this.createProject());
+
     // 阶段筛选
     document.querySelectorAll('[data-action="filter-phase"]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -996,5 +1135,88 @@ const ProgressPlan = {
     } catch (err) {
       App.showToast(`更新失败: ${err.message}`, 'error');
     }
+  },
+
+  /* ------------------------------------------------------------------
+   * 项目元信息保存 / 新建项目
+   * ---------------------------------------------------------------- */
+  /** 保存当前项目的某个字段到后端, 并同步本地缓存 */
+  async saveProjectField(field, value) {
+    if (!this.project || !this.project.id) {
+      App.showToast('项目信息未加载, 无法保存', 'warning');
+      return;
+    }
+    try {
+      const updated = await API.updateProject(this.project.id, { [field]: value });
+      this.project = updated;
+      App.state.project = updated;
+      // 同步项目下拉里的显示名
+      const inList = this.projects.find(p => String(p.id) === String(updated.id));
+      if (inList) Object.assign(inList, updated);
+      App.showToast('项目信息已保存', 'success', 1500);
+    } catch (err) {
+      App.showToast(`保存项目信息失败: ${err.message}`, 'error');
+    }
+  },
+
+  /** 新建项目 (弹窗输入, 创建后切换为当前项目) */
+  createProject() {
+    const modal = App.openModal({
+      title: '新建项目',
+      bodyHtml: `
+        <div class="form-group">
+          <label>项目名称 *</label>
+          <input type="text" id="pp-proj-name" placeholder="如 信投AI3.0">
+        </div>
+        <div class="form-group">
+          <label>执行图标题</label>
+          <input type="text" id="pp-proj-title" placeholder="项目进度计划执行图">
+        </div>
+        <div class="form-group">
+          <label>基于文档</label>
+          <input type="text" id="pp-proj-baseddoc" placeholder="文档名称">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>开始日期 *</label>
+            <input type="date" id="pp-proj-new-start">
+          </div>
+          <div class="form-group">
+            <label>结束日期 *</label>
+            <input type="date" id="pp-proj-new-end">
+          </div>
+        </div>
+      `,
+      footerHtml: `
+        <button class="btn btn-ghost" data-modal-close>取消</button>
+        <button class="btn btn-primary" id="pp-proj-create-btn">创建并切换</button>
+      `
+    });
+
+    modal.querySelector('#pp-proj-create-btn').addEventListener('click', async () => {
+      const name = modal.querySelector('#pp-proj-name').value.trim();
+      const startDate = modal.querySelector('#pp-proj-new-start').value;
+      const endDate = modal.querySelector('#pp-proj-new-end').value;
+      if (!name) { App.showToast('请输入项目名称', 'warning'); return; }
+      if (!startDate || !endDate) { App.showToast('请选择项目开始与结束日期', 'warning'); return; }
+      try {
+        const created = await API.createProject({
+          name,
+          title: modal.querySelector('#pp-proj-title').value.trim() || `${name} 项目进度计划执行图`,
+          based_doc: modal.querySelector('#pp-proj-baseddoc').value.trim(),
+          start_date: startDate,
+          end_date: endDate,
+          is_active: true,
+          sort_order: this.projects.length,
+        });
+        App.showToast('项目已创建并切换', 'success');
+        App.closeModal(modal);
+        this.tasks = [];
+        await this.ensureProject();
+        this.loadTasks();
+      } catch (err) {
+        App.showToast(`创建项目失败: ${err.message}`, 'error');
+      }
+    });
   }
 };
