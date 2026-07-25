@@ -51,8 +51,9 @@ export default defineConfig({
   },
   plugins: [staticCopyPlugin()],
   server: {
-    port: 5173,
-    open: true,
+    port: 8087,
+    host: '0.0.0.0',
+    open: false,
     // 支持通过 hash 路由访问子页面
     appType: 'mpa'
   }
