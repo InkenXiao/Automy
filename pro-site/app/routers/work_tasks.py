@@ -6,17 +6,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
+from app.models.module import Module
+from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
-from app.models.weekly_report import WeeklyPlanTask
+from app.models.weekly_report import WeeklyPlanTask, WeeklyReport
 from app.models.work_task import WeeklyWorkTask
 from app.schemas.work_task import (
     WeeklyWorkTaskCreate,
     WeeklyWorkTaskOut,
     WeeklyWorkTaskUpdate,
 )
+from app.utils import resolve_project_id
 
 router = APIRouter(prefix="/work-tasks", tags=["每周工作任务"])
 
@@ -38,8 +41,12 @@ async def _load_work_task(db: AsyncSession, task_id: int) -> WeeklyWorkTask:
             .selectinload(ProgressTask.phase),
             selectinload(WeeklyWorkTask.plan_task).selectinload(WeeklyPlanTask.module),
             selectinload(WeeklyWorkTask.module),
+            with_loader_criteria(WeeklyPlanTask, WeeklyPlanTask.is_delete.is_(False)),
+            with_loader_criteria(ProgressTask, ProgressTask.is_delete.is_(False)),
+            with_loader_criteria(Phase, Phase.is_delete.is_(False)),
+            with_loader_criteria(Module, Module.is_delete.is_(False)),
         )
-        .where(WeeklyWorkTask.id == task_id)
+        .where(WeeklyWorkTask.id == task_id, WeeklyWorkTask.is_delete.is_(False))
         .execution_options(populate_existing=True)
     )
     result = await db.execute(stmt)
@@ -51,19 +58,27 @@ async def _load_work_task(db: AsyncSession, task_id: int) -> WeeklyWorkTask:
 
 @router.get("/", response_model=list[WeeklyWorkTaskOut])
 async def list_work_tasks(
+    project_id: Optional[int] = None,
     week_start: Optional[date] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[WeeklyWorkTaskOut]:
-    """获取每周工作任务列表 (支持按 week_start 筛选)"""
+    """获取每周工作任务列表 (支持按 project_id / week_start 筛选; project_id 不传则用当前激活项目)"""
+    pid = await resolve_project_id(db, project_id)
     stmt = select(WeeklyWorkTask).options(
         selectinload(WeeklyWorkTask.plan_task)
         .selectinload(WeeklyPlanTask.progress_task)
         .selectinload(ProgressTask.phase),
         selectinload(WeeklyWorkTask.plan_task).selectinload(WeeklyPlanTask.module),
         selectinload(WeeklyWorkTask.module),
+        with_loader_criteria(WeeklyPlanTask, WeeklyPlanTask.is_delete.is_(False)),
+        with_loader_criteria(ProgressTask, ProgressTask.is_delete.is_(False)),
+        with_loader_criteria(Phase, Phase.is_delete.is_(False)),
+        with_loader_criteria(Module, Module.is_delete.is_(False)),
     )
+    stmt = stmt.where(WeeklyWorkTask.project_id == pid)
     if week_start is not None:
         stmt = stmt.where(WeeklyWorkTask.week_start == week_start)
+    stmt = stmt.where(WeeklyWorkTask.is_delete.is_(False))
     stmt = stmt.order_by(WeeklyWorkTask.sort_order, WeeklyWorkTask.id)
     result = await db.execute(stmt)
     items = result.scalars().all()
@@ -83,8 +98,10 @@ async def get_work_task(
 async def create_work_task(
     payload: WeeklyWorkTaskCreate, db: AsyncSession = Depends(get_db)
 ) -> WeeklyWorkTaskOut:
-    """新建每周工作任务"""
-    item = WeeklyWorkTask(**payload.model_dump())
+    """新建每周工作任务; project_id 未传时默认用当前激活项目"""
+    data = payload.model_dump()
+    data["project_id"] = await resolve_project_id(db, data.get("project_id"))
+    item = WeeklyWorkTask(**data)
     db.add(item)
     await db.flush()
     item = await _load_work_task(db, item.id)
@@ -97,10 +114,19 @@ async def create_work_tasks_from_plan(
     payload: FromPlanRequest,
     db: AsyncSession = Depends(get_db),
 ) -> list[WeeklyWorkTaskOut]:
-    """从周报下周任务批量生成每周工作任务"""
+    """从周报下周任务批量生成每周工作任务 (project_id 从周报继承)"""
+    # 取周报的 project_id 作为新工作任务的 project_id
+    report = await db.get(WeeklyReport, report_id)
+    if not report or report.is_delete:
+        raise HTTPException(status_code=404, detail="周报不存在")
+    pid = report.project_id
+
     stmt = (
         select(WeeklyPlanTask)
-        .where(WeeklyPlanTask.report_id == report_id)
+        .where(
+            WeeklyPlanTask.report_id == report_id,
+            WeeklyPlanTask.is_delete.is_(False),
+        )
         .order_by(WeeklyPlanTask.sort_order, WeeklyPlanTask.id)
     )
     result = await db.execute(stmt)
@@ -111,6 +137,7 @@ async def create_work_tasks_from_plan(
     created_ids: list[int] = []
     for idx, pt in enumerate(plan_tasks):
         item = WeeklyWorkTask(
+            project_id=pid,
             week_start=payload.week_start,
             week_end=payload.week_end,
             plan_task_id=pt.id,
@@ -135,8 +162,15 @@ async def create_work_tasks_from_plan(
             .selectinload(ProgressTask.phase),
             selectinload(WeeklyWorkTask.plan_task).selectinload(WeeklyPlanTask.module),
             selectinload(WeeklyWorkTask.module),
+            with_loader_criteria(WeeklyPlanTask, WeeklyPlanTask.is_delete.is_(False)),
+            with_loader_criteria(ProgressTask, ProgressTask.is_delete.is_(False)),
+            with_loader_criteria(Phase, Phase.is_delete.is_(False)),
+            with_loader_criteria(Module, Module.is_delete.is_(False)),
         )
-        .where(WeeklyWorkTask.id.in_(created_ids))
+        .where(
+            WeeklyWorkTask.id.in_(created_ids),
+            WeeklyWorkTask.is_delete.is_(False),
+        )
         .order_by(WeeklyWorkTask.sort_order, WeeklyWorkTask.id)
         .execution_options(populate_existing=True)
     )
@@ -153,7 +187,7 @@ async def update_work_task(
 ) -> WeeklyWorkTaskOut:
     """更新每周工作任务"""
     item = await db.get(WeeklyWorkTask, item_id)
-    if not item:
+    if not item or item.is_delete:
         raise HTTPException(status_code=404, detail="每周工作任务不存在")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
@@ -168,8 +202,8 @@ async def delete_work_task(
 ) -> dict:
     """删除每周工作任务"""
     item = await db.get(WeeklyWorkTask, item_id)
-    if not item:
+    if not item or item.is_delete:
         raise HTTPException(status_code=404, detail="每周工作任务不存在")
-    await db.delete(item)
+    item.is_delete = True
     await db.flush()
     return {"ok": True, "id": item_id}

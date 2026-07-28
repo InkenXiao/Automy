@@ -1,0 +1,75 @@
+# ============================================================
+# XIN-AI 三合一容器编排 (开发模式: 源码挂载, 改代码无需 rebuild)
+#
+# 一键启动: docker compose up -d
+# 查看日志: docker compose logs -f
+# 停止:     docker compose down
+#
+# 工作原理:
+#   - 镜像只装运行时 + 依赖 (Python venv / Node node_modules)
+#   - 三个项目源码通过卷挂载到容器, 修改宿主机代码实时生效
+#   - xin-site: Vite dev HMR 热更新 (浏览器自动刷新)
+#   - pro-site / abs-site: uvicorn --reload (Python 代码自动重载)
+#
+# 何时需要重新 build:
+#   - 修改了 pro-site/requirements.txt 或 abs-site/requirements.txt
+#   - 修改了 xin-site/package.json (新增/删除依赖)
+#   - 修改了 Dockerfile 或 docker-entrypoint.sh
+#   重新 build 后需清理命名卷: docker compose down -v && docker compose up -d --build
+# ============================================================
+
+services:
+  xin-ai:
+    container_name: xin-ai
+    build: .
+    image: xin-ai:latest
+    ports:
+      - "8087:8087"   # xin-site  (Vite dev 热更新)
+      - "8088:8088"   # pro-site  (FastAPI + reload)
+      - "8089:8089"   # abs-site  (FastAPI + reload)
+    env_file:
+      - .docker.env
+    environment:
+      - POSTGRES_HOST=${POSTGRES_HOST:-pg_db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-XIN}
+      - POSTGRES_USER=${POSTGRES_USER:-dbuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Siiit2026}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    volumes:
+      # ===== 源码挂载 (修改代码无需 rebuild) =====
+      - ./pro-site:/app/pro-site
+      - ./abs-site:/app/abs-site
+      - ./xin-site:/app/xin-site
+      # ===== 命名卷保护依赖 (不被源码挂载覆盖) =====
+      # 首次启动从镜像复制; 依赖变更后需 docker compose down -v 清理
+      - xin-ai-venv:/app/venv
+      - xin-ai-node-modules:/app/xin-site/node_modules
+      # ===== 日志持久化 =====
+      - xin-ai-logs:/app/logs
+    networks:
+      ai_network:
+        ipv4_address: 172.28.200.10
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8088/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  xin-ai-venv:            # Python 虚拟环境 (pro-site + abs-site 共用)
+  xin-ai-node-modules:    # xin-site 的 node_modules
+  xin-ai-logs:            # 应用日志
+
+networks:
+  ai_network:
+    external: true

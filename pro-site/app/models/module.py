@@ -1,18 +1,21 @@
 """项目模块字典模型"""
 from typing import List
 
-from sqlalchemy import Integer, String
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class Module(Base, TimestampMixin):
-    """项目模块字典 (底座/数据/智能体/应用/需求/协调)"""
+class Module(Base, TimestampMixin, SoftDeleteMixin):
+    """项目模块字典 (底座/数据/智能体/应用/需求/协调, 按项目隔离)"""
 
     __tablename__ = "modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )  # ★所属项目ID
     idx: Mapped[str] = mapped_column(String(4))  # '01','02'...
     tag: Mapped[str] = mapped_column(String(16))  # 底座/数据/智能体/应用/需求/协调
     title: Mapped[str] = mapped_column(String(128))
@@ -22,6 +25,7 @@ class Module(Base, TimestampMixin):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     # 关联
+    project: Mapped["Project"] = relationship("Project", back_populates="modules")
     kpis: Mapped[List["WeeklyKpi"]] = relationship("WeeklyKpi", back_populates="module")
     progress_items: Mapped[List["WeeklyProgressItem"]] = relationship(
         "WeeklyProgressItem", back_populates="module"

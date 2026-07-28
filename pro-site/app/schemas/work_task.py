@@ -12,6 +12,7 @@ from app.schemas.weekly_report import WeeklyPlanTaskOut
 class WeeklyWorkTaskBase(BaseModel):
     """每周工作任务基础字段"""
 
+    project_id: Optional[int] = None  # ★所属项目ID (可选, 后端默认用当前激活项目)
     week_start: date
     week_end: date
     plan_task_id: Optional[int] = None
@@ -32,7 +33,7 @@ class WeeklyWorkTaskCreate(WeeklyWorkTaskBase):
 
 
 class WeeklyWorkTaskUpdate(BaseModel):
-    """更新每周工作任务请求 (全部字段可选)"""
+    """更新每周工作任务请求 (全部字段可选, project_id 不可改)"""
 
     week_start: date | None = None
     week_end: date | None = None
@@ -53,6 +54,7 @@ class WeeklyWorkTaskOut(WeeklyWorkTaskBase):
     """每周工作任务输出 (含可选嵌套 plan_task 与 module)"""
 
     id: int
+    project_id: int  # ★所属项目ID
     plan_task: Optional[WeeklyPlanTaskOut] = None
     module: Optional[ModuleOut] = None
     model_config = ConfigDict(from_attributes=True)

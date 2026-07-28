@@ -346,6 +346,9 @@ const App = {
       'delayed':       { cls: 'badge--danger',  label: '延期' },
       'pending':       { cls: 'badge--gray',    label: '待开始' },
       'in_review':     { cls: 'badge--info',    label: '评审中' },
+      // 周报状态
+      'draft':         { cls: 'badge--gray',    label: '待汇报' },
+      'submitted':     { cls: 'badge--success', label: '已汇报' },
       // 进度计划任务状态 (后端)
       'planned':       { cls: 'badge--gray',    label: '待开始' },
       'ongoing':       { cls: 'badge--warning', label: '进行中' },
@@ -411,9 +414,10 @@ const App = {
     const loadingToast = this.showToast('正在生成PDF...', 'info', 60000);
 
     // 克隆元素到离屏容器, 避免影响原布局
+    // left:0 (非 -99999px) 确保 html2canvas windowWidth 能完整捕获内容, z-index:-1 遮盖避免视觉干扰
     const clone = element.cloneNode(true);
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:fixed;left:-99999px;top:0;z-index:-1;background:#ffffff;';
+    wrapper.style.cssText = 'position:fixed;left:0;top:0;z-index:-1;background:#ffffff;overflow:hidden;';
     wrapper.appendChild(clone);
     document.body.appendChild(wrapper);
 
@@ -424,6 +428,36 @@ const App = {
 
     if (prepareClone) {
       try { prepareClone(clone); } catch (e) { /* 忽略准备阶段错误, 继续导出 */ }
+    }
+
+    // 单页导出: 不分页, PDF 页面尺寸 = 内容尺寸 (适合周报等需完整保留格式的场景)
+    if (options.singlePage) {
+      const html2canvasFn = window.html2canvas;
+      const JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+      if (typeof html2canvasFn === 'function' && typeof JsPDF === 'function') {
+        return html2canvasFn(clone, {
+          scale: 2, useCORS: true, backgroundColor: '#ffffff',
+          windowWidth: clone.scrollWidth || 1200
+        }).then(canvas => {
+          const imgData = canvas.toDataURL('image/jpeg', 0.95);
+          const pdf = new JsPDF({
+            unit: 'px',
+            format: [canvas.width, canvas.height],
+            orientation: canvas.width >= canvas.height ? 'landscape' : 'portrait',
+            hotfixes: ['px_scaling']
+          });
+          pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height, undefined, 'FAST');
+          pdf.save(finalFilename);
+          if (loadingToast && loadingToast.parentNode) loadingToast.remove();
+          if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+          this.showToast('PDF已下载', 'success');
+        }).catch((err) => {
+          if (loadingToast && loadingToast.parentNode) loadingToast.remove();
+          if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+          this.showToast(`导出失败: ${err && err.message ? err.message : err}`, 'error');
+        });
+      }
+      // 库不可用时回退到标准分页导出
     }
 
     const opt = {
@@ -445,6 +479,7 @@ const App = {
       if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
       this.showToast('PDF已下载', 'success');
     }).catch((err) => {
+      console.error('[导出PDF失败]', err);
       if (loadingToast && loadingToast.parentNode) loadingToast.remove();
       if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
       this.showToast(`导出失败: ${err && err.message ? err.message : err}`, 'error');

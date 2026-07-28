@@ -694,3 +694,48 @@ npm run preview   # 预览构建产物
 | Cloudflare Pages 文档 | https://developers.cloudflare.com/pages/ |
 | Mermaid 文档 | https://mermaid.js.org/ |
 | MCP 协议规范 | https://modelcontextprotocol.io/ |
+
+---
+
+## 11. Docker 部署 (三合一容器)
+
+本工程为纯静态站点, 单独部署时可直接通过 Cloudflare Pages 或任意静态文件服务器; 同时也可与 `pro-site` / `abs-site` 共同打包为统一的 `xin-ai` 容器, 通过源码卷挂载实现开发模式热更新。
+
+### 11.1 容器编排要点
+
+- **镜像构建**: 仓库根的 `Dockerfile` 只装运行时与依赖 (Node node_modules + Python venv), 不含源码
+- **源码挂载**: `docker-compose.yml` 将 `./xin-site` / `./pro-site` / `./abs-site` 三个目录挂载到容器 `/app` 下, 修改宿主机代码实时生效
+- **依赖保护**: `node_modules` 存放在命名卷 (`xin-ai-node-modules`), 避免被源码挂载覆盖
+- **xin-site 启动**: 容器内通过 `vite dev --host 0.0.0.0 --port 8087` 启动, 开启 HMR 热更新, 浏览器自动刷新
+- **网络**: 容器加入外部 `ai_network`, 静态 IP `172.28.200.10`
+
+### 11.2 启动 / 停止
+
+```bash
+# 在仓库根目录执行
+docker compose up -d           # 启动 (首次会自动 build 镜像)
+docker compose logs -f         # 查看日志
+docker compose down            # 停止并清理容器
+docker compose down -v && docker compose up -d --build   # 依赖变更后重建
+```
+
+启动后访问: `http://localhost:8087/`
+
+### 11.3 何时需要重建镜像
+
+仅当以下文件变更时才需 `--build`:
+- `xin-site/package.json` (Node 依赖新增/删除)
+- `pro-site/requirements.txt` / `abs-site/requirements.txt` (Python 依赖, 同容器共享)
+- `Dockerfile` / `docker-entrypoint.sh` (构建或启动脚本)
+
+普通业务代码 (HTML/CSS/JS/JSON) 修改无需重建, Vite HMR 会自动推送到浏览器。
+
+### 11.4 部署方式对比
+
+| 场景 | 推荐方式 | 说明 |
+| --- | --- | --- |
+| 开发调试 | Docker 三合一容器 | 与后端同网络, 改代码实时生效 |
+| 生产部署 | Cloudflare Pages (`npx wrangler deploy`) | 全球 CDN 加速, 源码目录直接部署 |
+| 临时预览 | `npm run build && npm run preview` | 本地预览构建产物 |
+
+> Docker 容器内运行的是 Vite 开发服务器, 适合开发调试; 生产环境建议使用 Cloudflare Pages 部署构建产物或源码目录。

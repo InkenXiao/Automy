@@ -6,9 +6,10 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.base import SoftDeleteMixin
 
 
-class ReviewSchedule(Base):
+class ReviewSchedule(Base, SoftDeleteMixin):
     """复习计划 (艾宾浩斯 8 个间隔点)"""
 
     __tablename__ = "vocab_review_schedules"

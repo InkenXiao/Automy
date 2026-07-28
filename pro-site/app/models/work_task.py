@@ -5,15 +5,18 @@ from decimal import Decimal
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class WeeklyWorkTask(Base, TimestampMixin):
+class WeeklyWorkTask(Base, TimestampMixin, SoftDeleteMixin):
     """每周工作任务安排 ★核心关联表"""
 
     __tablename__ = "weekly_work_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )  # ★所属项目ID
     week_start: Mapped[date] = mapped_column(Date)
     week_end: Mapped[date] = mapped_column(Date)
     plan_task_id: Mapped[int] = mapped_column(
@@ -37,6 +40,7 @@ class WeeklyWorkTask(Base, TimestampMixin):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     # 关联
+    project: Mapped["Project"] = relationship("Project", back_populates="weekly_work_tasks")
     plan_task: Mapped["WeeklyPlanTask"] = relationship(
         "WeeklyPlanTask", back_populates="work_tasks"
     )

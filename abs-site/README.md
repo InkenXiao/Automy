@@ -204,6 +204,22 @@ vocab_units  1 ──< N  vocab_words  1 ──< N  vocab_review_schedules
 - **无需 Alembic 迁移**: 当前工程未集成迁移工具, 表结构变更依赖 `create_all` 的"存在则跳过"语义; **新增字段需手动 `ALTER TABLE` 或 DROP 重建**
 - **会话管理**: `get_db()` 异步生成器, 正常 `commit`, 异常 `rollback`, `finally` 关闭; 路由通过 `Depends(get_db)` 注入
 
+### 5.5 数据库脚本
+
+完整建表脚本位于仓库根的 `scripts/abs-site.sql`, 包含 3 张表的建表语句、索引、外键、字段备注, 幂等可重复执行 (基于 `IF NOT EXISTS`)。
+
+| 脚本 | 作用 | 执行方式 |
+| --- | --- | --- |
+| `scripts/abs-site.sql` | abs-site 完整建表 + 字段备注 | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/abs-site.sql` |
+| `scripts/db_comments.sql` | 全部表与字段备注 (含 abs-site + pro-site) | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/db_comments.sql` |
+
+> abs-site 无预置字典数据, 单词与单元由用户通过界面导入; 脚本仅负责表结构。
+
+```bash
+# 全新部署时执行完整脚本
+docker exec -i pg_db psql -U dbuser -d XIN < scripts/abs-site.sql
+```
+
 ---
 
 ## 6. 艾宾浩斯复习算法
@@ -411,3 +427,50 @@ python run.py
 ### 10.6 调整掌握阈值
 
 掌握判定阈值 `consecutive_passes >= 3` 硬编码于 `app/routers/review.py:134`, 修改该数字即可调高 / 调低掌握难度。
+
+---
+
+## 11. Docker 部署 (三合一容器)
+
+本工程与 `pro-site` / `xin-site` 共同打包为统一的 `xin-ai` 容器, 通过源码卷挂载实现开发模式热更新, 无需每次改代码都重建镜像。
+
+### 11.1 容器编排要点
+
+- **镜像构建**: 仓库根的 `Dockerfile` 只装运行时与依赖 (Python venv + Node node_modules), 不含源码
+- **源码挂载**: `docker-compose.yml` 将 `./pro-site` / `./abs-site` / `./xin-site` 三个目录挂载到容器 `/app` 下, 修改宿主机代码实时生效
+- **依赖保护**: venv 与 node_modules 存放在命名卷 (`xin-ai-venv` / `xin-ai-node-modules`), 避免被源码挂载覆盖
+- **abs-site 启动**: 容器内通过 `uvicorn --reload --host 0.0.0.0 --port 8089` 启动, 监听 `app/` 与 `web/` 目录变更
+- **网络**: 容器加入外部 `ai_network`, 静态 IP `172.28.200.10`, 通过容器名 `pg_db` 连接 PostgreSQL
+
+### 11.2 启动 / 停止
+
+```bash
+# 在仓库根目录执行
+docker compose up -d           # 启动 (首次会自动 build 镜像)
+docker compose logs -f         # 查看日志
+docker compose down            # 停止并清理容器
+docker compose down -v && docker compose up -d --build   # 依赖变更后重建
+```
+
+启动后访问:
+- 前端页面: `http://localhost:8089/`
+- API 文档: `http://localhost:8089/docs`
+
+### 11.3 何时需要重建镜像
+
+仅当以下文件变更时才需 `--build`:
+- `pro-site/requirements.txt` / `abs-site/requirements.txt` (Python 依赖)
+- `xin-site/package.json` (Node 依赖)
+- `Dockerfile` / `docker-entrypoint.sh` (构建或启动脚本)
+
+普通业务代码修改无需重建, uvicorn 自动重载即可生效。
+
+### 11.4 数据库初始化
+
+容器启动后, 执行一次完整建表脚本:
+
+```bash
+docker exec -i pg_db psql -U dbuser -d XIN < scripts/abs-site.sql
+```
+
+> `pg_db` 为 PostgreSQL 容器名, 与 `xin-ai` 容器同属 `ai_network` 网络。

@@ -42,8 +42,12 @@ class MeetingItemOut(MeetingItemCreate):
 
 # ---------- 会议主体 ----------
 class MeetingCreate(BaseModel):
-    """会议创建请求 (可携带议程项批量创建)"""
+    """会议创建请求 (可携带议程项批量创建)
 
+    project_id 可选, 不传时由后端用当前激活项目填充
+    """
+
+    project_id: int | None = None  # ★所属项目ID (可选, 后端默认用当前激活项目)
     title: str = "项目周例会"
     meet_date: str = ""
     meet_time: str = ""
@@ -56,7 +60,7 @@ class MeetingCreate(BaseModel):
 
 
 class MeetingUpdate(BaseModel):
-    """会议更新请求 (全部字段可选)"""
+    """会议更新请求 (全部字段可选, project_id 不可改)"""
 
     title: str | None = None
     meet_date: str | None = None
@@ -72,6 +76,7 @@ class MeetingOut(BaseModel):
     """会议输出 (含议程项)"""
 
     id: int
+    project_id: int  # ★所属项目ID
     title: str
     meet_date: str
     meet_time: str

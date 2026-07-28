@@ -1,6 +1,6 @@
 # XIN · 项目管理工作台
 
-> 信投 AI 2.0 项目建设专项的项目管理后端，基于 FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL，统一管理「进度计划、项目例会、项目周报、每周工作任务」四大协同模块，为项目治理提供结构化数据底座与可追溯的任务关联链路。
+> 信投 AI 2.0 项目建设专项的项目管理后端，基于 FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL，统一管理「进度计划、项目会议、项目周报、每周工作任务」四大协同模块，为项目治理提供结构化数据底座与可追溯的任务关联链路。
 
 ---
 
@@ -10,7 +10,7 @@
 
 - 将项目「阶段 → 进度计划任务 → 周报下周任务 → 每周工作任务」打通为可追溯的关联链条；
 - 周报结构化拆分为 KPI、本周进展、下周任务、风险四类子资源，支持批量保存与级联删除；
-- 提供项目例会议程的父子结构管理，支持议程项排序与批量创建。
+- 提供项目会议议程的父子结构管理，支持议程项排序与批量创建。
 
 ---
 
@@ -83,7 +83,7 @@ pro-site/
     │   ├── api.js              # 统一 fetch 封装, baseUrl=/api
     │   ├── app.js              # 视图切换/周次选择器入口
     │   ├── progress-plan.js    # 进度计划执行图视图
-    │   ├── meeting.js          # 项目例会视图
+    │   ├── meeting.js          # 项目会议视图
     │   ├── weekly-report.js    # 周报视图
     │   └── work-tasks.js       # 每周工作任务视图
     └── images/
@@ -100,7 +100,7 @@ pro-site/
 | 模块字典 | `app/routers/modules.py` | `Module` | 维护六大模块（底座/数据/智能体/应用/需求/协调），含颜色配置，作为周报与任务的归类维度 |
 | 阶段字典 | `app/routers/phases.py` | `Phase` | 维护项目三阶段（有得用/用起来/用得好）及起止日期，供进度计划任务归属 |
 | 进度计划 | `app/routers/progress_tasks.py` | `ProgressTask` | 项目甘特任务（含里程碑 `is_milestone`），按 `task_uid` 唯一标识，支持按 `phase_id`/`status` 筛选与状态切换 |
-| 项目例会 | `app/routers/meetings.py` | `Meeting` / `MeetingItem` | 会议主记录 + 议程项父子结构，议程项按 `sort_order` 排序，会议删除级联议程项 |
+| 项目会议 | `app/routers/meetings.py` | `Meeting` / `MeetingItem` | 会议主记录 + 议程项父子结构，议程项按 `sort_order` 排序，会议删除级联议程项 |
 | 项目周报 | `app/routers/weekly_reports.py` | `WeeklyReport` 及 4 子表 | 周报主体 + KPI（每模块一条，唯一约束）/ 本周进展 / 下周任务 / 风险；下周任务可关联进度计划任务 |
 | 每周工作任务 | `app/routers/work_tasks.py` | `WeeklyWorkTask` | 周任务执行层，可关联周报下周任务（`plan_task_id`），支持「从周报下周任务批量生成」 |
 
@@ -115,17 +115,19 @@ pro-site/
 | 模型类 | 表名 | 文件 | 关键字段 |
 |--------|------|------|----------|
 | `Project` | `projects` | `app/models/project.py` | `id`, `name`, `title`, `based_doc`, `start_date`, `end_date`, `is_active`, `sort_order` |
-| `Module` | `modules` | `app/models/module.py` | `id`, `idx`, `tag`, `title`, `owner`, `color`, `color_bg`, `sort_order` |
-| `Phase` | `phases` | `app/models/phase.py` | `id`, `name`, `subtitle`, `description`, `start_date`, `end_date` |
-| `ProgressTask` | `progress_tasks` | `app/models/progress_task.py` | `id`, `task_uid`(unique), `name`, `phase_id`(FK→phases), `start_date`, `end_date`, `status`, `full_desc`, `owner`, `is_milestone` |
-| `Meeting` | `meetings` | `app/models/meeting.py` | `id`, `title`, `meet_date`, `meet_time`, `place`, `host`, `attendees`, `description`, `sort_order` |
+| `Module` | `modules` | `app/models/module.py` | `id`, **`project_id`(FK→projects)**, `idx`, `tag`, `title`, `owner`, `color`, `color_bg`, `sort_order` |
+| `Phase` | `phases` | `app/models/phase.py` | `id`, **`project_id`(FK→projects)**, `name`, `subtitle`, `description`, `start_date`, `end_date` |
+| `ProgressTask` | `progress_tasks` | `app/models/progress_task.py` | `id`, **`project_id`(FK→projects)**, `task_uid`(unique), `name`, `phase_id`(FK→phases), `start_date`, `end_date`, `status`, `full_desc`, `owner`, `is_milestone` |
+| `Meeting` | `meetings` | `app/models/meeting.py` | `id`, **`project_id`(FK→projects)**, `title`, `meet_date`, `meet_time`, `place`, `host`, `attendees`, `description`, `sort_order` |
 | `MeetingItem` | `meeting_items` | `app/models/meeting.py` | `id`, `meeting_id`(FK→meetings, CASCADE), `item_time`, `theme`, `speaker`, `duration`, `note`, `description`, `sort_order` |
-| `WeeklyReport` | `weekly_reports` | `app/models/weekly_report.py` | `id`, `title`, `week_range`, `week_start`, `week_end`, `overview_summary`, `status`(draft/submitted) |
+| `WeeklyReport` | `weekly_reports` | `app/models/weekly_report.py` | `id`, **`project_id`(FK→projects)**, `title`, `week_range`, `week_start`, `week_end`, `overview_summary`, `status`(draft/submitted) |
 | `WeeklyKpi` | `weekly_kpis` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_pct`, `status`；唯一约束 `uq_kpi_report_module(report_id, module_id)` |
 | `WeeklyProgressItem` | `weekly_progress_items` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `content`, `detail`, `sort_order` |
 | `WeeklyPlanTask` | `weekly_plan_tasks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_task_id`(FK→progress_tasks, 可空), `name`, `is_key`, `owner`, `plan_period`, `status`, `remark`, `sort_order` |
 | `WeeklyRisk` | `weekly_risks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `seq`, `title`, `coordination`, `urgency`, `sort_order` |
-| `WeeklyWorkTask` | `weekly_work_tasks` | `app/models/work_task.py` | `id`, `week_start`, `week_end`, `plan_task_id`(FK→weekly_plan_tasks, 可空), `name`, `module_id`(FK, 可空), `owner`, `is_temporary`, `priority`, `status`, `planned_hours`, `actual_hours`, `remark`, `sort_order` |
+| `WeeklyWorkTask` | `weekly_work_tasks` | `app/models/work_task.py` | `id`, **`project_id`(FK→projects)**, `week_start`, `week_end`, `plan_task_id`(FK→weekly_plan_tasks, 可空), `name`, `module_id`(FK, 可空), `owner`, `is_temporary`, `priority`, `status`, `planned_hours`, `actual_hours`, `remark`, `sort_order` |
+
+> ★ **多项目隔离**：`modules` / `phases` / `progress_tasks` / `meetings` / `weekly_reports` / `weekly_work_tasks` 6 张顶级业务表均含 `project_id` 外键（关联 `projects.id`，ON DELETE CASCADE）。子表（`meeting_items` / `weekly_kpis` / `weekly_progress_items` / `weekly_plan_tasks` / `weekly_risks`）通过父表的 `project_id` 间接隔离，无需冗余字段。所有 list 接口支持 `?project_id=N` 查询参数，不传时默认用当前激活项目（`is_active=true`）。
 
 > 除 `WeeklyKpi` / `WeeklyProgressItem` / `WeeklyRisk` 外，其余模型均混入 `TimestampMixin`，自动维护 `created_at` / `updated_at`（带时区）。
 
@@ -152,25 +154,27 @@ Meeting 1──N MeetingItem (CASCADE)
 
 ### 5.3 建表逻辑
 
-- **自动建表**：`app/database.py` 的 `init_db()` 在应用 lifespan 启动时执行 `Base.metadata.create_all`，开发阶段无需手动建表。
-- **重要提示**：`app/models/__init__.py` 的 `__all__` 中列出了 `Project`，但 **未实际 `from app.models.project import Project`**。因此 `init_db()` 触发 `import app.models` 时不会注册 `projects` 表的 metadata。`projects` 表需通过 `app/routers/projects.py` 的 `GET /api/projects/active` 在首次访问时由 ORM 操作触发（若表不存在会报错），或手动建表。后续 AI 修改代码时建议补全该 import。
+- **自动建表**：`app/database.py` 的 `init_db()` 在应用 lifespan 启动时执行 `Base.metadata.create_all`，开发阶段无需手动建表（仅创建缺失的表，不修改已有表结构）。
+- **完整数据库脚本**：`scripts/pro-site.sql` 包含全部 12 张表的建表语句、索引、外键、字段备注，以及初始字典数据（2 个项目、6 个模块、3 个阶段）。幂等可重复执行。
 
-### 5.4 建表 SQL 示例（projects 表）
+```bash
+# 全新部署时执行完整脚本 (建表 + 初始数据)
+docker exec -i pg_db psql -U dbuser -d XIN < scripts/pro-site.sql
 
-```sql
-CREATE TABLE IF NOT EXISTS projects (
-    id          SERIAL PRIMARY KEY,
-    name        VARCHAR(64)  NOT NULL,
-    title       VARCHAR(256) NOT NULL,
-    based_doc   VARCHAR(256) DEFAULT '',
-    start_date  DATE         NOT NULL,
-    end_date    DATE         NOT NULL,
-    is_active   BOOLEAN      DEFAULT FALSE,
-    sort_order  INTEGER      DEFAULT 0,
-    created_at  TIMESTAMPTZ  DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  DEFAULT NOW()
-);
+# 已有库升级 (补充 project_id 字段)
+docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql
 ```
+
+- **字段变更迁移**：`scripts/add_project_id.sql` 为多项目支持迁移脚本，给 6 张顶级表添加 `project_id` 字段并填充现有数据。幂等可重复执行。
+
+### 5.4 数据库脚本清单
+
+| 脚本 | 作用 | 执行方式 |
+|------|------|----------|
+| `scripts/pro-site.sql` | pro-site 完整建表 + 初始数据 | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/pro-site.sql` |
+| `scripts/abs-site.sql` | abs-site 完整建表 | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/abs-site.sql` |
+| `scripts/add_project_id.sql` | 多项目支持迁移 (加 project_id) | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql` |
+| `scripts/db_comments.sql` | 全部表与字段备注 | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/db_comments.sql` |
 
 ### 5.5 种子脚本
 
@@ -224,7 +228,7 @@ CREATE TABLE IF NOT EXISTS projects (
 | PATCH | `/api/progress-tasks/{item_id}/status` | 仅更新状态（body: `{status}`） |
 | DELETE | `/api/progress-tasks/{item_id}` | 删除进度计划任务 |
 
-### 6.5 项目例会（`/api/meetings`）
+### 6.5 项目会议（`/api/meetings`）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -241,9 +245,10 @@ CREATE TABLE IF NOT EXISTS projects (
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/weekly-reports/` | 周报列表（按 week_start 倒序，含全部子表） |
+| GET | `/api/weekly-reports/` | 周报列表（支持 `?project_id=N` 过滤，不传用激活项目；按 week_start 倒序） |
 | GET | `/api/weekly-reports/{report_id}` | 周报详情（含 KPI/进展/下周任务/风险） |
-| POST | `/api/weekly-reports/` | 新建周报 |
+| POST | `/api/weekly-reports/` | 新建周报（`project_id` 未传时用激活项目） |
+| POST | `/api/weekly-reports/copy-last` | ★复制上周周报：只复制子表内容（KPI/进展/任务/风险），主表（标题/周次/总结）新生成；下周任务状态重置为"待开始" |
 | PUT | `/api/weekly-reports/{report_id}` | 更新周报 |
 | DELETE | `/api/weekly-reports/{report_id}` | 删除周报（级联删除子表） |
 | POST | `/api/weekly-reports/{report_id}/plan-tasks` | 新增下周任务 |
@@ -317,6 +322,8 @@ CREATE TABLE IF NOT EXISTS projects (
 
 服务固定监听 **8088** 端口，启动脚本见 `run.py`（`host=0.0.0.0`, `port=8088`, `reload=True`, `reload_dirs=["app","web"]`）。
 
+### 8.1 本地开发启动
+
 ```bash
 # 进入工程目录
 cd /mnt/data0/ai_deployment/proj/src/xin-ai/pro-site
@@ -331,6 +338,28 @@ cd /mnt/data0/ai_deployment/proj/src/xin-ai/pro-site
 - 前端工作台：`http://localhost:8088/`
 
 > 生产/无重载场景可执行：`./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8088`
+
+### 8.2 Docker 容器部署 (推荐)
+
+本工程与 `xin-site` / `abs-site` 共同打包到单一 Docker 容器，详见仓库根目录 `Dockerfile` 与 `docker-compose.yml`。
+
+```bash
+# 在仓库根目录执行
+cd /mnt/data0/ai_deployment/proj/src/xin-ai
+
+# 一键启动 (源码挂载, 改代码无需 rebuild)
+docker compose up -d
+
+# 查看日志
+docker compose logs -f
+
+# 停止
+docker compose down
+```
+
+容器内 pro-site 以 `uvicorn --reload` 模式运行，修改 `pro-site/app/` 下 Python 文件后自动重载。
+
+> 依赖变更（`requirements.txt`）才需重新 build：`docker compose down -v && docker compose up -d --build`
 
 ---
 

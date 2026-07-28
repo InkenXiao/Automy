@@ -1,10 +1,13 @@
 """项目模块字典 schema"""
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict
 
 
 class ModuleBase(BaseModel):
     """模块基础字段"""
 
+    project_id: Optional[int] = None  # ★所属项目ID (可选, 后端默认用当前激活项目)
     idx: str
     tag: str
     title: str
@@ -19,7 +22,7 @@ class ModuleCreate(ModuleBase):
 
 
 class ModuleUpdate(BaseModel):
-    """更新模块请求 (全部字段可选)"""
+    """更新模块请求 (全部字段可选, project_id 不可改)"""
 
     idx: str | None = None
     tag: str | None = None
@@ -34,4 +37,5 @@ class ModuleOut(ModuleBase):
     """模块输出"""
 
     id: int
+    project_id: int  # ★所属项目ID
     model_config = ConfigDict(from_attributes=True)

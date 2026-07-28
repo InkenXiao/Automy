@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
 from app.models.review import ReviewSchedule
@@ -46,6 +46,7 @@ async def start_learning(
     stmt = select(Word).where(
         Word.unit_id == payload.unit_id,
         Word.status == "new",
+        Word.is_delete.is_(False),
     ).order_by(Word.sort_order, Word.id)
     result = await db.execute(stmt)
     new_words = result.scalars().all()
@@ -79,10 +80,14 @@ async def today_reviews(db: AsyncSession = Depends(get_db)):
 
     stmt = (
         select(ReviewSchedule)
-        .options(selectinload(ReviewSchedule.word))
+        .options(
+            selectinload(ReviewSchedule.word),
+            with_loader_criteria(Word, Word.is_delete.is_(False)),
+        )
         .where(
             ReviewSchedule.status == "pending",
             ReviewSchedule.scheduled_at <= now,
+            ReviewSchedule.is_delete.is_(False),
         )
         .order_by(ReviewSchedule.scheduled_at.asc())
     )
@@ -110,12 +115,15 @@ async def mark_review(
 
     stmt = (
         select(ReviewSchedule)
-        .options(selectinload(ReviewSchedule.word))
-        .where(ReviewSchedule.id == payload.review_id)
+        .options(
+            selectinload(ReviewSchedule.word),
+            with_loader_criteria(Word, Word.is_delete.is_(False)),
+        )
+        .where(ReviewSchedule.id == payload.review_id, ReviewSchedule.is_delete.is_(False))
     )
     result = await db.execute(stmt)
     review = result.scalar_one_or_none()
-    if review is None:
+    if review is None or review.is_delete:
         raise HTTPException(status_code=404, detail="Review not found")
 
     word = review.word
@@ -141,6 +149,7 @@ async def mark_review(
                         ReviewSchedule.word_id == word.id,
                         ReviewSchedule.status == "pending",
                         ReviewSchedule.id != review.id,
+                        ReviewSchedule.is_delete.is_(False),
                     )
                     .values(status="skipped")
                     .execution_options(synchronize_session=False)
@@ -160,6 +169,7 @@ async def mark_review(
             .where(
                 ReviewSchedule.word_id == word.id,
                 ReviewSchedule.status == "pending",
+                ReviewSchedule.is_delete.is_(False),
             )
             .order_by(ReviewSchedule.interval_index.asc())
             .limit(1)
@@ -184,8 +194,11 @@ async def mark_review(
     # 重新加载以返回最新状态 (含 word 关系)
     refresh_stmt = (
         select(ReviewSchedule)
-        .options(selectinload(ReviewSchedule.word))
-        .where(ReviewSchedule.id == review.id)
+        .options(
+            selectinload(ReviewSchedule.word),
+            with_loader_criteria(Word, Word.is_delete.is_(False)),
+        )
+        .where(ReviewSchedule.id == review.id, ReviewSchedule.is_delete.is_(False))
     )
     refresh_result = await db.execute(refresh_stmt)
     fresh = refresh_result.scalar_one()
@@ -204,36 +217,54 @@ async def stats(db: AsyncSession = Depends(get_db)):
         select(func.count(ReviewSchedule.id)).where(
             ReviewSchedule.status == "pending",
             ReviewSchedule.scheduled_at <= now,
+            ReviewSchedule.is_delete.is_(False),
         )
     ) or 0
 
     # today_learned: 今日首次学习的单词数
     today_learned = await db.scalar(
-        select(func.count(Word.id)).where(Word.learned_at >= start_of_today)
+        select(func.count(Word.id)).where(
+            Word.learned_at >= start_of_today,
+            Word.is_delete.is_(False),
+        )
     ) or 0
 
     # mastered
     mastered = await db.scalar(
-        select(func.count(Word.id)).where(Word.status == "mastered")
+        select(func.count(Word.id)).where(
+            Word.status == "mastered",
+            Word.is_delete.is_(False),
+        )
     ) or 0
 
     # total_words
-    total_words = await db.scalar(select(func.count(Word.id))) or 0
+    total_words = await db.scalar(
+        select(func.count(Word.id)).where(Word.is_delete.is_(False))
+    ) or 0
 
     # learning_words
     learning_words = await db.scalar(
-        select(func.count(Word.id)).where(Word.status == "learning")
+        select(func.count(Word.id)).where(
+            Word.status == "learning",
+            Word.is_delete.is_(False),
+        )
     ) or 0
 
     # new_words
     new_words = await db.scalar(
-        select(func.count(Word.id)).where(Word.status == "new")
+        select(func.count(Word.id)).where(
+            Word.status == "new",
+            Word.is_delete.is_(False),
+        )
     ) or 0
 
     # stubborn: learning 且 consecutive_passes==0 且 存在 mark=fail 的复习记录
     fail_word_ids = (
         select(ReviewSchedule.word_id)
-        .where(ReviewSchedule.mark == "fail")
+        .where(
+            ReviewSchedule.mark == "fail",
+            ReviewSchedule.is_delete.is_(False),
+        )
         .distinct()
     )
     stubborn = await db.scalar(
@@ -241,12 +272,14 @@ async def stats(db: AsyncSession = Depends(get_db)):
             Word.status == "learning",
             Word.consecutive_passes == 0,
             Word.id.in_(fail_word_ids),
+            Word.is_delete.is_(False),
         )
     ) or 0
 
     # streak_days & weekly_reviews: 查询全部已完成复习的 completed_at
     completed_stmt = select(ReviewSchedule.completed_at).where(
-        ReviewSchedule.completed_at.is_not(None)
+        ReviewSchedule.completed_at.is_not(None),
+        ReviewSchedule.is_delete.is_(False),
     )
     completed_result = await db.execute(completed_stmt)
     completed_datetimes = completed_result.scalars().all()
@@ -286,7 +319,10 @@ async def stubborn_words(db: AsyncSession = Depends(get_db)):
     """顽固单词: 存在 fail 复习记录且未掌握, 附带 fail 次数"""
     fail_word_ids = (
         select(ReviewSchedule.word_id)
-        .where(ReviewSchedule.mark == "fail")
+        .where(
+            ReviewSchedule.mark == "fail",
+            ReviewSchedule.is_delete.is_(False),
+        )
         .distinct()
     )
 
@@ -295,6 +331,7 @@ async def stubborn_words(db: AsyncSession = Depends(get_db)):
         .where(
             Word.status != "mastered",
             Word.id.in_(fail_word_ids),
+            Word.is_delete.is_(False),
         )
         .order_by(Word.id)
     )
@@ -312,6 +349,7 @@ async def stubborn_words(db: AsyncSession = Depends(get_db)):
         .where(
             ReviewSchedule.word_id.in_(word_ids),
             ReviewSchedule.mark == "fail",
+            ReviewSchedule.is_delete.is_(False),
         )
         .group_by(ReviewSchedule.word_id)
     )

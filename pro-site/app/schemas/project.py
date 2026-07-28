@@ -37,4 +37,9 @@ class ProjectOut(ProjectBase):
     """项目输出"""
 
     id: int
+    # 统计信息 (可选, 由路由层按需填充)
+    meeting_count: Optional[int] = None
+    progress_task_count: Optional[int] = None
+    weekly_report_count: Optional[int] = None
+    weekly_work_task_count: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)

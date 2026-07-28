@@ -1,5 +1,5 @@
 /* ==========================================================================
-   项目例会 · 会议议程管理
+   项目会议 · 会议议程管理
    交互逻辑:
      1. 列表页(中栏): 会议卡片列表
         - 单击卡片 → 右栏(detail-panel)显示会议纪要(meetings.description)
@@ -87,17 +87,21 @@ const Meeting = {
               <span class="mt-card-title">${App.escapeHtml(m.title || '项目周例会')}</span>
             </div>
             <div class="mt-card-meta">
-              <span class="mt-meta-item">📅 ${App.escapeHtml(m.meet_date || '未定日期')}</span>
-              <span class="mt-meta-item">🕐 ${App.escapeHtml(m.meet_time || '')}</span>
-              <span class="mt-meta-item">📍 ${App.escapeHtml(m.place || '未定地点')}</span>
-              <span class="mt-meta-item">👤 ${App.escapeHtml(m.host || '')}</span>
-              <span class="mt-meta-item">📋 ${itemCount} 项议程</span>
+              <div class="mt-meta-row">
+                <span class="mt-meta-item">📅 ${App.escapeHtml(m.meet_date || '未定日期')}</span>
+                <span class="mt-meta-item">🕐 ${App.escapeHtml(m.meet_time || '')}</span>
+              </div>
+              <div class="mt-meta-row">
+                <span class="mt-meta-item">📍 ${App.escapeHtml(m.place || '未定地点')}</span>
+                <span class="mt-meta-item">👤 ${App.escapeHtml(m.host || '')}</span>
+              </div>
             </div>
             <div class="mt-card-actions">
-              <button class="mt-btn sm" data-action="open" data-id="${m.id}">查看详情</button>
-              <button class="mt-btn sm danger" data-action="delete" data-id="${m.id}">删除</button>
+              <span class="mt-meta-item mt-meta-agenda">📋 ${itemCount} 项议程</span>
+              <span class="mt-actions-spacer"></span>
+              <button class="mt-btn sm" data-action="open" data-id="${m.id}">详情</button>
+              <button class="mt-icon-btn danger" data-action="delete" data-id="${m.id}" title="删除">🗑</button>
             </div>
-            <div class="mt-card-hint">单击查看纪要 · 双击进入议程</div>
           </div>
         `;
       });
@@ -107,7 +111,7 @@ const Meeting = {
       <div class="mt-container">
         <div class="mt-header">
           <div class="mt-header-l">
-            <h1>📅 项目例会</h1>
+            <h1>📅 项目会议</h1>
             <span class="mt-subtitle">管理会议议程 · 记录会议安排</span>
           </div>
           <div class="mt-header-r">
@@ -224,6 +228,19 @@ const Meeting = {
    * 事件处理 (中栏点击)
    * ---------------------------------------------------------------- */
   handleClick(e) {
+    // 富文本编辑器工具栏按钮 (编辑/预览/保存) — 优先处理
+    // 这些按钮只有 data-rt-action, 无 data-action, 必须在下方 data-action 早返回之前处理
+    const rtEl = e.target.closest('[data-rt-action]');
+    if (rtEl) {
+      const act = rtEl.dataset.rtAction;
+      if (act === 'edit' || act === 'preview') {
+        this.switchRtMode(act);
+      } else if (act === 'save') {
+        this.saveRtContent();
+      }
+      return;
+    }
+
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const action = el.dataset.action;
@@ -269,17 +286,6 @@ const Meeting = {
       case 'export-pdf':
         this.exportPdf();
         break;
-    }
-
-    // 富文本编辑器工具栏按钮 (编辑/预览/保存)
-    const rtEl = e.target.closest('[data-rt-action]');
-    if (rtEl) {
-      const act = rtEl.dataset.rtAction;
-      if (act === 'edit' || act === 'preview') {
-        this.switchRtMode(act);
-      } else if (act === 'save') {
-        this.saveRtContent();
-      }
     }
   },
 
@@ -335,19 +341,65 @@ const Meeting = {
         <div class="detail-panel__title">${panelTitle}</div>
         <div class="detail-panel__meta">${panelMeta}</div>
       </div>
-      <div class="detail-panel__body" data-rt-kind="${kind}" data-rt-id="${rtId}">
+      <div class="detail-panel__body is-rt" data-rt-kind="${kind}" data-rt-id="${rtId}">
         <div class="rt-toolbar">
           <button class="rt-btn active" data-rt-action="edit" title="编辑 Markdown 源码">✏️ 编辑</button>
           <button class="rt-btn" data-rt-action="preview" title="预览渲染效果">👁️ 预览</button>
-          <span class="rt-hint">支持 Markdown 语法</span>
-          <button class="rt-btn rt-save" data-rt-action="save" title="保存">💾 保存</button>
+          <span class="rt-status" data-rt-target="status"></span>
+          <button class="rt-btn rt-save" data-rt-action="save" title="保存 (Ctrl+S)">💾 保存</button>
         </div>
         <textarea class="rt-editor" data-rt-target="editor" placeholder="${App.escapeHtml(placeholder)}">${App.escapeHtml(value)}</textarea>
         <div class="rt-preview" data-rt-target="preview" hidden></div>
       </div>
     `);
+    // 记录已保存的值, 用于判断未保存状态
+    this._rtSavedValue = value;
+    const editor = document.querySelector('[data-rt-target="editor"]');
+    if (editor) {
+      // 输入时仅更新未保存状态 (编辑器高度由 CSS flex 按窗口自适应, 无需 JS 撑高)
+      editor.addEventListener('input', () => {
+        this.updateRtStatus(editor.value !== this._rtSavedValue ? 'dirty' : 'clean');
+      });
+      // Ctrl+S 快捷保存
+      editor.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          this.saveRtContent();
+        }
+      });
+      this.updateRtStatus('clean');
+    }
     // 初始进入编辑模式时同步一次预览内容(供切换时使用)
     this._syncRtPreview();
+  },
+
+  /** 自适应调整 textarea 高度(随内容增长, 不低于 CSS min-height) */
+  autoGrowTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  },
+
+  /** 更新工具栏未保存/已保存状态指示 */
+  updateRtStatus(state) {
+    const status = document.querySelector('[data-rt-target="status"]');
+    if (!status) return;
+    status.classList.remove('dirty', 'saved');
+    if (state === 'dirty') {
+      status.textContent = '● 未保存';
+      status.classList.add('dirty');
+    } else if (state === 'saved') {
+      status.textContent = '✓ 已保存';
+      status.classList.add('saved');
+      setTimeout(() => {
+        if (status.classList.contains('saved')) {
+          status.classList.remove('saved');
+          status.textContent = '';
+        }
+      }, 2000);
+    } else {
+      status.textContent = '';
+    }
   },
 
   /** 同步编辑器内容到预览区 */
@@ -409,7 +461,9 @@ const Meeting = {
           this.state.selectedItem.description = value;
         }
       }
-      // 保存后停留在当前模式, 刷新预览
+      // 保存后停留在当前模式, 刷新预览, 更新状态
+      this._rtSavedValue = value;
+      this.updateRtStatus('saved');
       this._syncRtPreview();
       App.showToast('已保存', 'success', 1500);
     } catch (err) {

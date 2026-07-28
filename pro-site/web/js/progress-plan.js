@@ -19,11 +19,13 @@ const ProgressPlan = {
   // 被隐藏的阶段 (图例点击)
   hiddenPhases: new Set(),
 
-  // 时间轴参数 (由 initTimeline() 根据当前项目周期动态生成, 支持多项目)
+  // 时间轴参数 (由 initTimeline() 根据当前项目周期 + 阶段日期动态生成)
   project: null,        // 当前项目元信息 {id,name,title,based_doc,start_date,end_date}
   projects: [],         // 全部项目列表 (供头部下拉切换)
   PROJECT_START: null,  // 项目起始日 (本地午夜 Date)
   TOTAL_DAYS: 184,      // 项目总天数
+  PX_PER_DAY: 5,        // 每天 px 宽度 (固定, 保持周间距不变; 7天≈35px)
+  TIMELINE_WIDTH: 960,  // 时间轴总宽度 (px, = TOTAL_DAYS * PX_PER_DAY)
   MONTHS: [],           // 月份定义 [{name, start, end}] (start/end 为相对起始日的天数偏移)
   BIWEEKS: [],          // 双周迭代 [{label, start, end}]
 
@@ -47,7 +49,7 @@ const ProgressPlan = {
     }
   },
 
-  /** 加载当前激活项目 + 全部项目列表, 并重建时间轴 */
+  /** 加载当前激活项目 + 全部项目列表 + 阶段, 并重建时间轴 */
   async ensureProject() {
     try {
       const [active, all] = await Promise.all([
@@ -57,55 +59,75 @@ const ProgressPlan = {
       App.state.project = active;
       this.project = active;
       this.projects = Array.isArray(all) ? all : [];
+      // 重新加载阶段 (切换项目时阶段也需更新)
+      await App.loadPhases();
       this.initTimeline();
     } catch (err) {
       App.showToast(`加载项目信息失败: ${err.message}`, 'error');
     }
   },
 
-  /** 根据当前项目的 start_date/end_date 动态生成时间轴参数 */
+  /** 根据当前项目 + 阶段的日期范围动态生成时间轴参数 (阶段日期优先) */
   initTimeline() {
     const p = this.project;
-    if (!p || !p.start_date || !p.end_date) {
+    const phases = App.state.phases || [];
+    // 收集所有有效日期 (项目 + 阶段)
+    const dates = [];
+    if (p?.start_date) dates.push(p.start_date);
+    if (p?.end_date) dates.push(p.end_date);
+    phases.forEach(ph => {
+      if (ph.start_date) dates.push(ph.start_date);
+      if (ph.end_date) dates.push(ph.end_date);
+    });
+    if (dates.length < 2) {
       this.PROJECT_START = null;
       this.TOTAL_DAYS = 1;
+      this.TIMELINE_WIDTH = 960;
       this.MONTHS = [];
       this.BIWEEKS = [];
       return;
     }
+    dates.sort();
     // 本地午夜起始, 避免 dateToDay 因时区偏移
-    const start = new Date(p.start_date + 'T00:00:00');
-    const end = new Date(p.end_date + 'T00:00:00');
+    const start = new Date(dates[0] + 'T00:00:00');
+    const end = new Date(dates[dates.length - 1] + 'T00:00:00');
     this.PROJECT_START = start;
     this.TOTAL_DAYS = Math.max(1, Math.round((end - start) / 86400000) + 1);
+    // 固定每周间距: 7天 = 35px, 总宽度 = 天数 × 5px (最少 960px)
+    this.TIMELINE_WIDTH = Math.max(960, this.TOTAL_DAYS * this.PX_PER_DAY);
     this.MONTHS = this.buildMonths(start, end);
     this.BIWEEKS = this.buildBiweeks(start, end);
   },
 
-  /** 按月切分, 返回 [{name, start, end}] (start/end 为相对起始日的偏移) */
+  /** 按月切分, 返回 [{name, start, end}] (跨年时显示年度) */
   buildMonths(start, end) {
     const months = [];
     const cur = new Date(start.getFullYear(), start.getMonth(), 1);
     const startYear = start.getFullYear();
+    let lastYear = null;
     while (cur <= end) {
       const mStart = new Date(cur.getFullYear(), cur.getMonth(), 1);
       const mEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0); // 月末
       const so = Math.max(0, Math.round((mStart - start) / 86400000));
       const eo = Math.min(this.TOTAL_DAYS - 1, Math.round((mEnd - start) / 86400000));
-      const name = cur.getFullYear() === startYear && months.length === 0
+      // 首月或跨年时显示年度
+      const showYear = cur.getFullYear() !== lastYear;
+      const name = showYear
         ? `${cur.getFullYear()}年${cur.getMonth() + 1}月`
         : `${cur.getMonth() + 1}月`;
       months.push({ name, start: so, end: eo });
+      lastYear = cur.getFullYear();
       cur.setMonth(cur.getMonth() + 1);
     }
     return months;
   },
 
-  /** 从起始日按 14 天一段切分双周迭代, 末段不足 14 天并入最后一段 */
+  /** 从起始日按 14 天一段切分双周迭代, 跨年时日期含年度 */
   buildBiweeks(start, end) {
     const list = [];
     let idx = 1;
     let cur = new Date(start);
+    let lastYear = null;
     while (cur <= end) {
       const segStart = new Date(cur);
       let segEnd = new Date(cur);
@@ -113,12 +135,19 @@ const ProgressPlan = {
       if (segEnd > end) segEnd = new Date(end);
       const so = Math.round((segStart - start) / 86400000);
       const eo = Math.round((segEnd - start) / 86400000);
-      const fmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+      // 跨年时显示年度
+      const fmt = (d) => {
+        const crossYear = d.getFullYear() !== lastYear;
+        return crossYear
+          ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
+          : `${d.getMonth() + 1}/${d.getDate()}`;
+      };
       list.push({
         label: `迭代${idx}\n${fmt(segStart)}-${fmt(segEnd)}`,
         start: so,
         end: eo,
       });
+      lastYear = segEnd.getFullYear();
       idx++;
       cur = new Date(segEnd);
       cur.setDate(cur.getDate() + 1);
@@ -141,6 +170,11 @@ const ProgressPlan = {
   /** 天数偏移转百分比 (用于 left/width) */
   dayToPct(day) {
     return (day / this.TOTAL_DAYS * 100).toFixed(2);
+  },
+
+  /** 天数偏移转像素 (固定每周间距, 用于 left/width) */
+  dayToPx(day) {
+    return (day * this.PX_PER_DAY).toFixed(1);
   },
 
   /** 计算今天的偏移天数 (基于实际当前日期, 限制在 [0, TOTAL_DAYS-1]) */
@@ -225,21 +259,14 @@ const ProgressPlan = {
         </div>
 
         <div class="pp-stats-bar" id="pp-stats-bar">
-          <div class="pp-stat-item p1" data-filter="1">
-            <div class="num" id="pp-stat-p1">0</div>
-            <div class="label">第一阶段任务</div>
-            <div class="progress-bar"><div class="progress-fill" id="pp-prog-p1" style="width:0%"></div></div>
-          </div>
-          <div class="pp-stat-item p2" data-filter="2">
-            <div class="num" id="pp-stat-p2">0</div>
-            <div class="label">第二阶段任务</div>
-            <div class="progress-bar"><div class="progress-fill" id="pp-prog-p2" style="width:0%"></div></div>
-          </div>
-          <div class="pp-stat-item p3" data-filter="3">
-            <div class="num" id="pp-stat-p3">0</div>
-            <div class="label">第三阶段任务</div>
-            <div class="progress-bar"><div class="progress-fill" id="pp-prog-p3" style="width:0%"></div></div>
-          </div>
+          ${App.state.phases.map((p, i) => {
+            const pn = i + 1;
+            return `<div class="pp-stat-item p${pn}" data-filter="${pn}">
+              <div class="num" id="pp-stat-p${pn}">0</div>
+              <div class="label">${App.escapeHtml(p.name)}任务</div>
+              <div class="progress-bar"><div class="progress-fill" id="pp-prog-p${pn}" style="width:0%"></div></div>
+            </div>`;
+          }).join('')}
           <div class="pp-stat-item ms" data-filter="ms">
             <div class="num" id="pp-stat-ms">0</div>
             <div class="label">里程碑达成</div>
@@ -260,9 +287,11 @@ const ProgressPlan = {
           <div class="pp-toolbar-group">
             <span class="pp-toolbar-label">🔒 筛选:</span>
             <button class="pp-btn active" data-phase="all" data-action="filter-phase">全部</button>
-            <button class="pp-btn" data-phase="1" data-action="filter-phase">第一阶段</button>
-            <button class="pp-btn p2-filter" data-phase="2" data-action="filter-phase">第二阶段</button>
-            <button class="pp-btn p3-filter" data-phase="3" data-action="filter-phase">第三阶段</button>
+            ${App.state.phases.map((p, i) => {
+              const pn = i + 1;
+              const cls = pn === 2 ? 'p2-filter' : pn === 3 ? 'p3-filter' : '';
+              return `<button class="pp-btn ${cls}" data-phase="${pn}" data-action="filter-phase">${App.escapeHtml(p.name)}</button>`;
+            }).join('')}
             <button class="pp-btn ms-filter" data-phase="ms" data-action="filter-phase">里程碑</button>
           </div>
           <div class="pp-toolbar-group">
@@ -276,6 +305,7 @@ const ProgressPlan = {
             <div class="pp-search-box">
               <input type="text" id="pp-search" placeholder="搜索任务..." value="${App.escapeHtml(this.filters.keyword)}">
             </div>
+            <button class="pp-btn" id="pp-edit-phases-btn">⚙ 编辑阶段</button>
             <button class="pp-btn" id="pp-new-btn">＋ 新建任务</button>
             <button class="pp-btn" id="pp-reset-btn">🔄 重置</button>
             <button class="pp-btn" id="pp-export-btn">📄 导出PDF</button>
@@ -283,18 +313,16 @@ const ProgressPlan = {
         </div>
 
         <div class="pp-legend" id="pp-legend">
-          <div class="pp-legend-item" data-toggle-phase="1">
-            <div class="pp-legend-bar" style="background:linear-gradient(135deg,var(--pp-p1),#93C5FD)"></div>
-            第一阶段·有得用（7-8月）
-          </div>
-          <div class="pp-legend-item" data-toggle-phase="2">
-            <div class="pp-legend-bar" style="background:linear-gradient(135deg,var(--pp-p2),#5EEAD4)"></div>
-            第二阶段·用起来（9-10月）
-          </div>
-          <div class="pp-legend-item" data-toggle-phase="3">
-            <div class="pp-legend-bar" style="background:linear-gradient(135deg,var(--pp-p3),#C4B5FD)"></div>
-            第三阶段·用得好（11-12月）
-          </div>
+          ${App.state.phases.map((p, i) => {
+            const pn = i + 1;
+            const subtitle = p.subtitle ? `·${App.escapeHtml(p.subtitle)}` : '';
+            const dateRange = (p.start_date && p.end_date) ? `（${App.formatDate(p.start_date)}~${App.formatDate(p.end_date)}）` : '';
+            const gradient = pn === 2 ? 'var(--pp-p2),#5EEAD4' : pn === 3 ? 'var(--pp-p3),#C4B5FD' : 'var(--pp-p1),#93C5FD';
+            return `<div class="pp-legend-item" data-toggle-phase="${pn}">
+              <div class="pp-legend-bar" style="background:linear-gradient(135deg,${gradient})"></div>
+              ${App.escapeHtml(p.name)}${subtitle}${dateRange}
+            </div>`;
+          }).join('')}
           <div class="pp-legend-item" data-toggle-phase="ms">
             <div class="pp-legend-diamond"></div>
             里程碑（M1-M11）
@@ -326,7 +354,7 @@ const ProgressPlan = {
               <div class="pp-month-headers" id="pp-month-headers"></div>
               <div class="pp-biweek-headers" id="pp-biweek-headers"></div>
             </div>
-            <div id="pp-chart-body" style="position:relative;min-width:960px;">
+            <div id="pp-chart-body" style="position:relative;min-width:${this.TIMELINE_WIDTH}px;">
               <div class="pp-grid-bg" id="pp-grid-bg"></div>
               <div id="pp-bars-area"></div>
               <div class="pp-today-line" id="pp-today-line"></div>
@@ -352,16 +380,19 @@ const ProgressPlan = {
 
   /** 渲染时间轴顶部月份/双周表头 */
   renderTimelineHeaders() {
+    // 设置表头最小宽度 = 时间轴总宽度
+    const topEl = document.querySelector('.pp-timeline-top');
+    if (topEl) topEl.style.minWidth = this.TIMELINE_WIDTH + 'px';
     const monthEl = document.getElementById('pp-month-headers');
     if (monthEl) {
       monthEl.innerHTML = this.MONTHS.map((m, i) => `
-        <div class="pp-month-header" style="width:${((m.end - m.start + 1) / this.TOTAL_DAYS * 100).toFixed(2)}%;${i === this.MONTHS.length - 1 ? 'border-right:none;' : ''}">${App.escapeHtml(m.name)}</div>
+        <div class="pp-month-header" style="width:${((m.end - m.start + 1) * this.PX_PER_DAY).toFixed(1)}px;${i === this.MONTHS.length - 1 ? 'border-right:none;' : ''}">${App.escapeHtml(m.name)}</div>
       `).join('');
     }
     const biweekEl = document.getElementById('pp-biweek-headers');
     if (biweekEl) {
       biweekEl.innerHTML = this.BIWEEKS.map(b => `
-        <div class="pp-biweek-header" style="width:${((b.end - b.start + 1) / this.TOTAL_DAYS * 100).toFixed(2)}%;">${App.escapeHtml(b.label).replace(/\n/g, '<br>')}</div>
+        <div class="pp-biweek-header" style="width:${((b.end - b.start + 1) * this.PX_PER_DAY).toFixed(1)}px;">${App.escapeHtml(b.label).replace(/\n/g, '<br>')}</div>
       `).join('');
     }
   },
@@ -372,16 +403,16 @@ const ProgressPlan = {
     if (!bg) return;
     let html = '';
     this.MONTHS.forEach(m => {
-      html += `<div class="pp-grid-line month" style="left:${this.dayToPct(m.start)}%;"></div>`;
+      html += `<div class="pp-grid-line month" style="left:${this.dayToPx(m.start)}px;"></div>`;
     });
-    html += `<div class="pp-grid-line month" style="left:100%;"></div>`;
+    html += `<div class="pp-grid-line month" style="left:${this.TIMELINE_WIDTH}px;"></div>`;
     this.BIWEEKS.forEach(b => {
-      html += `<div class="pp-grid-line biweek" style="left:${this.dayToPct(b.start)}%;"></div>`;
+      html += `<div class="pp-grid-line biweek" style="left:${this.dayToPx(b.start)}px;"></div>`;
     });
     // 交替背景 (偶数双周)
     this.BIWEEKS.forEach((b, i) => {
       if (i % 2 === 1) {
-        html += `<div style="position:absolute;top:0;bottom:0;left:${this.dayToPct(b.start)}%;width:${((b.end - b.start + 1) / this.TOTAL_DAYS * 100).toFixed(2)}%;background:rgba(0,0,0,0.015);"></div>`;
+        html += `<div style="position:absolute;top:0;bottom:0;left:${this.dayToPx(b.start)}px;width:${((b.end - b.start + 1) * this.PX_PER_DAY).toFixed(1)}px;background:rgba(0,0,0,0.015);"></div>`;
       }
     });
     bg.innerHTML = html;
@@ -391,7 +422,7 @@ const ProgressPlan = {
   renderTodayLine() {
     const line = document.getElementById('pp-today-line');
     if (!line) return;
-    line.style.left = this.dayToPct(this.todayDay()) + '%';
+    line.style.left = this.dayToPx(this.todayDay()) + 'px';
     // 日期标签 (替代原 CSS 固定文案 "今天")
     line.innerHTML = `<div class="pp-today-label">${App.formatShortDate()}</div>`;
   },
@@ -475,7 +506,7 @@ const ProgressPlan = {
         phBar.style.cssText = 'height:34px;border-bottom:2px solid #d0d0d0;border-top:2px solid #d0d0d0;position:relative;background:transparent;';
         const phInner = document.createElement('div');
         phInner.className = `phase-${phaseNo}`;
-        phInner.style.cssText = `position:absolute;height:26px;top:50%;transform:translateY(-50%);left:${this.dayToPct(phaseStart)}%;width:${this.dayToPct(phaseEnd - phaseStart + 1)}%;border-radius:4px;display:flex;align-items:center;padding:0 12px;font-size:11px;color:rgba(255,255,255,0.95);font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:linear-gradient(135deg,var(--pp-p${phaseNo}),var(--pp-p${phaseNo}));`;
+        phInner.style.cssText = `position:absolute;height:26px;top:50%;transform:translateY(-50%);left:${this.dayToPx(phaseStart)}px;width:${this.dayToPx(phaseEnd - phaseStart + 1)}px;border-radius:4px;display:flex;align-items:center;padding:0 12px;font-size:11px;color:rgba(255,255,255,0.95);font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:linear-gradient(135deg,var(--pp-p${phaseNo}),var(--pp-p${phaseNo}));`;
         phInner.textContent = phaseDesc;
         phBar.appendChild(phInner);
         barsArea.appendChild(phBar);
@@ -519,14 +550,14 @@ const ProgressPlan = {
       if (isMilestone) {
         const diamond = document.createElement('div');
         diamond.className = 'pp-milestone-diamond' + (isDone ? ' done' : '');
-        diamond.style.left = this.dayToPct(startDay) + '%';
+        diamond.style.left = this.dayToPx(startDay) + 'px';
         diamond.dataset.taskId = task.id;
         diamond.dataset.action = 'task-click';
         barContainer.appendChild(diamond);
 
         const label = document.createElement('div');
         label.className = 'pp-milestone-label';
-        label.style.left = `calc(${this.dayToPct(startDay)}% + 12px)`;
+        label.style.left = `calc(${this.dayToPx(startDay)}px + 12px)`;
         label.textContent = (task.name || '').replace(/^★\s*/, '');
         barContainer.appendChild(label);
       } else {
@@ -535,8 +566,8 @@ const ProgressPlan = {
         if (isDone) cls.push('done');
         if (task.status === 'ongoing' && !isDone) cls.push('ongoing');
         bar.className = cls.join(' ');
-        bar.style.left = this.dayToPct(startDay) + '%';
-        bar.style.width = this.dayToPct(Math.max(1, endDay - startDay + 1)) + '%';
+        bar.style.left = this.dayToPx(startDay) + 'px';
+        bar.style.width = this.dayToPx(Math.max(1, endDay - startDay + 1)) + 'px';
         bar.textContent = task.task_uid || '';
         bar.dataset.taskId = task.id;
         bar.dataset.action = 'task-click';
@@ -556,16 +587,21 @@ const ProgressPlan = {
 
   /** 更新统计栏 */
   updateStats() {
-    const counts = { 1: 0, 2: 0, 3: 0, ms: 0, total: 0 };
-    const dones  = { 1: 0, 2: 0, 3: 0, ms: 0, total: 0 };
+    const counts = { ms: 0, total: 0 };
+    const dones  = { ms: 0, total: 0 };
+    // 按动态阶段初始化计数
+    App.state.phases.forEach((p, i) => {
+      counts[i + 1] = 0;
+      dones[i + 1] = 0;
+    });
 
     this.tasks.forEach(t => {
       const isMs = t.is_milestone || t.status === 'milestone';
       const key = isMs ? 'ms' : this.phaseNo(t.phase_id);
-      counts[key]++;
+      counts[key] = (counts[key] || 0) + 1;
       counts.total++;
       if (t.status === 'done') {
-        dones[key]++;
+        dones[key] = (dones[key] || 0) + 1;
         dones.total++;
       }
     });
@@ -577,9 +613,10 @@ const ProgressPlan = {
       if (progEl) progEl.style.width = total > 0 ? (done / total * 100) + '%' : '0%';
     };
 
-    setStat('p1', dones[1], counts[1]);
-    setStat('p2', dones[2], counts[2]);
-    setStat('p3', dones[3], counts[3]);
+    App.state.phases.forEach((p, i) => {
+      const pn = i + 1;
+      setStat(`p${pn}`, dones[pn] || 0, counts[pn] || 0);
+    });
     setStat('ms', dones.ms, counts.ms);
     setStat('total', dones.total, counts.total);
   },
@@ -698,6 +735,10 @@ const ProgressPlan = {
     const newBtn = document.getElementById('pp-new-btn');
     if (newBtn) newBtn.addEventListener('click', () => this.editTask(null));
 
+    // 编辑阶段
+    const editPhasesBtn = document.getElementById('pp-edit-phases-btn');
+    if (editPhasesBtn) editPhasesBtn.addEventListener('click', () => this.editPhases());
+
     // 统计栏点击 -> 阶段筛选
     document.querySelectorAll('.pp-stat-item[data-filter]').forEach(item => {
       item.addEventListener('click', () => {
@@ -797,6 +838,104 @@ const ProgressPlan = {
         });
         const chartBody = clone.querySelector('#pp-chart-body');
         if (chartBody) chartBody.style.minWidth = '960px';
+      }
+    });
+  },
+
+  /** 编辑项目阶段 (增删改) */
+  editPhases() {
+    const phases = App.state.phases.slice();
+    const renderRow = (p) => {
+      const id = p?.id || '';
+      return `<div class="form-row" data-phase-row data-phase-id="${id}" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;">
+        <div class="form-group" style="flex:1;">
+          <label>阶段名称</label>
+          <input type="text" data-phase-name value="${App.escapeHtml(p?.name || '')}" placeholder="如: 第一阶段">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>副标题</label>
+          <input type="text" data-phase-subtitle value="${App.escapeHtml(p?.subtitle || '')}" placeholder="如: 有得用">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>开始日期</label>
+          <input type="date" data-phase-start value="${p?.start_date || ''}">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>结束日期</label>
+          <input type="date" data-phase-end value="${p?.end_date || ''}">
+        </div>
+        ${id ? `<div class="form-group" style="flex:0 0 auto;">
+          <button type="button" class="btn btn-ghost btn-sm" data-phase-del data-phase-id="${id}">删除</button>
+        </div>` : ''}
+      </div>`;
+    };
+
+    const modal = App.openModal({
+      title: '编辑项目阶段',
+      bodyHtml: `
+        <div id="phase-editor">
+          ${phases.length === 0 ? renderRow(null) : phases.map(p => renderRow(p)).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" id="phase-add-row" style="margin-top:8px;">＋ 添加阶段</button>
+      `,
+      footerHtml: `
+        <button class="btn btn-ghost" data-modal-close>取消</button>
+        <button class="btn btn-primary" id="phase-save-btn">保存</button>
+      `
+    });
+
+    modal.querySelector('#phase-add-row').addEventListener('click', () => {
+      const editor = modal.querySelector('#phase-editor');
+      const wrap = document.createElement('div');
+      wrap.innerHTML = renderRow(null);
+      editor.appendChild(wrap.firstElementChild);
+    });
+
+    modal.addEventListener('click', async (e) => {
+      const delBtn = e.target.closest('[data-phase-del]');
+      if (!delBtn) return;
+      const phaseId = delBtn.getAttribute('data-phase-id');
+      if (!phaseId) return;
+      if (!confirm('确认删除该阶段? 关联的任务将变为"未分阶段"')) return;
+      try {
+        await API.deletePhase(phaseId);
+        App.showToast('阶段已删除', 'success');
+        const row = delBtn.closest('[data-phase-row]');
+        if (row) row.remove();
+        // 同步刷新阶段缓存
+        await App.loadPhases();
+      } catch (err) {
+        App.showToast(`删除失败: ${err.message}`, 'error');
+      }
+    });
+
+    modal.querySelector('#phase-save-btn').addEventListener('click', async () => {
+      const rows = modal.querySelectorAll('[data-phase-row]');
+      const promises = [];
+      rows.forEach(row => {
+        const phaseId = row.getAttribute('data-phase-id');
+        const name = row.querySelector('[data-phase-name]')?.value?.trim();
+        const subtitle = row.querySelector('[data-phase-subtitle]')?.value?.trim() || '';
+        const startDate = row.querySelector('[data-phase-start]')?.value;
+        const endDate = row.querySelector('[data-phase-end]')?.value;
+        if (!name || !startDate || !endDate) return;
+        const data = { name, subtitle, start_date: startDate, end_date: endDate };
+        if (phaseId) {
+          promises.push(API.updatePhase(phaseId, data));
+        } else {
+          promises.push(API.createPhase(data));
+        }
+      });
+      try {
+        await Promise.all(promises);
+        await App.loadPhases();
+        // 阶段日期可能变化, 重建时间轴 + 重新加载任务
+        this.initTimeline();
+        App.showToast('阶段已保存', 'success');
+        App.closeModal(modal);
+        this.loadTasks();
+      } catch (err) {
+        App.showToast(`保存失败: ${err.message}`, 'error');
       }
     });
   },
@@ -944,61 +1083,128 @@ const ProgressPlan = {
   },
 
   /* ------------------------------------------------------------------
-   * 右栏显示任务详情 (供任务行点击)
+   * 右栏显示任务详情 (全部字段可编辑, 保存写回后端)
    * ---------------------------------------------------------------- */
   showTaskDetail(task) {
-    const phase = App.getPhase(task.phase_id);
+    const isMilestone = task.is_milestone || task.status === 'milestone';
     const refCount = task.ref_count || task.reference_count || 0;
-    const dateRange = (task.start_date || task.end_date)
-      ? `${task.start_date ? App.formatDate(task.start_date) : '—'} ~ ${task.end_date ? App.formatDate(task.end_date) : '—'}`
-      : '—';
+    const phaseOpts = App.state.phases.map(p =>
+      `<option value="${p.id}" ${String(task.phase_id) === String(p.id) ? 'selected' : ''}>${App.escapeHtml(p.name)}</option>`
+    ).join('');
 
     App.showDetail(`
       <div class="detail-panel__header">
-        <div class="detail-panel__title">${task.is_milestone ? '★ ' : ''}${App.escapeHtml(task.name || '')}</div>
-        <div class="detail-panel__meta">进度计划任务 #${App.escapeHtml(String(task.id))} · UID: ${App.escapeHtml(task.task_uid || '—')}</div>
+        <div class="detail-panel__title">${isMilestone ? '★ ' : ''}编辑进度计划任务</div>
+        <div class="detail-panel__meta">UID: ${App.escapeHtml(task.task_uid || '—')} · #${App.escapeHtml(String(task.id))} · 被引用 ${refCount} 次</div>
       </div>
-      <div class="detail-panel__body">
-        <div class="detail-section">
-          <div class="detail-section__label">所属阶段</div>
-          <div class="detail-section__value">
-            ${phase ? `<span class="tag tag--blue">${App.escapeHtml(phase.name)}</span>` : '<span class="text-tertiary">未分阶段</span>'}
+      <div class="detail-panel__body is-pp-edit" data-pp-id="${task.id}">
+        <div class="pp-edit-form">
+          <div class="form-group">
+            <label>任务名称 *</label>
+            <input type="text" id="ppd-name" value="${App.escapeHtml(task.name || '')}">
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1;">
+              <label>任务 UID *</label>
+              <input type="text" id="ppd-uid" value="${App.escapeHtml(task.task_uid || '')}">
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>所属阶段</label>
+              <select id="ppd-phase"><option value="">— 请选择 —</option>${phaseOpts}</select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>开始日期</label>
+              <input type="date" id="ppd-start" value="${task.start_date ? App.formatDate(task.start_date) : ''}">
+            </div>
+            <div class="form-group">
+              <label>结束日期</label>
+              <input type="date" id="ppd-end" value="${task.end_date ? App.formatDate(task.end_date) : ''}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1;">
+              <label>责任方</label>
+              <input type="text" id="ppd-owner" value="${App.escapeHtml(task.owner || '')}">
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>状态</label>
+              <select id="ppd-status">
+                <option value="planned" ${task.status === 'planned' ? 'selected' : ''}>待开始</option>
+                <option value="ongoing" ${task.status === 'ongoing' ? 'selected' : ''}>进行中</option>
+                <option value="done" ${task.status === 'done' ? 'selected' : ''}>已完成</option>
+                <option value="milestone" ${task.status === 'milestone' ? 'selected' : ''}>里程碑</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>类型</label>
+            <select id="ppd-ms">
+              <option value="false" ${!isMilestone ? 'selected' : ''}>普通任务</option>
+              <option value="true" ${isMilestone ? 'selected' : ''}>★ 里程碑</option>
+            </select>
+          </div>
+          <div class="form-group pp-edit-desc-group">
+            <label>完整描述</label>
+            <textarea id="ppd-desc" placeholder="任务详细说明 (含责任方等), 支持 Markdown 语法">${App.escapeHtml(task.full_desc || '')}</textarea>
           </div>
         </div>
-        <div class="detail-section">
-          <div class="detail-section__label">日期范围</div>
-          <div class="detail-section__value">${App.escapeHtml(dateRange)}</div>
-        </div>
-        <div class="detail-section">
-          <div class="detail-section__label">责任方</div>
-          <div class="detail-section__value">${App.escapeHtml(task.owner || '—')}</div>
-        </div>
-        <div class="detail-section">
-          <div class="detail-section__label">状态</div>
-          <div class="detail-section__value">${App.statusBadge(task.status || 'planned')}</div>
-        </div>
-        ${task.is_milestone ? `
-          <div class="detail-section">
-            <div class="detail-section__label">类型</div>
-            <div class="detail-section__value"><span class="badge badge--primary">★ 里程碑</span></div>
-          </div>
-        ` : ''}
-        ${task.full_desc ? `
-          <div class="detail-section">
-            <div class="detail-section__label">完整描述</div>
-            <div class="detail-section__value">${App.escapeHtml(task.full_desc)}</div>
-          </div>
-        ` : ''}
-        <div class="detail-section">
-          <div class="detail-section__label">被引用情况</div>
-          <div class="detail-section__value">
-            ${refCount > 0
-              ? `<span class="badge badge--primary">🔗 共被 ${refCount} 处周报下周任务引用</span>`
-              : '<span class="text-tertiary">尚未被周报引用</span>'}
-          </div>
+        <div class="pp-edit-actions">
+          <span class="pp-edit-status" data-pp-status></span>
+          <button class="btn btn-primary" id="ppd-save">💾 保存</button>
         </div>
       </div>
     `);
+
+    const saveBtn = document.getElementById('ppd-save');
+    if (saveBtn) saveBtn.addEventListener('click', () => this.saveTaskDetail(task.id));
+  },
+
+  /** 保存右栏编辑的进度计划任务 */
+  async saveTaskDetail(id) {
+    const name = document.getElementById('ppd-name').value.trim();
+    const taskUid = document.getElementById('ppd-uid').value.trim();
+    if (!name) { App.showToast('请输入任务名称', 'warning'); return; }
+    if (!taskUid) { App.showToast('请输入任务 UID', 'warning'); return; }
+
+    const payload = {
+      task_uid: taskUid,
+      name,
+      phase_id: document.getElementById('ppd-phase').value
+        ? parseInt(document.getElementById('ppd-phase').value, 10) : null,
+      start_date: document.getElementById('ppd-start').value || null,
+      end_date: document.getElementById('ppd-end').value || null,
+      owner: document.getElementById('ppd-owner').value.trim() || '',
+      status: document.getElementById('ppd-status').value,
+      is_milestone: document.getElementById('ppd-ms').value === 'true',
+      full_desc: document.getElementById('ppd-desc').value.trim()
+    };
+
+    const statusEl = document.querySelector('[data-pp-status]');
+    try {
+      await API.updateProgressTask(id, payload);
+      const t = this.tasks.find(x => String(x.id) === String(id));
+      if (t) Object.assign(t, payload);
+      if (statusEl) {
+        statusEl.textContent = '✓ 已保存';
+        statusEl.className = 'pp-edit-status saved';
+        setTimeout(() => {
+          if (statusEl.classList.contains('saved')) {
+            statusEl.textContent = '';
+            statusEl.className = 'pp-edit-status';
+          }
+        }, 2000);
+      }
+      App.showToast('已保存', 'success', 1500);
+      this.renderTasks();   // 刷新甘特图任务条
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = '✗ 保存失败';
+        statusEl.className = 'pp-edit-status dirty';
+      }
+      App.showToast(`保存失败: ${err.message}`, 'error');
+    }
   },
 
   /* ------------------------------------------------------------------

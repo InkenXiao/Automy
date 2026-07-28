@@ -139,10 +139,22 @@ class PlanTaskLinkRequest(BaseModel):
     module_id: int
 
 
+# ---------- 复制上周周报请求 ----------
+class CopyLastWeekRequest(BaseModel):
+    """复制上周周报到新周次的请求"""
+
+    week_start: date
+    week_end: date
+    project_id: Optional[int] = None  # ★所属项目ID (可选, 不传则用当前激活项目)
+    title: str | None = None
+    overview_summary: str | None = None
+
+
 # ---------- 周报主体 ----------
 class WeeklyReportBase(BaseModel):
     """周报基础字段"""
 
+    project_id: Optional[int] = None  # ★所属项目ID (可选, 后端默认用当前激活项目)
     title: str = ""
     week_range: str = ""
     week_start: Optional[date] = None
@@ -156,7 +168,7 @@ class WeeklyReportCreate(WeeklyReportBase):
 
 
 class WeeklyReportUpdate(BaseModel):
-    """更新周报请求 (全部字段可选)"""
+    """更新周报请求 (全部字段可选, project_id 不可改)"""
 
     title: str | None = None
     week_range: str | None = None
@@ -170,6 +182,7 @@ class WeeklyReportOut(WeeklyReportBase):
     """周报输出 (含全部子表)"""
 
     id: int
+    project_id: int  # ★所属项目ID
     kpis: list[WeeklyKpiOut] = []
     progress_items: list[WeeklyProgressItemOut] = []
     plan_tasks: list[WeeklyPlanTaskOut] = []

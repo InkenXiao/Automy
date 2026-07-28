@@ -4,15 +4,18 @@ from typing import List
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class Meeting(Base, TimestampMixin):
+class Meeting(Base, TimestampMixin, SoftDeleteMixin):
     """会议主记录"""
 
     __tablename__ = "meetings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )  # ★所属项目ID
     title: Mapped[str] = mapped_column(String(256), default="项目周例会")  # 会议主题
     meet_date: Mapped[str] = mapped_column(String(32), default="")  # 日期, 如 '2026-07-21'
     meet_time: Mapped[str] = mapped_column(String(32), default="")  # 时间, 如 '09:00-10:00'
@@ -22,6 +25,8 @@ class Meeting(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(Text, default="")  # 会议描述/纪要
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
+    # 关联项目
+    project: Mapped["Project"] = relationship("Project", back_populates="meetings")
     # 关联议程项
     items: Mapped[List["MeetingItem"]] = relationship(
         "MeetingItem", back_populates="meeting", cascade="all, delete-orphan"
@@ -31,7 +36,7 @@ class Meeting(Base, TimestampMixin):
         return f"<Meeting {self.id} {self.title}>"
 
 
-class MeetingItem(Base, TimestampMixin):
+class MeetingItem(Base, TimestampMixin, SoftDeleteMixin):
     """会议议程项"""
 
     __tablename__ = "meeting_items"

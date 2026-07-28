@@ -102,9 +102,27 @@ const API = {
   getModules() {
     return this.get('/modules/');
   },
+  createModule(data) {
+    return this.post('/modules/', data);
+  },
+  updateModule(id, data) {
+    return this.put(`/modules/${id}`, data);
+  },
+  deleteModule(id) {
+    return this.del(`/modules/${id}`);
+  },
 
   getPhases() {
     return this.get('/phases/');
+  },
+  createPhase(data) {
+    return this.post('/phases/', data);
+  },
+  updatePhase(id, data) {
+    return this.put(`/phases/${id}`, data);
+  },
+  deletePhase(id) {
+    return this.del(`/phases/${id}`);
   },
 
   /* ------------------------------------------------------------------
@@ -180,6 +198,10 @@ const API = {
 
   createWeeklyReport(data) {
     return this.post('/weekly-reports/', data);
+  },
+
+  copyLastWeekReport(data) {
+    return this.post('/weekly-reports/copy-last', data);
   },
 
   updateWeeklyReport(id, data) {
@@ -269,7 +291,7 @@ const API = {
   },
 
   /* ------------------------------------------------------------------
-     项目例会
+     项目会议
      ------------------------------------------------------------------ */
   getMeetings() {
     return this.get('/meetings/');

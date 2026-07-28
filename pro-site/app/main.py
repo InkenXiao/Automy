@@ -18,6 +18,15 @@ from app.routers import (
 )
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """开发期静态文件禁用缓存, 确保浏览器始终加载最新前端资源"""
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期: 启动时初始化数据库"""
@@ -50,4 +59,4 @@ for router in [
 # 挂载前端静态文件 (web 目录)
 web_dir = Path(__file__).resolve().parent.parent / "web"
 if web_dir.exists():
-    app.mount("/", StaticFiles(directory=str(web_dir), html=True), name="web")
+    app.mount("/", NoCacheStaticFiles(directory=str(web_dir), html=True), name="web")

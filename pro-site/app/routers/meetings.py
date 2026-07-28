@@ -1,8 +1,10 @@
 """会议议程路由 · 含议程项子资源"""
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
 from app.models.meeting import Meeting, MeetingItem
@@ -14,16 +16,20 @@ from app.schemas.meeting import (
     MeetingOut,
     MeetingUpdate,
 )
+from app.utils import resolve_project_id
 
-router = APIRouter(prefix="/meetings", tags=["项目例会"])
+router = APIRouter(prefix="/meetings", tags=["项目会议"])
 
 
 async def _load_meeting(db: AsyncSession, meeting_id: int) -> Meeting:
     """加载单条会议 (含议程项按 sort_order 排序, populate_existing 强制刷新)"""
     stmt = (
         select(Meeting)
-        .options(selectinload(Meeting.items))
-        .where(Meeting.id == meeting_id)
+        .options(
+            selectinload(Meeting.items),
+            with_loader_criteria(MeetingItem, MeetingItem.is_delete.is_(False)),
+        )
+        .where(Meeting.id == meeting_id, Meeting.is_delete.is_(False))
         .execution_options(populate_existing=True)
     )
     result = await db.execute(stmt)
@@ -37,12 +43,20 @@ async def _load_meeting(db: AsyncSession, meeting_id: int) -> Meeting:
 
 # ---------- 会议主体 ----------
 @router.get("/", response_model=list[MeetingOut])
-async def list_meetings(db: AsyncSession = Depends(get_db)) -> list[MeetingOut]:
-    """获取所有会议 (按 sort_order 排序, 含议程项)"""
+async def list_meetings(
+    project_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[MeetingOut]:
+    """获取会议列表 (支持按 project_id 过滤; 不传则返回当前激活项目的会议)"""
+    pid = await resolve_project_id(db, project_id)
     stmt = (
         select(Meeting)
-        .options(selectinload(Meeting.items))
-        .order_by(Meeting.sort_order, Meeting.id)
+        .options(
+            selectinload(Meeting.items),
+            with_loader_criteria(MeetingItem, MeetingItem.is_delete.is_(False)),
+        )
+        .where(Meeting.is_delete.is_(False), Meeting.project_id == pid)
+        .order_by(Meeting.meet_date.desc(), Meeting.meet_time.desc())
     )
     result = await db.execute(stmt)
     items = result.scalars().all()
@@ -65,9 +79,11 @@ async def get_meeting(
 async def create_meeting(
     payload: MeetingCreate, db: AsyncSession = Depends(get_db)
 ) -> MeetingOut:
-    """创建会议 (含议程项批量创建)"""
+    """创建会议 (含议程项批量创建); project_id 未传时默认用当前激活项目"""
     data = payload.model_dump()
     items_data = data.pop("items", [])
+    # 解析 project_id (未传则用当前激活项目)
+    data["project_id"] = await resolve_project_id(db, data.get("project_id"))
     meeting = Meeting(**data)
     for item_in in items_data:
         meeting.items.append(MeetingItem(**item_in))
@@ -86,7 +102,7 @@ async def update_meeting(
 ) -> MeetingOut:
     """更新会议主记录"""
     meeting = await db.get(Meeting, meeting_id)
-    if not meeting:
+    if not meeting or meeting.is_delete:
         raise HTTPException(status_code=404, detail="会议不存在")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(meeting, key, value)
@@ -102,9 +118,9 @@ async def delete_meeting(
 ) -> dict:
     """删除会议 (级联删除议程项)"""
     meeting = await db.get(Meeting, meeting_id)
-    if not meeting:
+    if not meeting or meeting.is_delete:
         raise HTTPException(status_code=404, detail="会议不存在")
-    await db.delete(meeting)
+    meeting.is_delete = True
     await db.flush()
     return {"ok": True, "id": meeting_id}
 
@@ -118,7 +134,7 @@ async def create_meeting_item(
 ) -> MeetingItemOut:
     """新增议程项"""
     meeting = await db.get(Meeting, meeting_id)
-    if not meeting:
+    if not meeting or meeting.is_delete:
         raise HTTPException(status_code=404, detail="会议不存在")
     item = MeetingItem(meeting_id=meeting_id, **payload.model_dump())
     db.add(item)
@@ -136,7 +152,7 @@ async def update_meeting_item(
 ) -> MeetingItemOut:
     """更新议程项"""
     item = await db.get(MeetingItem, item_id)
-    if not item or item.meeting_id != meeting_id:
+    if not item or item.is_delete or item.meeting_id != meeting_id:
         raise HTTPException(status_code=404, detail="议程项不存在")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
@@ -151,8 +167,8 @@ async def delete_meeting_item(
 ) -> dict:
     """删除议程项"""
     item = await db.get(MeetingItem, item_id)
-    if not item or item.meeting_id != meeting_id:
+    if not item or item.is_delete or item.meeting_id != meeting_id:
         raise HTTPException(status_code=404, detail="议程项不存在")
-    await db.delete(item)
+    item.is_delete = True
     await db.flush()
     return {"ok": True, "id": item_id}

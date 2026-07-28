@@ -1,0 +1,58 @@
+# ============================================================
+# Docker 构建忽略清单
+# 目的: 减小镜像体积 + 避免本地环境干扰
+# ============================================================
+
+# ---------- Python ----------
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# ---------- Node.js ----------
+**/node_modules/
+**/npm-debug.log*
+**/yarn-error.log*
+
+# ---------- 构建产物 (镜像内会重新构建) ----------
+xin-site/dist/
+xin-site/.vite/
+
+# ---------- 版本控制 ----------
+.git/
+.gitignore
+.gitattributes
+
+# ---------- 日志与运行时文件 ----------
+.logs/
+*.log
+**/*.pid
+
+# ---------- 容器自身文件 (避免递归) ----------
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.docker.env*
+
+# ---------- IDE / 编辑器 ----------
+.vscode/
+.idea/
+**/*.swp
+**/*.swo
+**/.DS_Store
+
+# ---------- 文档 (可选, 减小体积) ----------
+**/*.md
+!pro-site/README.md
+!abs-site/README.md
+docs/
+
+# ---------- 环境配置 (避免密码进镜像, 运行时通过 env_file 注入) ----------
+**/.env
+**/.env.local
+**/.env.*.local

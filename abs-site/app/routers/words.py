@@ -4,9 +4,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
+from app.models.unit import Unit
 from app.models.word import Word
 from app.schemas.word import WordBatchImport, WordCreate, WordOut, WordUpdate
 
@@ -21,7 +22,14 @@ async def list_words(
     db: AsyncSession = Depends(get_db),
 ):
     """列出全部单词, 支持搜索 / 单元 / 状态过滤, 按 sort_order, id 排序"""
-    stmt = select(Word).options(selectinload(Word.unit))
+    stmt = (
+        select(Word)
+        .options(
+            selectinload(Word.unit),
+            with_loader_criteria(Unit, Unit.is_delete.is_(False)),
+        )
+        .where(Word.is_delete.is_(False))
+    )
     if q:
         pattern = f"%{q}%"
         stmt = stmt.where(
@@ -108,12 +116,15 @@ async def get_word(word_id: int, db: AsyncSession = Depends(get_db)):
     """查询单个单词"""
     stmt = (
         select(Word)
-        .options(selectinload(Word.unit))
-        .where(Word.id == word_id)
+        .options(
+            selectinload(Word.unit),
+            with_loader_criteria(Unit, Unit.is_delete.is_(False)),
+        )
+        .where(Word.id == word_id, Word.is_delete.is_(False))
     )
     result = await db.execute(stmt)
     word = result.scalar_one_or_none()
-    if word is None:
+    if word is None or word.is_delete:
         raise HTTPException(status_code=404, detail="Word not found")
     return word
 
@@ -125,12 +136,15 @@ async def update_word(
     """更新单词"""
     stmt = (
         select(Word)
-        .options(selectinload(Word.unit))
-        .where(Word.id == word_id)
+        .options(
+            selectinload(Word.unit),
+            with_loader_criteria(Unit, Unit.is_delete.is_(False)),
+        )
+        .where(Word.id == word_id, Word.is_delete.is_(False))
     )
     result = await db.execute(stmt)
     word = result.scalar_one_or_none()
-    if word is None:
+    if word is None or word.is_delete:
         raise HTTPException(status_code=404, detail="Word not found")
     update_data = word_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -143,11 +157,11 @@ async def update_word(
 @router.delete("/{word_id}")
 async def delete_word(word_id: int, db: AsyncSession = Depends(get_db)):
     """删除单词"""
-    stmt = select(Word).where(Word.id == word_id)
+    stmt = select(Word).where(Word.id == word_id, Word.is_delete.is_(False))
     result = await db.execute(stmt)
     word = result.scalar_one_or_none()
-    if word is None:
+    if word is None or word.is_delete:
         raise HTTPException(status_code=404, detail="Word not found")
-    await db.delete(word)
+    word.is_delete = True
     await db.flush()
     return {"ok": True, "id": word_id}

@@ -13,15 +13,18 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class WeeklyReport(Base, TimestampMixin):
+class WeeklyReport(Base, TimestampMixin, SoftDeleteMixin):
     """项目周报"""
 
     __tablename__ = "weekly_reports"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )  # ★所属项目ID
     title: Mapped[str] = mapped_column(String(128), default="")
     week_range: Mapped[str] = mapped_column(String(32), default="")  # '07.01 — 07.07'
     week_start: Mapped[date] = mapped_column(Date, nullable=True)
@@ -29,7 +32,9 @@ class WeeklyReport(Base, TimestampMixin):
     overview_summary: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(16), default="draft")  # draft/submitted
 
-    # 关联
+    # 关联项目
+    project: Mapped["Project"] = relationship("Project", back_populates="weekly_reports")
+    # 关联子表
     kpis: Mapped[List["WeeklyKpi"]] = relationship(
         "WeeklyKpi", back_populates="report", cascade="all, delete-orphan"
     )
@@ -40,14 +45,15 @@ class WeeklyReport(Base, TimestampMixin):
         "WeeklyPlanTask", back_populates="report", cascade="all, delete-orphan"
     )
     risks: Mapped[List["WeeklyRisk"]] = relationship(
-        "WeeklyRisk", back_populates="report", cascade="all, delete-orphan"
+        "WeeklyRisk", back_populates="report", cascade="all, delete-orphan",
+        order_by="WeeklyRisk.sort_order"
     )
 
     def __repr__(self):
         return f"<WeeklyReport {self.id} {self.week_range}>"
 
 
-class WeeklyKpi(Base):
+class WeeklyKpi(Base, SoftDeleteMixin):
     """周报-本周概览 KPI (每模块一条)"""
 
     __tablename__ = "weekly_kpis"
@@ -65,7 +71,7 @@ class WeeklyKpi(Base):
     module: Mapped["Module"] = relationship("Module", back_populates="kpis")
 
 
-class WeeklyProgressItem(Base):
+class WeeklyProgressItem(Base, SoftDeleteMixin):
     """周报-本周进展 (每模块多条)"""
 
     __tablename__ = "weekly_progress_items"
@@ -85,7 +91,7 @@ class WeeklyProgressItem(Base):
     module: Mapped["Module"] = relationship("Module", back_populates="progress_items")
 
 
-class WeeklyPlanTask(Base, TimestampMixin):
+class WeeklyPlanTask(Base, TimestampMixin, SoftDeleteMixin):
     """周报-下周任务 ★核心关联表 (可关联 progress_tasks)"""
 
     __tablename__ = "weekly_plan_tasks"
@@ -122,7 +128,7 @@ class WeeklyPlanTask(Base, TimestampMixin):
         return f"<WeeklyPlanTask {self.id} {self.name}>"
 
 
-class WeeklyRisk(Base):
+class WeeklyRisk(Base, SoftDeleteMixin):
     """周报-风险与应对"""
 
     __tablename__ = "weekly_risks"
