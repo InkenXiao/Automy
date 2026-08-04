@@ -1867,6 +1867,54 @@ li:hover > .wr-item-edit { display: block; }
   box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
   animation: pp-pulse-glow 2s infinite;
 }
+/* 已删除: 灰色 + 删除线 */
+.pp-task-bar.deleted {
+  background: linear-gradient(135deg, #9ca3af, #d1d5db) !important;
+  opacity: 0.5; filter: grayscale(1);
+  text-decoration: line-through;
+}
+.pp-task-bar.deleted::after { content: '✕'; margin-left: 4px; font-size: 8px; }
+/* 逾期: 红色边框 */
+.pp-task-bar.overdue {
+  background: linear-gradient(135deg, #ef4444, #f87171) !important;
+  box-shadow: 0 0 0 2px rgba(239,68,68,0.3);
+}
+/* 行级样式 */
+.pp-task-row.pp-deleted, .pp-milestone-row.pp-deleted { opacity: 0.55; }
+.pp-task-row.pp-overdue { background: #fef2f2 !important; }
+.pp-task-row.pp-overdue:hover { background: #fee2e2 !important; }
+.pp-milestone-row.pp-overdue { background: #fef2f2 !important; }
+/* 状态点 */
+.pp-task-name .status-dot.deleted { background: #9ca3af; }
+/* 里程碑已删除/逾期 */
+.pp-milestone-diamond.deleted {
+  background: linear-gradient(135deg, #9ca3af, #d1d5db) !important;
+  border-color: #6b7280 !important;
+  opacity: 0.5;
+}
+.pp-milestone-diamond.overdue {
+  background: linear-gradient(135deg, #ef4444, #f87171) !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.2);
+}
+.pp-milestone-label.deleted { color: #9ca3af !important; text-decoration: line-through; }
+.pp-milestone-label.overdue { color: #ef4444 !important; }
+
+/* 拖拽排序视觉反馈 */
+.pp-task-row.pp-dragging, .pp-milestone-row.pp-dragging {
+  opacity: 0.4; background: #dbeafe !important;
+}
+.pp-task-row.pp-drag-over, .pp-milestone-row.pp-drag-over {
+  border-top: 3px solid var(--pp-p1) !important;
+}
+.pp-phase-header.pp-drag-over {
+  border-top: 3px solid var(--pp-p1);
+}
+.pp-task-bar.pp-dragging-bar, .pp-milestone-diamond.pp-dragging-bar {
+  cursor: grabbing !important; opacity: 0.8; z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.pp-task-bar, .pp-milestone-diamond { cursor: grab; }
 
 @keyframes pp-pulse-glow {
   0%, 100% { box-shadow: 0 0 0 0 var(--pp-p1-glow); }

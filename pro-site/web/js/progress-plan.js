@@ -300,6 +300,7 @@ const ProgressPlan = {
             <button class="pp-btn ${this.filters.status === 'ongoing' ? 'active' : ''}" data-status="ongoing" data-action="filter-status">进行中</button>
             <button class="pp-btn ${this.filters.status === 'planned' ? 'active' : ''}" data-status="planned" data-action="filter-status">计划中</button>
             <button class="pp-btn ${this.filters.status === 'done' ? 'active' : ''}" data-status="done" data-action="filter-status">已完成</button>
+            <button class="pp-btn ${this.filters.status === 'deleted' ? 'active' : ''}" data-status="deleted" data-action="filter-status">已删除</button>
           </div>
           <div class="pp-toolbar-group" style="margin-left:auto;">
             <div class="pp-search-box">
@@ -456,7 +457,12 @@ const ProgressPlan = {
     sorted.forEach(task => {
       const isMilestone = task.is_milestone || task.status === 'milestone';
       const isDone = task.status === 'done';
+      const isDeleted = task.status === 'deleted';
       const phaseNo = this.phaseNo(task.phase_id);
+
+      // 逾期检测: 未完成、未删除、end_date 早于今天
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isOverdue = !isDone && !isDeleted && task.end_date && task.end_date < todayStr;
 
       // ---- 应用筛选 ----
       if (this.hiddenPhases.has(isMilestone ? 'ms' : String(phaseNo))) return;
@@ -466,8 +472,10 @@ const ProgressPlan = {
       }
       if (this.filters.status !== 'all') {
         if (isMilestone) {
-          // 里程碑只在筛选"已完成"时按完成状态过滤，其他状态筛选隐藏
-          if (this.filters.status === 'done' ? !isDone : true) return;
+          // 里程碑: 筛选"已完成"时按完成状态过滤, 筛选"已删除"时按删除状态过滤, 其他隐藏
+          if (this.filters.status === 'done') { if (!isDone) return; }
+          else if (this.filters.status === 'deleted') { if (!isDeleted) return; }
+          else return;
         } else {
           const effectiveStatus = isDone ? 'done' : (task.status || 'planned');
           if (effectiveStatus !== this.filters.status) return;
@@ -494,6 +502,8 @@ const ProgressPlan = {
         // 左侧阶段标题
         const phLeft = document.createElement('div');
         phLeft.className = 'pp-phase-header';
+        phLeft.dataset.phaseId = task.phase_id;
+        phLeft.dataset.phaseNo = phaseNo;
         phLeft.innerHTML = `
           <div class="phase-name" style="width:360px;min-width:360px;flex-shrink:0;">
             <span style="color:var(--pp-p${phaseNo});font-weight:700;">${App.escapeHtml(phaseName)}${phaseSubtitle ? '·' + App.escapeHtml(phaseSubtitle) : ''}</span>
@@ -515,8 +525,11 @@ const ProgressPlan = {
       // ---- 任务行 (左) ----
       const row = document.createElement('div');
       row.className = isMilestone ? 'pp-milestone-row' : 'pp-task-row';
+      if (isDeleted) row.classList.add('pp-deleted');
+      if (isOverdue) row.classList.add('pp-overdue');
       row.dataset.taskId = task.id;
       row.style.position = 'relative';
+      row.draggable = true;
 
       const startDay = this.dateToDay(task.start_date);
       const endDay = this.dateToDay(task.end_date || task.start_date);
@@ -524,15 +537,17 @@ const ProgressPlan = {
       const nameEl = document.createElement('div');
       nameEl.className = 'pp-task-name';
       if (isMilestone) {
-        nameEl.innerHTML = `<span style="color:${isDone ? 'var(--color-success)' : 'var(--pp-ms)'};font-weight:700;">${App.escapeHtml(task.name || '')}</span>`;
+        const msColor = isDeleted ? '#999' : (isDone ? 'var(--color-success)' : (isOverdue ? 'var(--color-danger)' : 'var(--pp-ms)'));
+        nameEl.innerHTML = `<span style="color:${msColor};font-weight:700;${isDeleted ? 'text-decoration:line-through;' : ''}">${App.escapeHtml(task.name || '')}</span>`;
       } else {
-        const statusCls = isDone ? 'done' : (task.status === 'ongoing' ? 'ongoing' : 'planned');
+        const statusCls = isDeleted ? 'deleted' : (isDone ? 'done' : (task.status === 'ongoing' ? 'ongoing' : 'planned'));
         const checkCls = isDone ? 'checked' : '';
+        const nameStyle = isDeleted ? 'text-decoration:line-through;color:#999;' : (isOverdue ? 'color:var(--color-danger);' : '');
         nameEl.innerHTML = `
           <div class="check-btn ${checkCls}" data-action="toggle-done" data-id="${task.id}" title="标记完成">${isDone ? '✓' : ''}</div>
           <span class="status-dot ${statusCls}"></span>
           <span class="task-id">${App.escapeHtml(task.task_uid || '')}</span>
-          <span title="${App.escapeHtml(task.full_desc || '')}">${App.escapeHtml(task.name || '')}</span>
+          <span title="${App.escapeHtml(task.full_desc || '')}" style="${nameStyle}">${App.escapeHtml(task.name || '')}</span>
         `;
       }
       row.appendChild(nameEl);
@@ -541,6 +556,8 @@ const ProgressPlan = {
       // ---- 任务条 (右) ----
       const barRow = document.createElement('div');
       barRow.className = isMilestone ? 'pp-milestone-row' : 'pp-task-row';
+      if (isDeleted) barRow.classList.add('pp-deleted');
+      if (isOverdue) barRow.classList.add('pp-overdue');
       barRow.style.position = 'relative';
       barRow.dataset.taskId = task.id;
 
@@ -549,7 +566,11 @@ const ProgressPlan = {
 
       if (isMilestone) {
         const diamond = document.createElement('div');
-        diamond.className = 'pp-milestone-diamond' + (isDone ? ' done' : '');
+        let diamondCls = 'pp-milestone-diamond';
+        if (isDone) diamondCls += ' done';
+        if (isDeleted) diamondCls += ' deleted';
+        if (isOverdue) diamondCls += ' overdue';
+        diamond.className = diamondCls;
         diamond.style.left = this.dayToPx(startDay) + 'px';
         diamond.dataset.taskId = task.id;
         diamond.dataset.action = 'task-click';
@@ -557,6 +578,8 @@ const ProgressPlan = {
 
         const label = document.createElement('div');
         label.className = 'pp-milestone-label';
+        if (isDeleted) label.classList.add('deleted');
+        if (isOverdue) label.classList.add('overdue');
         label.style.left = `calc(${this.dayToPx(startDay)}px + 12px)`;
         label.textContent = (task.name || '').replace(/^★\s*/, '');
         barContainer.appendChild(label);
@@ -564,7 +587,9 @@ const ProgressPlan = {
         const bar = document.createElement('div');
         const cls = ['pp-task-bar', `p${phaseNo}`];
         if (isDone) cls.push('done');
-        if (task.status === 'ongoing' && !isDone) cls.push('ongoing');
+        if (isDeleted) cls.push('deleted');
+        if (isOverdue) cls.push('overdue');
+        if (task.status === 'ongoing' && !isDone && !isDeleted) cls.push('ongoing');
         bar.className = cls.join(' ');
         bar.style.left = this.dayToPx(startDay) + 'px';
         bar.style.width = this.dayToPx(Math.max(1, endDay - startDay + 1)) + 'px';
@@ -810,12 +835,229 @@ const ProgressPlan = {
       });
     }
 
+    // 任务拖拽排序 (左栏垂直拖拽 → 自动更新阶段与日期)
+    this.bindTaskDragSort();
+
+    // 任务条水平拖拽 (右栏拖拽任务条 → 更新开始/结束日期)
+    this.bindBarDrag();
+
     // 滚动同步 (task-panel 与 timeline-panel)
     this.syncScroll();
 
     // 导出 PDF
     const exportBtn = document.getElementById('pp-export-btn');
     if (exportBtn) exportBtn.addEventListener('click', () => this.exportToPdf());
+  },
+
+  /** 天数偏移转日期字符串 (YYYY-MM-DD) */
+  dayToDateStr(day) {
+    if (!this.PROJECT_START) return null;
+    const d = new Date(this.PROJECT_START);
+    d.setDate(d.getDate() + day);
+    return d.toISOString().split('T')[0];
+  },
+
+  /** 根据日期字符串判断所属阶段 */
+  getPhaseForDate(dateStr) {
+    if (!dateStr) return null;
+    const phases = App.state.phases || [];
+    for (const ph of phases) {
+      if (ph.start_date && ph.end_date && dateStr >= ph.start_date && dateStr <= ph.end_date) {
+        return ph;
+      }
+    }
+    return null;
+  },
+
+  /** 计算两个日期字符串间的天数差 (b - a) */
+  daysBetween(a, b) {
+    if (!a || !b) return 0;
+    const da = new Date(a + 'T00:00:00');
+    const db = new Date(b + 'T00:00:00');
+    return Math.round((db - da) / 86400000);
+  },
+
+  /** 任务行垂直拖拽排序: 拖到不同阶段区域 → 自动更新 phase_id + 日期 */
+  bindTaskDragSort() {
+    const taskList = document.getElementById('pp-task-list');
+    if (!taskList) return;
+    let dragRow = null;
+
+    taskList.addEventListener('dragstart', (e) => {
+      const row = e.target.closest('.pp-task-row, .pp-milestone-row');
+      if (!row) return;
+      dragRow = row;
+      row.classList.add('pp-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', row.dataset.taskId || '');
+    });
+
+    taskList.addEventListener('dragend', () => {
+      if (dragRow) dragRow.classList.remove('pp-dragging');
+      taskList.querySelectorAll('.pp-drag-over').forEach(el => el.classList.remove('pp-drag-over'));
+      dragRow = null;
+    });
+
+    taskList.addEventListener('dragover', (e) => {
+      if (!dragRow) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const target = e.target.closest('.pp-task-row, .pp-milestone-row, .pp-phase-header');
+      if (!target || target === dragRow) return;
+      taskList.querySelectorAll('.pp-drag-over').forEach(el => el.classList.remove('pp-drag-over'));
+      target.classList.add('pp-drag-over');
+    });
+
+    taskList.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      if (!dragRow) return;
+      const dragTaskId = dragRow.dataset.taskId;
+      const target = e.target.closest('.pp-task-row, .pp-milestone-row, .pp-phase-header');
+      taskList.querySelectorAll('.pp-drag-over').forEach(el => el.classList.remove('pp-drag-over'));
+      dragRow.classList.remove('pp-dragging');
+      if (!target || target === dragRow) { dragRow = null; return; }
+
+      const task = this.tasks.find(t => String(t.id) === String(dragTaskId));
+      if (!task) { dragRow = null; return; }
+
+      // 找到拖放位置的所属阶段 (从目标元素向上查找最近的阶段标题)
+      let phaseHeader = null;
+      if (target.classList.contains('pp-phase-header')) {
+        phaseHeader = target;
+      } else {
+        let prev = target.previousElementSibling;
+        while (prev) {
+          if (prev.classList && prev.classList.contains('pp-phase-header')) {
+            phaseHeader = prev;
+            break;
+          }
+          prev = prev.previousElementSibling;
+        }
+      }
+
+      if (!phaseHeader) { dragRow = null; return; }
+      const newPhaseId = parseInt(phaseHeader.dataset.phaseId, 10);
+      const newPhase = App.state.phases.find(p => String(p.id) === String(newPhaseId));
+      if (!newPhase) { dragRow = null; return; }
+
+      const oldPhaseId = task.phase_id;
+      const duration = Math.max(1, this.daysBetween(task.start_date, task.end_date || task.start_date) + 1);
+
+      // 计算新日期: 如果阶段变了, 用新阶段的开始日期 + 原时长
+      let newStartDate, newEndDate;
+      if (String(oldPhaseId) !== String(newPhaseId)) {
+        newStartDate = newPhase.start_date;
+        newEndDate = this.dayToDateStr(this.dateToDay(newStartDate) + duration - 1);
+      } else {
+        newStartDate = task.start_date;
+        newEndDate = task.end_date;
+      }
+
+      dragRow = null;
+
+      // 调用后端更新
+      const payload = {
+        phase_id: newPhaseId,
+        start_date: newStartDate,
+        end_date: newEndDate
+      };
+      try {
+        await API.updateProgressTask(task.id, payload);
+        Object.assign(task, payload);
+        App.showToast(`已移动到「${newPhase.name}」, 日期已更新`, 'success', 2000);
+        this.loadTasks();
+      } catch (err) {
+        App.showToast(`拖拽更新失败: ${err.message}`, 'error');
+      }
+    });
+  },
+
+  /** 任务条水平拖拽: 在时间轴上左右拖动任务条 → 更新开始/结束日期, 跨阶段时自动更新 phase_id */
+  bindBarDrag() {
+    const barsArea = document.getElementById('pp-bars-area');
+    if (!barsArea) return;
+
+    let dragInfo = null; // { taskId, bar, startMouseX, origLeftPx, origStartDay, origEndDay, isMilestone }
+
+    barsArea.addEventListener('mousedown', (e) => {
+      const bar = e.target.closest('.pp-task-bar, .pp-milestone-diamond');
+      if (!bar) return;
+      // 排除已删除任务
+      if (bar.classList.contains('deleted')) return;
+      const taskId = bar.dataset.taskId;
+      const task = this.tasks.find(t => String(t.id) === String(taskId));
+      if (!task) return;
+
+      e.preventDefault();
+      const origStartDay = this.dateToDay(task.start_date);
+      const origEndDay = this.dateToDay(task.end_date || task.start_date);
+      dragInfo = {
+        taskId,
+        bar,
+        startMouseX: e.clientX,
+        origLeftPx: parseFloat(bar.style.left) || 0,
+        origStartDay,
+        origEndDay,
+        isMilestone: bar.classList.contains('pp-milestone-diamond'),
+        moved: false
+      };
+      bar.classList.add('pp-dragging-bar');
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragInfo) return;
+      const deltaX = e.clientX - dragInfo.startMouseX;
+      if (Math.abs(deltaX) < 3 && !dragInfo.moved) return;
+      dragInfo.moved = true;
+      const deltaDays = Math.round(deltaX / this.PX_PER_DAY);
+      const newLeftPx = dragInfo.origLeftPx + deltaDays * this.PX_PER_DAY;
+      dragInfo.bar.style.left = newLeftPx + 'px';
+      // 里程碑标签同步移动
+      if (dragInfo.isMilestone) {
+        const label = dragInfo.bar.parentElement.querySelector('.pp-milestone-label');
+        if (label) label.style.left = `calc(${newLeftPx}px + 12px)`;
+      }
+    });
+
+    document.addEventListener('mouseup', async (e) => {
+      if (!dragInfo) return;
+      const info = dragInfo;
+      dragInfo = null;
+      info.bar.classList.remove('pp-dragging-bar');
+      if (!info.moved) return;
+
+      const task = this.tasks.find(t => String(t.id) === String(info.taskId));
+      if (!task) return;
+
+      const deltaX = e.clientX - info.startMouseX;
+      const deltaDays = Math.round(deltaX / this.PX_PER_DAY);
+      const newStartDay = Math.max(0, info.origStartDay + deltaDays);
+      const newEndDay = Math.max(newStartDay, info.origEndDay + deltaDays);
+      const newStartDate = this.dayToDateStr(newStartDay);
+      const newEndDate = this.dayToDateStr(newEndDay);
+
+      // 检测新位置所属阶段
+      const newPhase = this.getPhaseForDate(newStartDate);
+      const payload = { start_date: newStartDate, end_date: newEndDate };
+      let phaseChanged = false;
+      if (newPhase && String(newPhase.id) !== String(task.phase_id)) {
+        payload.phase_id = newPhase.id;
+        phaseChanged = true;
+      }
+
+      try {
+        await API.updateProgressTask(task.id, payload);
+        Object.assign(task, payload);
+        const msg = phaseChanged
+          ? `日期已更新, 阶段变更为「${newPhase.name}」`
+          : '日期已更新';
+        App.showToast(msg, 'success', 2000);
+        this.loadTasks();
+      } catch (err) {
+        App.showToast(`拖拽更新失败: ${err.message}`, 'error');
+        this.renderTasks();
+      }
+    });
   },
 
   /** 导出甘特图为 PDF (横向, 完整展开滚动区域) */
@@ -1134,6 +1376,7 @@ const ProgressPlan = {
                 <option value="planned" ${task.status === 'planned' ? 'selected' : ''}>待开始</option>
                 <option value="ongoing" ${task.status === 'ongoing' ? 'selected' : ''}>进行中</option>
                 <option value="done" ${task.status === 'done' ? 'selected' : ''}>已完成</option>
+                <option value="deleted" ${task.status === 'deleted' ? 'selected' : ''}>已删除</option>
                 <option value="milestone" ${task.status === 'milestone' ? 'selected' : ''}>里程碑</option>
               </select>
             </div>
@@ -1214,6 +1457,26 @@ const ProgressPlan = {
     const task = id ? this.tasks.find(t => String(t.id) === String(id)) : null;
     const statusVal = task?.status || 'planned';
 
+    // 新建任务时, 默认使用当前选中阶段的阶段、开始/结束日期
+    let defaultPhaseId = null;
+    let defaultStart = '';
+    let defaultEnd = '';
+    if (!id) {
+      let selPhase = null;
+      if (this.filters.phase !== 'all' && this.filters.phase !== 'ms') {
+        const phaseNo = parseInt(this.filters.phase, 10);
+        selPhase = App.state.phases[phaseNo - 1];
+      } else if (App.state.phases.length > 0) {
+        // 未选阶段时默认第一个
+        selPhase = App.state.phases[0];
+      }
+      if (selPhase) {
+        defaultPhaseId = selPhase.id;
+        defaultStart = selPhase.start_date ? App.formatDate(selPhase.start_date) : '';
+        defaultEnd = selPhase.end_date ? App.formatDate(selPhase.end_date) : '';
+      }
+    }
+
     const modal = App.openModal({
       title: id ? '编辑任务' : '新建任务',
       bodyHtml: `
@@ -1231,17 +1494,17 @@ const ProgressPlan = {
           <label>所属阶段</label>
           <select id="pp-phase">
             <option value="">— 请选择 —</option>
-            ${App.state.phases.map(p => `<option value="${p.id}" ${task && String(task.phase_id) === String(p.id) ? 'selected' : ''}>${App.escapeHtml(p.name)}</option>`).join('')}
+            ${App.state.phases.map(p => `<option value="${p.id}" ${task ? (String(task.phase_id) === String(p.id) ? 'selected' : '') : (String(defaultPhaseId) === String(p.id) ? 'selected' : '')}>${App.escapeHtml(p.name)}</option>`).join('')}
           </select>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>开始日期</label>
-            <input type="date" id="pp-start" value="${task && task.start_date ? App.formatDate(task.start_date) : ''}">
+            <input type="date" id="pp-start" value="${task && task.start_date ? App.formatDate(task.start_date) : defaultStart}">
           </div>
           <div class="form-group">
             <label>结束日期</label>
-            <input type="date" id="pp-end" value="${task && task.end_date ? App.formatDate(task.end_date) : ''}">
+            <input type="date" id="pp-end" value="${task && task.end_date ? App.formatDate(task.end_date) : defaultEnd}">
           </div>
         </div>
         <div class="form-row">
@@ -1252,11 +1515,12 @@ const ProgressPlan = {
           <div class="form-group">
             <label>状态</label>
             <select id="pp-status">
-              <option value="planned" ${statusVal === 'planned' ? 'selected' : ''}>待开始</option>
-              <option value="ongoing" ${statusVal === 'ongoing' ? 'selected' : ''}>进行中</option>
-              <option value="done" ${statusVal === 'done' ? 'selected' : ''}>已完成</option>
-              <option value="milestone" ${statusVal === 'milestone' ? 'selected' : ''}>里程碑</option>
-            </select>
+                <option value="planned" ${statusVal === 'planned' ? 'selected' : ''}>待开始</option>
+                <option value="ongoing" ${statusVal === 'ongoing' ? 'selected' : ''}>进行中</option>
+                <option value="done" ${statusVal === 'done' ? 'selected' : ''}>已完成</option>
+                <option value="deleted" ${statusVal === 'deleted' ? 'selected' : ''}>已删除</option>
+                <option value="milestone" ${statusVal === 'milestone' ? 'selected' : ''}>里程碑</option>
+              </select>
           </div>
         </div>
         <div class="form-group">

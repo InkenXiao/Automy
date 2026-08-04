@@ -26,7 +26,7 @@ class ProgressTask(Base, TimestampMixin, SoftDeleteMixin):
     end_date: Mapped[date] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), default="planned"
-    )  # ongoing/planned/milestone/done
+    )  # ongoing/planned/milestone/done/deleted
     full_desc: Mapped[str] = mapped_column(Text, default="")  # 完整描述(含责任方)
     owner: Mapped[str] = mapped_column(String(64), default="")
     is_milestone: Mapped[bool] = mapped_column(Boolean, default=False)
