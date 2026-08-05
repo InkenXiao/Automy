@@ -275,6 +275,13 @@
   flex: 1;
 }
 
+.chat-session-item__time {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  margin-right: 6px;
+  font-weight: 400;
+}
+
 .chat-session-item__del {
   opacity: 0;
   color: var(--color-text-tertiary);

@@ -58,7 +58,7 @@ const TaskCenter = {
             </div>
             <div class="form-field">
               <label>任务描述</label>
-              <textarea id="tc-input" rows="4" placeholder="描述要让智能体完成的任务, 如: 汇总本周进度并识别风险; 输入 / 可引用当前项目的会议/周报/里程碑/周任务记录"></textarea>
+              <textarea id="tc-input" rows="4" placeholder="描述要让智能体完成的任务, 如: 汇总本周进度并识别风险; 输入 / 引用会议/周报/里程碑/周任务记录, # 选择智能体/技能/工具"></textarea>
             </div>
             <button class="cw-btn cw-btn--primary" id="tc-run" style="width:100%">▶ 创建并执行</button>
           </div>
@@ -702,6 +702,13 @@ const MentionBox = {
     { key: 'worktask',  label: '周任务', icon: '✅' },
   ],
 
+  // # 触发的资源类别
+  RES_KINDS: [
+    { key: 'agent', label: '智能体', icon: '🤖' },
+    { key: 'skill', label: '技能',   icon: '⚡' },
+    { key: 'tool',  label: '工具',   icon: '🔧' },
+  ],
+
   /** 绑定到输入框; opts: { getProjectId, onPickProject } */
   attach(textarea, opts = {}) {
     this.detach();
@@ -734,18 +741,19 @@ const MentionBox = {
 
   isOpen() { return !!this.popup; },
 
-  /** 解析光标前的触发词: @xx 或 /xx (前面需为行首/空白) */
+  /** 解析光标前的触发词: @xx 或 /xx 或 #xx (前面需为行首/空白) */
   handleInput() {
     const ta = this.textarea;
     if (!ta) return;
     // 记录选择阶段: 继续输入则关闭浮层
-    if (this.stage === 'record') { this.close(); return; }
+    if (this.stage === 'record' || this.stage === 'resource') { this.close(); return; }
     const pos = ta.selectionStart;
     const before = ta.value.slice(0, pos);
-    const m = before.match(/(^|[\s\n])([@/])([^\s@/]*)$/);
+    const m = before.match(/(^|[\s\n])([@/#])([^\s@/#]*)$/);
     if (!m) { this.close(); return; }
     this.triggerStart = pos - m[3].length - 1;
     if (m[2] === '@') this.showProjects(m[3]);
+    else if (m[2] === '#') this.showResKinds(m[3]);
     else this.showCategories(m[3]);
   },
 
@@ -783,6 +791,55 @@ const MentionBox = {
       .filter(c => !keyword || c.label.includes(keyword))
       .map(c => ({ title: c.label, sub: '引用项目记录', icon: c.icon, category: c }));
     this.renderPopup('/ 选择记录类型');
+  },
+
+  /** # 触发: 展示资源类别 (智能体/技能/工具) */
+  showResKinds(keyword) {
+    this.stage = 'reskind';
+    this.items = this.RES_KINDS
+      .filter(k => !keyword || k.label.includes(keyword))
+      .map(k => ({ title: k.label, sub: '引用系统资源', icon: k.icon, reskind: k }));
+    this.renderPopup('# 选择资源类型');
+  },
+
+  /** 选定资源类别后: 加载对应资源列表 */
+  async showResources(kind) {
+    this.stage = 'resource';
+    this.renderPopup(`${kind.icon} ${kind.label} · 加载中…`, true);
+    let records = [];
+    try {
+      records = await this.loadResources(kind.key);
+    } catch (e) { records = []; }
+    if (this.stage !== 'resource') return; // 期间被关闭
+    this.items = records;
+    this.renderPopup(`${kind.icon} ${kind.label} · 选择资源插入`);
+  },
+
+  /** 按资源类别拉取智能体/技能/工具并格式化为可插入片段 */
+  async loadResources(key) {
+    if (key === 'agent') {
+      const list = await API.getAgents();
+      return list.map(a => ({
+        title: `${(a.config || {}).icon || '🤖'} ${a.name}`,
+        sub: (a.description || '').slice(0, 40),
+        snippet: `【智能体#${a.id}】${a.name} | ${a.description || ''} | 可用工具: ${(a.tools || []).join(', ')}\n`,
+      }));
+    }
+    if (key === 'skill') {
+      const list = await API.getSkills();
+      return list.map(s => ({
+        title: `${(s.config || {}).icon || '⚡'} ${s.name}`,
+        sub: (s.description || '').slice(0, 40),
+        snippet: `【技能#${s.id}】${s.name} | ${s.description || ''}\n`,
+      }));
+    }
+    // tool: 与后端 TOOL_DEFINITIONS 一致的中文注释清单
+    return CoworkBuilder.ALL_TOOLS.map(([name, zh]) => ({
+      title: name,
+      sub: zh,
+      icon: '🔧',
+      snippet: `【工具】${name} | ${zh}\n`,
+    }));
   },
 
   /** 选定类别后: 加载当前项目下的记录列表 */
@@ -892,7 +949,7 @@ const MentionBox = {
     }
   },
 
-  /** 选中条目: 项目→插入@名并回调; 类别→进入记录列表; 记录→插入片段 */
+  /** 选中条目: 项目→插入@名并回调; 类别→进入记录列表; 资源类别→进入资源列表; 记录/资源→插入片段 */
   pick(i) {
     const item = this.items[i];
     if (!item) return;
@@ -904,6 +961,10 @@ const MentionBox = {
       // 清掉已输入的 /xx, 再展开记录列表
       this.replaceTrigger('');
       this.showRecords(item.category);
+    } else if (item.reskind) {
+      // 清掉已输入的 #xx, 再展开资源列表
+      this.replaceTrigger('');
+      this.showResources(item.reskind);
     } else if (item.snippet) {
       this.replaceTrigger(item.snippet);
       this.close();
@@ -1006,7 +1067,7 @@ const AgentChat = {
           </div>
           <div class="chat-messages" id="chat-messages"></div>
           <div class="chat-input">
-            <textarea id="chat-textarea" rows="2" placeholder="输入消息, Enter 发送; @ 选择项目, / 引用会议/周报/里程碑/周任务"></textarea>
+            <textarea id="chat-textarea" rows="2" placeholder="输入消息, Enter 发送; @ 选择项目, / 引用会议/周报/里程碑/周任务, # 选择智能体/技能/工具"></textarea>
             <button class="cw-btn cw-btn--primary" id="chat-send">发送</button>
           </div>
         </div>
@@ -1046,11 +1107,14 @@ const AgentChat = {
       this.sessions = [];
     }
     if (!list) return;
-    list.innerHTML = this.sessions.map(s => `
+    list.innerHTML = this.sessions.map(s => {
+      const time = (s.created_at || '').slice(5, 16).replace('T', ' ');
+      return `
       <div class="chat-session-item" data-session-id="${s.id}">
-        <span class="chat-session-item__title">${App.escapeHtml(s.title || '未命名会话')}</span>
+        <span class="chat-session-item__title" title="${App.escapeHtml(s.title || '未命名会话')}">${time ? `<span class="chat-session-item__time">${time}</span>` : ''}${App.escapeHtml(s.title || '未命名会话')}</span>
         <span class="chat-session-item__del" data-del="${s.id}" title="归档">×</span>
-      </div>`).join('') || '<div style="padding:8px;font-size:12px;color:var(--color-text-tertiary)">暂无历史会话</div>';
+      </div>`;
+    }).join('') || '<div style="padding:8px;font-size:12px;color:var(--color-text-tertiary)">暂无历史会话</div>';
 
     list.querySelectorAll('.chat-session-item').forEach(item => {
       const sid = parseInt(item.dataset.sessionId, 10);

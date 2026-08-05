@@ -2,7 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.agent import Agent
+from app.models.agent import Agent, AgentMemory
 
 # 通用行为约定 (五大能力)
 CAPABILITY_GUIDE = """
@@ -139,4 +139,85 @@ async def seed_preset_agents(db: AsyncSession):
             continue
         agent = Agent(**preset)
         db.add(agent)
+    await db.flush()
+
+
+# ---------- 预置默认记忆 (高级项目经理/开发经理应知应会, 按智能体 type 分组) ----------
+# memory_type: fact(事实/方法论) preference(偏好/原则) context(背景) decision(决策规范)
+DEFAULT_MEMORIES: dict[str, list[dict]] = {
+    "progress": [
+        {"memory_type": "decision", "key": "里程碑验收标准",
+         "content": "里程碑必须有明确的验收标准与交付物, 无交付物的节点不设为里程碑; 创建里程碑任务时主动向用户确认交付物"},
+        {"memory_type": "fact", "key": "关键路径优先原则",
+         "content": "进度分析优先识别关键路径 (CPM) 上的任务: 关键路径任务延误即项目整体延误, 非关键路径任务有一定浮动时间"},
+        {"memory_type": "preference", "key": "进度预警阈值",
+         "content": "任务逾期超过3天, 或里程碑距计划日期7天内仍未完成时, 主动预警并提示风险"},
+        {"memory_type": "context", "key": "延期根因四分法",
+         "content": "分析延期时先按四类归因再给建议: 需求变更 / 资源不足 / 技术风险 / 外部依赖"},
+        {"memory_type": "fact", "key": "开发估时经验法则",
+         "content": "开发任务估时应包含约20%风险缓冲; 联调与测试通常各占开发工时的30%左右, 排期时不可省略"},
+    ],
+    "meeting": [
+        {"memory_type": "decision", "key": "纪要三段式规范",
+         "content": "会议纪要必须包含三部分: 会议结论 / 行动项(负责人+截止时间) / 风险与遗留问题, 缺一不可; 更新纪要时按此结构整理"},
+        {"memory_type": "preference", "key": "会议效率原则",
+         "content": "单次会议控制在60分钟内; 议程项必须带时间段与汇报人; 无议程的会议建议取消"},
+        {"memory_type": "fact", "key": "行动项闭环追踪",
+         "content": "每次例会先回顾上次会议行动项的完成情况, 未闭环项必须说明原因与新的截止时间"},
+        {"memory_type": "context", "key": "会议类型与纪要侧重",
+         "content": "例会侧重进度同步与风险暴露; 评审会侧重决策结论; 专题会侧重问题攻关方案; 整理纪要时按类型突出对应重点"},
+    ],
+    "weekly_report": [
+        {"memory_type": "decision", "key": "周报四段结构",
+         "content": "周报固定四段: 本周概览(KPI) / 本周进展 / 下周计划 / 风险与应对; 生成周报时严格按此结构组织"},
+        {"memory_type": "preference", "key": "结果导向表述",
+         "content": "进展描述用结果导向: 写'完成了什么+量化结果', 不写'做了什么工作'; 例如'完成XX接口开发并通过联调'而非'进行XX开发'"},
+        {"memory_type": "fact", "key": "风险描述四要素",
+         "content": "每条风险必须包含: 影响范围 / 紧急程度 / 应对措施 / 责任人, 缺要素的风险描述视为不合格"},
+        {"memory_type": "context", "key": "数据一致性核对",
+         "content": "周报KPI与进展数据必须与进度计划、周任务的实际数据一致, 引用前先调用工具核对, 禁止凭印象填写"},
+        {"memory_type": "preference", "key": "下周计划可执行性",
+         "content": "下周计划项必须有负责人与预期完成时间, 且与当前人力负荷匹配, 避免列入无法落地的空泛事项"},
+    ],
+    "work_plan": [
+        {"memory_type": "decision", "key": "排期优先级矩阵",
+         "content": "排期按重要紧急四象限排序, 关键路径上的任务优先; 每人每天安排的高优先级任务不超过3个"},
+        {"memory_type": "fact", "key": "工作量评估基准",
+         "content": "单人日有效工时按6小时计(扣除会议与沟通); 任务粒度不超过2天, 超过则拆分为子任务"},
+        {"memory_type": "preference", "key": "机动工时缓冲",
+         "content": "周计划预留约15%机动工时, 用于应对临时插入的紧急任务与缺陷修复"},
+        {"memory_type": "context", "key": "任务依赖检查",
+         "content": "排期前先确认前置任务的完成状态; 被阻塞的任务优先安排解锁动作, 而非等待"},
+        {"memory_type": "fact", "key": "开发自测与联调约定",
+         "content": "开发任务必须包含自测时间; 联调任务需相关方同时在场, 排期时对齐双方时间"},
+    ],
+}
+
+
+async def seed_preset_memories(db: AsyncSession):
+    """为预置 Agent 播种默认记忆 (幂等: 按 agent_id+key 已存在则同步内容)"""
+    for preset in PRESET_AGENTS:
+        memories = DEFAULT_MEMORIES.get(preset["type"])
+        if not memories:
+            continue
+        result = await db.execute(
+            select(Agent).where(Agent.type == preset["type"], Agent.name == preset["name"])
+        )
+        agent = result.scalars().first()
+        if not agent:
+            continue
+        for mem in memories:
+            result = await db.execute(
+                select(AgentMemory).where(
+                    AgentMemory.agent_id == agent.id,
+                    AgentMemory.key == mem["key"],
+                    AgentMemory.project_id.is_(None),
+                )
+            )
+            existing = result.scalars().first()
+            if existing:
+                existing.memory_type = mem["memory_type"]
+                existing.content = mem["content"]
+                continue
+            db.add(AgentMemory(agent_id=agent.id, project_id=None, **mem))
     await db.flush()

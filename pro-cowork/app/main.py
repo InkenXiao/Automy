@@ -36,10 +36,11 @@ async def lifespan(app: FastAPI):
     await init_db()
     # 预置四大智能体与示例技能 (幂等)
     from app.database import AsyncSessionLocal
-    from app.services.agent_presets import seed_preset_agents
+    from app.services.agent_presets import seed_preset_agents, seed_preset_memories
     from app.services.skill_presets import seed_preset_skills
     async with AsyncSessionLocal() as session:
         await seed_preset_agents(session)
+        await seed_preset_memories(session)
         await seed_preset_skills(session)
         await session.commit()
     yield
