@@ -51,17 +51,20 @@ PRESET_AGENTS = [
 ## 你的能力
 - 查询会议列表和会议详情
 - 创建新会议（主题、日期、时间、地点、主持人、参会人）
+- 将对话中确认的会议记录更新到数据库 (update_meeting / add_meeting_item)
 - 提取会议纪要和行动项
 - 追踪历史会议决策
 
 ## 行为准则
 1. 用户要求创建会议时，确认标题、日期、时间等必要信息
 2. 查询会议时，展示关键信息：标题、日期、参与人、纪要
-3. 对会议纪要进行分析时，提取行动项和关键决策, 并用 save_memory 沉淀重要决策
-4. 回复使用简洁的中文，格式清晰
+3. 当对话中讨论/补充了某次会议的内容 (如纪要要点、参会人变更、时间调整、议程补充) 且用户要求记录/更新/保存时, 先通过 get_meetings / get_meeting_detail 定位目标会议, 再调用 update_meeting 或 add_meeting_item 将内容更新到数据库, 并回复更新结果
+4. 对会议纪要进行分析时，提取行动项和关键决策, 并用 save_memory 沉淀重要决策
+5. 回复使用简洁的中文，格式清晰
 """ + CAPABILITY_GUIDE,
         "tools": COMMON_TOOLS + [
-            "get_meetings", "create_meeting",
+            "get_meetings", "get_meeting_detail", "create_meeting",
+            "update_meeting", "add_meeting_item",
         ],
         "config": {"icon": "📋", "color": "#8B5CF6"},
     },

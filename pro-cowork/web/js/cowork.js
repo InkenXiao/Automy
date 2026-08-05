@@ -58,7 +58,7 @@ const TaskCenter = {
             </div>
             <div class="form-field">
               <label>任务描述</label>
-              <textarea id="tc-input" rows="4" placeholder="描述要让智能体完成的任务, 如: 汇总本周进度并识别风险"></textarea>
+              <textarea id="tc-input" rows="4" placeholder="描述要让智能体完成的任务, 如: 汇总本周进度并识别风险; 输入 / 可引用当前项目的会议/周报/里程碑/周任务记录"></textarea>
             </div>
             <button class="cw-btn cw-btn--primary" id="tc-run" style="width:100%">▶ 创建并执行</button>
           </div>
@@ -105,6 +105,11 @@ const TaskCenter = {
     document.getElementById('tc-upload').onclick = () => document.getElementById('tc-file-input').click();
     document.getElementById('tc-file-input').onchange = (e) => this.uploadFile(e);
     document.getElementById('tc-run').onclick = () => this.createAndRun();
+
+    // 新任务窗口: 输入 / 引用当前所选项目的 会议/周报/里程碑/周任务 记录
+    MentionBox.attach(document.getElementById('tc-input'), {
+      getProjectId: () => this.currentProjectId(),
+    });
 
     // 补充对话区事件
     document.getElementById('fc-send').onclick = () => this.sendFollowup();
@@ -674,6 +679,260 @@ const CoworkAgents = {
 };
 
 /* ------------------------------------------------------------------
+   输入联想组件: 对话/任务输入框的 @项目 与 /记录 引用
+   - 输入 @ : 弹出系统项目列表, 选择后插入 @项目名 并作为后续 / 引用的项目上下文
+   - 输入 / : 弹出 会议/周报/里程碑/周任务 四类选项, 选定类别后进一步列出
+              当前所选项目下的对应记录, 选中记录将其关键信息插入输入框
+   ------------------------------------------------------------------ */
+const MentionBox = {
+  textarea: null,       // 当前绑定的 textarea
+  popup: null,          // 浮层 DOM
+  getProjectId: null,   // 回调: 获取当前项目 id (未 @ 选择时的默认项目)
+  onPickProject: null,  // 回调: @ 选中项目后通知宿主
+  projects: null,       // 项目缓存
+  stage: null,          // 'project' | 'category' | 'record'
+  triggerStart: -1,     // 触发字符 (@ 或 /) 在文本中的下标
+  items: [],            // 当前浮层条目 [{title, sub, snippet|project|category}]
+  activeIdx: 0,
+
+  CATEGORIES: [
+    { key: 'meeting',   label: '会议',   icon: '📅' },
+    { key: 'report',    label: '周报',   icon: '📝' },
+    { key: 'milestone', label: '里程碑', icon: '★' },
+    { key: 'worktask',  label: '周任务', icon: '✅' },
+  ],
+
+  /** 绑定到输入框; opts: { getProjectId, onPickProject } */
+  attach(textarea, opts = {}) {
+    this.detach();
+    this.textarea = textarea;
+    this.getProjectId = opts.getProjectId || null;
+    this.onPickProject = opts.onPickProject || null;
+    // 输入框容器需要相对定位以承载浮层
+    this.host = textarea.closest('.chat-input, .form-field') || textarea.parentElement;
+    if (this.host) this.host.style.position = 'relative';
+
+    this._onInput = () => this.handleInput();
+    this._onKeydown = (e) => this.handleKeydown(e);
+    this._onDocDown = (e) => {
+      if (this.popup && !this.popup.contains(e.target) && e.target !== this.textarea) this.close();
+    };
+    textarea.addEventListener('input', this._onInput);
+    textarea.addEventListener('keydown', this._onKeydown, true); // 捕获阶段, 先于发送逻辑
+    document.addEventListener('mousedown', this._onDocDown);
+  },
+
+  detach() {
+    if (this.textarea) {
+      this.textarea.removeEventListener('input', this._onInput);
+      this.textarea.removeEventListener('keydown', this._onKeydown, true);
+    }
+    if (this._onDocDown) document.removeEventListener('mousedown', this._onDocDown);
+    this.close();
+    this.textarea = null;
+  },
+
+  isOpen() { return !!this.popup; },
+
+  /** 解析光标前的触发词: @xx 或 /xx (前面需为行首/空白) */
+  handleInput() {
+    const ta = this.textarea;
+    if (!ta) return;
+    // 记录选择阶段: 继续输入则关闭浮层
+    if (this.stage === 'record') { this.close(); return; }
+    const pos = ta.selectionStart;
+    const before = ta.value.slice(0, pos);
+    const m = before.match(/(^|[\s\n])([@/])([^\s@/]*)$/);
+    if (!m) { this.close(); return; }
+    this.triggerStart = pos - m[3].length - 1;
+    if (m[2] === '@') this.showProjects(m[3]);
+    else this.showCategories(m[3]);
+  },
+
+  async ensureProjects() {
+    if (!this.projects) {
+      try { this.projects = await API.getProjects(); } catch (e) { this.projects = []; }
+    }
+    return this.projects;
+  },
+
+  /** 当前项目 id: 优先宿主回调 (@选中或任务页下拉框), 其次激活项目 */
+  async currentProjectId() {
+    if (this.getProjectId) {
+      const id = this.getProjectId();
+      if (id) return id;
+    }
+    const projects = await this.ensureProjects();
+    const active = projects.find(p => p.is_active);
+    return active ? active.id : (projects[0] ? projects[0].id : null);
+  },
+
+  async showProjects(keyword) {
+    this.stage = 'project';
+    const projects = (await this.ensureProjects())
+      .filter(p => !keyword || p.name.includes(keyword));
+    this.items = projects.map(p => ({
+      title: p.name, sub: p.is_active ? '当前激活' : '', project: p,
+    }));
+    this.renderPopup('@ 选择项目');
+  },
+
+  showCategories(keyword) {
+    this.stage = 'category';
+    this.items = this.CATEGORIES
+      .filter(c => !keyword || c.label.includes(keyword))
+      .map(c => ({ title: c.label, sub: '引用项目记录', icon: c.icon, category: c }));
+    this.renderPopup('/ 选择记录类型');
+  },
+
+  /** 选定类别后: 加载当前项目下的记录列表 */
+  async showRecords(category) {
+    this.stage = 'record';
+    this.renderPopup(`${category.icon} ${category.label} · 加载中…`, true);
+    const pid = await this.currentProjectId();
+    let records = [];
+    try {
+      records = await this.loadRecords(category.key, pid);
+    } catch (e) { records = []; }
+    if (this.stage !== 'record') return; // 期间被关闭
+    this.items = records;
+    this.renderPopup(`${category.icon} ${category.label} · 选择记录插入`);
+  },
+
+  /** 按类别拉取记录并格式化为可插入片段 */
+  async loadRecords(key, pid) {
+    if (!pid) return [];
+    if (key === 'meeting') {
+      const list = await API.get(`/meetings/?project_id=${pid}`);
+      return list.map(m => ({
+        title: m.title,
+        sub: `${m.meet_date || ''} ${m.meet_time || ''} ${m.host ? '主持:' + m.host : ''}`.trim(),
+        snippet: `【会议#${m.id}】${m.title} | ${m.meet_date || ''} ${m.meet_time || ''} | ${m.place || ''} | 主持:${m.host || '待定'} | 参会:${m.attendees || '待定'}${m.description ? '\n纪要: ' + m.description : ''}\n`,
+      }));
+    }
+    if (key === 'report') {
+      const list = await API.get(`/weekly-reports/?project_id=${pid}`);
+      return list.map(r => ({
+        title: r.title,
+        sub: `${r.week_range || ''} ${r.status === 'submitted' ? '已提交' : '草稿'}`.trim(),
+        snippet: `【周报#${r.id}】${r.title} (${r.week_range || ''})${r.overview_summary ? '\n概览: ' + r.overview_summary : ''}\n`,
+      }));
+    }
+    if (key === 'milestone') {
+      const list = await API.getProgressTasks({ project_id: pid });
+      return list.filter(t => t.is_milestone).map(t => ({
+        title: `${t.task_uid} ${t.name}`,
+        sub: `${t.start_date || ''}~${t.end_date || ''} ${t.status}`,
+        snippet: `【里程碑#${t.id}】${t.task_uid} ${t.name} | ${t.start_date || ''}~${t.end_date || ''} | 状态:${t.status} | 负责人:${t.owner || '待定'}\n`,
+      }));
+    }
+    // worktask
+    const list = await API.get(`/work-tasks/?project_id=${pid}`);
+    return list.map(t => ({
+      title: t.name,
+      sub: `${t.owner || ''} ${t.status || ''}`.trim(),
+      snippet: `【周任务#${t.id}】${t.name} | 负责人:${t.owner || '待定'} | 状态:${t.status || ''} | 优先级:${t.priority || ''} | 计划工时:${t.planned_hours || 0}h\n`,
+    }));
+  },
+
+  renderPopup(head, loading = false) {
+    // 仅移除旧浮层 DOM, 不重置 stage/items (close 会做完整清理)
+    if (this.popup) { this.popup.remove(); this.popup = null; }
+    if (!this.host) return;
+    this.activeIdx = 0;
+    const popup = document.createElement('div');
+    popup.className = 'mention-popup';
+    let html = `<div class="mention-head">${App.escapeHtml(head)}</div>`;
+    if (loading) {
+      html += '<div class="mention-item mention-item--none">加载中…</div>';
+    } else if (!this.items.length) {
+      html += '<div class="mention-item mention-item--none">无匹配记录</div>';
+    } else {
+      html += this.items.slice(0, 30).map((it, i) => `
+        <div class="mention-item${i === 0 ? ' active' : ''}" data-idx="${i}">
+          <span class="mention-item__title">${it.icon ? it.icon + ' ' : ''}${App.escapeHtml(it.title)}</span>
+          ${it.sub ? `<span class="mention-item__sub">${App.escapeHtml(it.sub)}</span>` : ''}
+        </div>`).join('');
+    }
+    popup.innerHTML = html;
+    popup.querySelectorAll('.mention-item[data-idx]').forEach(el => {
+      // mousedown 抢在 blur 前触发, 保持输入框焦点
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this.pick(parseInt(el.dataset.idx, 10));
+      });
+      el.addEventListener('mouseenter', () => this.setActive(parseInt(el.dataset.idx, 10)));
+    });
+    this.host.appendChild(popup);
+    this.popup = popup;
+  },
+
+  setActive(i) {
+    this.activeIdx = i;
+    if (!this.popup) return;
+    this.popup.querySelectorAll('.mention-item[data-idx]').forEach(el => {
+      el.classList.toggle('active', parseInt(el.dataset.idx, 10) === i);
+    });
+  },
+
+  handleKeydown(e) {
+    if (!this.popup) return;
+    if (e.key === 'Escape') {
+      e.preventDefault(); e.stopPropagation();
+      this.close();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault(); e.stopPropagation();
+      this.setActive(Math.min(this.activeIdx + 1, this.items.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault(); e.stopPropagation();
+      this.setActive(Math.max(this.activeIdx - 1, 0));
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); e.stopPropagation();
+      if (this.items.length) this.pick(this.activeIdx);
+    }
+  },
+
+  /** 选中条目: 项目→插入@名并回调; 类别→进入记录列表; 记录→插入片段 */
+  pick(i) {
+    const item = this.items[i];
+    if (!item) return;
+    if (item.project) {
+      this.replaceTrigger(`@${item.project.name} `);
+      if (this.onPickProject) this.onPickProject(item.project);
+      this.close();
+    } else if (item.category) {
+      // 清掉已输入的 /xx, 再展开记录列表
+      this.replaceTrigger('');
+      this.showRecords(item.category);
+    } else if (item.snippet) {
+      this.replaceTrigger(item.snippet);
+      this.close();
+    }
+  },
+
+  /** 用 text 替换触发词区间 (triggerStart 到光标) */
+  replaceTrigger(text) {
+    const ta = this.textarea;
+    if (!ta) return;
+    const start = this.triggerStart >= 0 ? this.triggerStart : ta.selectionStart;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(ta.selectionStart);
+    ta.value = before + text + after;
+    const pos = (before + text).length;
+    ta.selectionStart = ta.selectionEnd = pos;
+    ta.focus();
+  },
+
+  close() {
+    if (this.popup) this.popup.remove();
+    this.popup = null;
+    this.stage = null;
+    this.items = [];
+    this.triggerStart = -1;
+  },
+};
+
+/* ------------------------------------------------------------------
    智能体对话视图 (SSE 流式 + 工具轨迹 + 记忆面板)
    ------------------------------------------------------------------ */
 const AgentChat = {
@@ -681,6 +940,7 @@ const AgentChat = {
   session: null,
   sessions: [],
   sending: false,
+  mentionProjectId: null,   // @ 选择的项目 id (作为 / 引用的项目上下文)
 
   init() {},
 
@@ -712,10 +972,18 @@ const AgentChat = {
       return;
     }
     this.session = null;
+    this.mentionProjectId = null;
     await this.renderLayout();
     if (el) el.dataset.agentId = String(this.agent.id);
     await this.loadSessions();
-    await this.newSession(false);
+    // 不自动创建新会话: 有历史会话则默认加载最近一次, 否则展示空状态
+    if (this.sessions.length) {
+      await this.openSession(this.sessions[0].id);
+    } else {
+      this.renderMessages([]);
+      this.appendSystemHint(`点击左上角「+ 新会话」开始与「${this.agent.name}」对话`);
+      this.loadMemories();
+    }
   },
 
   async renderLayout() {
@@ -738,7 +1006,7 @@ const AgentChat = {
           </div>
           <div class="chat-messages" id="chat-messages"></div>
           <div class="chat-input">
-            <textarea id="chat-textarea" rows="2" placeholder="输入消息, Enter 发送, Shift+Enter 换行"></textarea>
+            <textarea id="chat-textarea" rows="2" placeholder="输入消息, Enter 发送; @ 选择项目, / 引用会议/周报/里程碑/周任务"></textarea>
             <button class="cw-btn cw-btn--primary" id="chat-send">发送</button>
           </div>
         </div>
@@ -758,6 +1026,15 @@ const AgentChat = {
         e.preventDefault();
         this.send();
       }
+    });
+
+    // 接入 @项目 / /记录 输入联想
+    MentionBox.attach(textarea, {
+      getProjectId: () => this.mentionProjectId,
+      onPickProject: (p) => {
+        this.mentionProjectId = p.id;
+        App.showToast(`已选择项目「${p.name}」, / 可引用其会议/周报/里程碑/周任务`, 'success');
+      },
     });
   },
 
@@ -786,11 +1063,24 @@ const AgentChat = {
       del.onclick = async (e) => {
         e.stopPropagation();
         const sid = parseInt(del.dataset.del, 10);
+        // 记录被删会话位置, 删除后默认加载其下一条会话
+        const idx = this.sessions.findIndex(s => s.id === sid);
         try {
           await API.archiveSession(sid);
           App.showToast('会话已归档', 'success');
+          const wasCurrent = this.session && this.session.id === sid;
           await this.loadSessions();
-          if (this.session && this.session.id === sid) await this.newSession(false);
+          if (wasCurrent) {
+            const next = this.sessions[Math.min(idx, this.sessions.length - 1)];
+            if (next) {
+              await this.openSession(next.id);
+            } else {
+              // 无剩余会话: 清空为空白状态, 不自动创建新会话
+              this.session = null;
+              this.renderMessages([]);
+              this.appendSystemHint('会话已删除, 点击左上角「+ 新会话」开始新对话');
+            }
+          }
         } catch (err) {
           App.showToast(`归档失败: ${err.message}`, 'error');
         }
@@ -886,7 +1176,11 @@ const AgentChat = {
     if (this.sending) return;
     const textarea = document.getElementById('chat-textarea');
     const message = (textarea.value || '').trim();
-    if (!message || !this.session) return;
+    if (!message) return;
+    if (!this.session) {
+      App.showToast('请先点击左上角「+ 新会话」创建会话', 'warning');
+      return;
+    }
 
     textarea.value = '';
     this.appendMessage('user', message);
@@ -986,12 +1280,28 @@ const AgentChat = {
    ------------------------------------------------------------------ */
 const CoworkBuilder = {
   editing: null,   // 正在编辑的 agent, null=新建
+  /* 全部可用工具: [工具名, 中文注释] —— 与后端 TOOL_DEFINITIONS 保持一致 */
   ALL_TOOLS: [
-    'get_today', 'get_project_info', 'get_progress_tasks', 'create_progress_task',
-    'update_progress_task', 'get_phases', 'get_modules', 'get_weekly_reports',
-    'get_weekly_report_detail', 'create_weekly_report', 'get_meetings',
-    'create_meeting', 'get_work_tasks', 'create_work_task', 'update_work_task',
-    'run_skill', 'save_memory',
+    ['get_today', '获取当前日期与本周起止 (感知时间)'],
+    ['get_project_info', '获取当前激活项目信息'],
+    ['get_progress_tasks', '查询进度计划任务列表'],
+    ['create_progress_task', '创建进度任务/里程碑'],
+    ['update_progress_task', '更新进度任务 (状态/日期/负责人等)'],
+    ['get_phases', '查询项目阶段列表'],
+    ['get_modules', '查询项目模块列表'],
+    ['get_weekly_reports', '查询周报列表 (最近10份)'],
+    ['get_weekly_report_detail', '查询周报详情 (KPI/进展/下周任务/风险)'],
+    ['create_weekly_report', '创建本周周报 (自动复制上周草稿)'],
+    ['get_meetings', '查询会议列表 (最近10个)'],
+    ['get_meeting_detail', '查询会议详情 (含议程项)'],
+    ['create_meeting', '创建会议'],
+    ['update_meeting', '更新会议记录到数据库 (主题/纪要/参会人等)'],
+    ['add_meeting_item', '添加会议议程项/纪要条目'],
+    ['get_work_tasks', '查询每周工作任务'],
+    ['create_work_task', '创建每周工作任务'],
+    ['update_work_task', '更新每周工作任务 (状态/工时/优先级)'],
+    ['run_skill', '执行技能 (按名称或ID调用技能工作流)'],
+    ['save_memory', '保存长期记忆 (事实/偏好/决策)'],
   ],
   AGENT_TYPES: [
     ['progress', '进度管理'], ['meeting', '会议管理'],
@@ -1066,9 +1376,11 @@ const CoworkBuilder = {
           <div class="form-field">
             <label>可用工具 (决策与执行能力)</label>
             <div class="tool-checks">
-              ${this.ALL_TOOLS.map(t => `
-                <label class="tool-check">
-                  <input type="checkbox" value="${t}" ${tools.includes(t) ? 'checked' : ''}> ${t}
+              ${this.ALL_TOOLS.map(([t, zh]) => `
+                <label class="tool-check" title="${t}">
+                  <input type="checkbox" value="${t}" ${tools.includes(t) ? 'checked' : ''}>
+                  <span class="tool-check__zh">${zh}</span>
+                  <span class="tool-check__en">${t}</span>
                 </label>`).join('')}
             </div>
           </div>

@@ -624,6 +624,73 @@
 
 .tool-check:hover { border-color: var(--color-primary-border); }
 .tool-check input { accent-color: var(--color-primary); }
+.tool-check__zh { color: var(--color-text); }
+.tool-check__en { color: var(--color-text-tertiary); font-size: 11px; font-family: Consolas, monospace; }
+
+/* ------------------------------------------------------------------
+   输入联想浮层 (@项目 / /记录 引用)
+   ------------------------------------------------------------------ */
+.mention-popup {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 280px;
+  max-width: 460px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  z-index: 200;
+}
+
+.mention-head {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg-subtle);
+  position: sticky;
+  top: 0;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mention-item:hover,
+.mention-item.active {
+  background: var(--color-primary-light);
+}
+
+.mention-item__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-item__sub {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
+}
+
+.mention-item--none {
+  color: var(--color-text-tertiary);
+  cursor: default;
+  justify-content: center;
+}
+
+.mention-item--none:hover {
+  background: transparent;
+}
 
 .builder-debug {
   width: 420px;

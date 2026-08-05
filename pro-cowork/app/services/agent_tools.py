@@ -179,6 +179,20 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "get_meeting_detail",
+            "description": "获取会议详情 (含全部议程项/纪要条目)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "meeting_id": {"type": "integer", "description": "会议ID"},
+                },
+                "required": ["meeting_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_meeting",
             "description": "创建会议",
             "parameters": {
@@ -193,6 +207,46 @@ TOOL_DEFINITIONS = [
                     "description": {"type": "string", "description": "会议描述/纪要"},
                 },
                 "required": ["title"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_meeting",
+            "description": "将对话中确认的会议内容更新到数据库 (主题/日期/时间/地点/主持人/参会人/会议纪要), 用于会议记录落库",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "meeting_id": {"type": "integer", "description": "会议ID (必填)"},
+                    "title": {"type": "string", "description": "会议主题"},
+                    "meet_date": {"type": "string", "description": "会议日期 YYYY-MM-DD"},
+                    "meet_time": {"type": "string", "description": "时间段, 如 09:00-10:00"},
+                    "place": {"type": "string", "description": "地点"},
+                    "host": {"type": "string", "description": "主持人"},
+                    "attendees": {"type": "string", "description": "参会人员, 逗号分隔"},
+                    "description": {"type": "string", "description": "会议描述/纪要正文"},
+                },
+                "required": ["meeting_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_meeting_item",
+            "description": "为指定会议添加议程项/纪要条目 (时间/主题/发言人/时长/备注)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "meeting_id": {"type": "integer", "description": "会议ID"},
+                    "item_time": {"type": "string", "description": "议程时间, 如 09:00-09:10"},
+                    "theme": {"type": "string", "description": "议程主题"},
+                    "speaker": {"type": "string", "description": "发言人"},
+                    "duration": {"type": "string", "description": "时长, 如 10分钟"},
+                    "note": {"type": "string", "description": "备注/纪要要点"},
+                },
+                "required": ["meeting_id", "theme"],
             },
         },
     },
@@ -595,6 +649,67 @@ class ToolExecutor:
         await self.db.flush()
         await self.db.refresh(meeting)
         return {"id": meeting.id, "title": meeting.title, "meet_date": meeting.meet_date}
+
+    async def _tool_get_meeting_detail(self, meeting_id: int) -> dict:
+        """会议详情: 主记录 + 全部议程项 (按 sort_order 排序)"""
+        result = await self.db.execute(
+            select(Meeting)
+            .options(selectinload(Meeting.items))
+            .where(Meeting.id == meeting_id, Meeting.is_delete.is_(False))
+        )
+        meeting = result.scalars().first()
+        if not meeting:
+            return {"error": "会议不存在"}
+        return {
+            "id": meeting.id,
+            "title": meeting.title,
+            "meet_date": meeting.meet_date,
+            "meet_time": meeting.meet_time,
+            "place": meeting.place,
+            "host": meeting.host,
+            "attendees": meeting.attendees,
+            "description": meeting.description,
+            "items": [
+                {
+                    "id": it.id, "item_time": it.item_time, "theme": it.theme,
+                    "speaker": it.speaker, "duration": it.duration, "note": it.note,
+                }
+                for it in sorted(meeting.items, key=lambda x: x.sort_order)
+                if not it.is_delete
+            ],
+        }
+
+    async def _tool_update_meeting(self, meeting_id: int, **kwargs) -> dict:
+        """更新会议主记录 (对话内容落库); 仅更新传入的非空字段"""
+        meeting = await self.db.get(Meeting, meeting_id)
+        if not meeting or meeting.is_delete:
+            return {"error": "会议不存在"}
+        allowed = {"title", "meet_date", "meet_time", "place", "host", "attendees", "description"}
+        updated = []
+        for k, v in kwargs.items():
+            if k in allowed and v is not None:
+                setattr(meeting, k, v)
+                updated.append(k)
+        if not updated:
+            return {"error": "未提供任何待更新字段"}
+        await self.db.flush()
+        await self.db.refresh(meeting)
+        return {"id": meeting.id, "title": meeting.title, "updated_fields": updated}
+
+    async def _tool_add_meeting_item(self, meeting_id: int, theme: str, **kwargs) -> dict:
+        """添加会议议程项/纪要条目"""
+        from app.models.meeting import MeetingItem
+
+        meeting = await self.db.get(Meeting, meeting_id)
+        if not meeting or meeting.is_delete:
+            return {"error": "会议不存在"}
+        allowed = {"item_time", "speaker", "duration", "note", "description"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+        item = MeetingItem(meeting_id=meeting_id, theme=theme, **fields)
+        self.db.add(item)
+        await self.db.flush()
+        await self.db.refresh(item)
+        return {"id": item.id, "meeting_id": meeting_id, "theme": item.theme}
 
     # ---- 工作任务 ----
 
