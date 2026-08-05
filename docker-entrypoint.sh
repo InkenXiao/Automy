@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # ============================================================
-# XIN-AI 容器入口脚本 (开发模式: 代码改动实时生效)
+# XIN-AI 五合一容器入口脚本 (开发模式: 代码改动实时生效)
 #   xin-site  : 8087  vite dev (HMR 热更新)
 #   pro-site  : 8088  uvicorn --reload (Python 代码自动重载)
 #   abs-site  : 8089  uvicorn --reload (Python 代码自动重载)
+#   xin-cowork: 8090  vite dev (HMR 热更新)
+#   pro-cowork: 8091  uvicorn --reload (智能体平台)
 #
 # 源码通过 docker-compose 卷挂载, 修改宿主机代码后:
-#   - xin-site: 浏览器自动刷新 (HMR)
-#   - pro-site / abs-site: uvicorn 自动重载 (无需重启容器)
+#   - xin-site / xin-cowork: 浏览器自动刷新 (HMR)
+#   - pro-site / abs-site / pro-cowork: uvicorn 自动重载 (无需重启容器)
 # ============================================================
 set -u
 
@@ -94,14 +96,21 @@ ensure_node_modules() {
         cd /app/xin-site && npm install
         ok "npm install 完成"
     fi
+    if [ ! -d "/app/xin-cowork/node_modules" ]; then
+        warn "xin-cowork/node_modules 不存在, 执行 npm install..."
+        cd /app/xin-cowork && npm install
+        ok "npm install 完成"
+    fi
 }
 
 echo ""
 echo "============================================================"
-echo "  XIN-AI 三合一容器启动 (开发模式, 代码改动实时生效)"
-echo "    xin-site : 8087  (Vite dev 热更新 HMR)"
-echo "    pro-site : 8088  (FastAPI + uvicorn --reload)"
-echo "    abs-site : 8089  (FastAPI + uvicorn --reload)"
+echo "  XIN-AI 五合一容器启动 (开发模式, 代码改动实时生效)"
+echo "    xin-site  : 8087  (Vite dev 热更新 HMR)"
+echo "    pro-site  : 8088  (FastAPI + uvicorn --reload)"
+echo "    abs-site  : 8089  (FastAPI + uvicorn --reload)"
+echo "    xin-cowork: 8090  (Vite dev 热更新 HMR)"
+echo "    pro-cowork: 8091  (FastAPI 智能体平台 + uvicorn --reload)"
 echo "============================================================"
 echo ""
 
@@ -122,11 +131,21 @@ start_service "abs-site" 8089 "${APP_ROOT}/abs-site" \
 start_service "xin-site" 8087 "${APP_ROOT}/xin-site" \
     npx vite --port 8087 --host 0.0.0.0 --strictPort
 
+# ---------- 启动 xin-cowork (vite dev 热更新) ----------
+start_service "xin-cowork" 8090 "${APP_ROOT}/xin-cowork" \
+    npx vite --port 8090 --host 0.0.0.0 --strictPort
+
+# ---------- 启动 pro-cowork (FastAPI 智能体平台, uvicorn --reload) ----------
+start_service "pro-cowork" 8091 "${APP_ROOT}/pro-cowork" \
+    python -m uvicorn app.main:app --host 0.0.0.0 --port 8091 --reload --reload-dir app
+
 echo ""
 ok "全部服务已启动. 日志目录: ${LOG_DIR}/"
-echo "  xin-site: ${LOG_DIR}/xin-site.log"
-echo "  pro-site: ${LOG_DIR}/pro-site.log"
-echo "  abs-site: ${LOG_DIR}/abs-site.log"
+echo "  xin-site:   ${LOG_DIR}/xin-site.log"
+echo "  pro-site:   ${LOG_DIR}/pro-site.log"
+echo "  abs-site:   ${LOG_DIR}/abs-site.log"
+echo "  xin-cowork: ${LOG_DIR}/xin-cowork.log"
+echo "  pro-cowork: ${LOG_DIR}/pro-cowork.log"
 echo ""
 log "提示: 修改宿主机源码后, 容器内服务会自动重载/热更新, 无需重启容器"
 

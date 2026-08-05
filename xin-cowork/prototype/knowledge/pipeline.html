@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>文档处理流水线 · 知识库 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item active"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">知识库</div>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📄</span><span class="app-nav-item__label">文档列表</span></a>
+        <a href="#/prototype/knowledge/search-test" class="app-nav-item"><span class="app-nav-item__icon">🔍</span><span class="app-nav-item__label">检索测试</span></a>
+        <a href="#/prototype/knowledge/pipeline" class="app-nav-item active"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">处理流水线</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div class="app-topbar__title">文档处理流水线</div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">重新处理</button>
+          <button class="btn btn-primary btn-sm">下载分块</button>
+        </div>
+      </div>
+      <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/knowledge">知识库</a></li>
+          <li>处理流水线</li>
+        </ul>
+
+        <!-- 文档基本信息 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-body">
+            <div class="flex items-center gap-3" style="margin-bottom: 12px;">
+              <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--color-primary-light); display: flex; align-items: center; justify-content: center; font-size: 24px;">📊</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0;">ABC新能源_2025年度财务报告.pdf</h3>
+                <div class="text-sm text-secondary">来源:本地上传 · 财务报表类别</div>
+              </div>
+              <span class="badge badge-success">处理完成</span>
+            </div>
+            <div class="grid grid-cols-4 text-sm" style="gap: 12px; padding-top: 12px; border-top: 1px solid var(--color-border-light);">
+              <div><div class="text-xs text-tertiary">文件大小</div><div class="font-medium">12.4 MB</div></div>
+              <div><div class="text-xs text-tertiary">页数</div><div class="font-medium">186 页</div></div>
+              <div><div class="text-xs text-tertiary">上传时间</div><div class="font-medium">2026-07-08 14:23</div></div>
+              <div><div class="text-xs text-tertiary">处理耗时</div><div class="font-medium">3 分 12 秒</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 处理流程可视化 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header"><div class="card-title">处理流程</div></div>
+          <div class="card-body">
+            <div class="flex" style="gap: 0; align-items: stretch;">
+              <!-- 步骤 -->
+              <div style="flex: 1; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-success-light);">
+                <div class="flex items-center gap-2" style="margin-bottom: 4px;"><span class="badge badge-success">✓ 完成</span></div>
+                <div class="font-medium text-sm">1. 上传</div>
+                <div class="text-xs text-tertiary">耗时 2s</div>
+              </div>
+              <div style="display: flex; align-items: center; padding: 0 8px; color: var(--color-success);">→</div>
+              <div style="flex: 1; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-success-light);">
+                <div class="flex items-center gap-2" style="margin-bottom: 4px;"><span class="badge badge-success">✓ 完成</span></div>
+                <div class="font-medium text-sm">2. 解析</div>
+                <div class="text-xs text-tertiary">耗时 28s · OCR</div>
+              </div>
+              <div style="display: flex; align-items: center; padding: 0 8px; color: var(--color-success);">→</div>
+              <div style="flex: 1; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-success-light);">
+                <div class="flex items-center gap-2" style="margin-bottom: 4px;"><span class="badge badge-success">✓ 完成</span></div>
+                <div class="font-medium text-sm">3. 分块</div>
+                <div class="text-xs text-tertiary">耗时 6s · 412 块</div>
+              </div>
+              <div style="display: flex; align-items: center; padding: 0 8px; color: var(--color-success);">→</div>
+              <div style="flex: 1; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-success-light);">
+                <div class="flex items-center gap-2" style="margin-bottom: 4px;"><span class="badge badge-success">✓ 完成</span></div>
+                <div class="font-medium text-sm">4. 向量化</div>
+                <div class="text-xs text-tertiary">耗时 96s · bge-m3</div>
+              </div>
+              <div style="display: flex; align-items: center; padding: 0 8px; color: var(--color-success);">→</div>
+              <div style="flex: 1; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-success-light);">
+                <div class="flex items-center gap-2" style="margin-bottom: 4px;"><span class="badge badge-success">✓ 完成</span></div>
+                <div class="font-medium text-sm">5. 入库</div>
+                <div class="text-xs text-tertiary">耗时 78s · Milvus</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分块预览 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">分块预览</div>
+            <span class="text-xs text-tertiary">共 412 块 · 平均 512 tokens</span>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div class="grid" style="grid-template-columns: 260px 1fr; min-height: 320px;">
+              <!-- 左侧分块列表 -->
+              <div style="border-right: 1px solid var(--color-border-light); overflow-y: auto; max-height: 360px;">
+                <div class="app-nav-item active" style="border-radius: 0; border-bottom: 1px solid var(--color-border-light);">
+                  <div style="flex: 1;"><div class="text-sm font-medium">块 #001</div><div class="text-xs text-tertiary">P3 · 摘要</div></div>
+                  <span class="badge badge-primary">512t</span>
+                </div>
+                <div class="app-nav-item" style="border-radius: 0; border-bottom: 1px solid var(--color-border-light);">
+                  <div style="flex: 1;"><div class="text-sm">块 #002</div><div class="text-xs text-tertiary">P3 · 营收</div></div>
+                  <span class="badge badge-secondary">498t</span>
+                </div>
+                <div class="app-nav-item" style="border-radius: 0; border-bottom: 1px solid var(--color-border-light);">
+                  <div style="flex: 1;"><div class="text-sm">块 #003</div><div class="text-xs text-tertiary">P4 · 成本</div></div>
+                  <span class="badge badge-secondary">510t</span>
+                </div>
+                <div class="app-nav-item" style="border-radius: 0; border-bottom: 1px solid var(--color-border-light);">
+                  <div style="flex: 1;"><div class="text-sm">块 #004</div><div class="text-xs text-tertiary">P5 · 关联交易</div></div>
+                  <span class="badge badge-warning">512t</span>
+                </div>
+                <div class="app-nav-item" style="border-radius: 0; border-bottom: 1px solid var(--color-border-light);">
+                  <div style="flex: 1;"><div class="text-sm">块 #005</div><div class="text-xs text-tertiary">P6 · 现金流</div></div>
+                  <span class="badge badge-secondary">504t</span>
+                </div>
+              </div>
+              <!-- 右侧原文 -->
+              <div style="padding: 16px;">
+                <div class="flex justify-between items-center" style="margin-bottom: 8px;">
+                  <div class="text-sm font-medium">块 #001 · 第 3 页</div>
+                  <span class="badge badge-info">高亮命中</span>
+                </div>
+                <div class="text-sm text-secondary" style="line-height: 1.7; background: var(--color-bg-subtle); padding: 12px; border-radius: 6px;">
+                  三、经营情况讨论与分析<p>2025 年度,公司实现营业收入 <mark>12.0 亿元</mark>,同比增长 35.2%;归属于上市公司股东的净利润 <mark>1.8 亿元</mark>,同比增长 22.4%。其中新能源动力电池业务贡献营收 9.2 亿元,占比 76.7%......</p>
+                  <p>报告期内,公司关联交易金额合计 <mark style="background: var(--color-danger-light); color: var(--color-danger);">2.4 亿元</mark>,占营业收入 20.0%,主要为向母公司采购原材料......</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 元数据 -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">元数据</div></div>
+          <div class="card-body">
+            <div class="grid grid-cols-3" style="gap: 12px;">
+              <div><div class="text-xs text-tertiary">部门</div><div class="text-sm">投研部</div></div>
+              <div><div class="text-xs text-tertiary">密级</div><div><span class="badge badge-danger">机密</span></div></div>
+              <div><div class="text-xs text-tertiary">来源</div><div class="text-sm">本地上传</div></div>
+              <div><div class="text-xs text-tertiary">上传者</div><div class="text-sm">张三</div></div>
+              <div><div class="text-xs text-tertiary">有效期至</div><div class="text-sm">2029-07-08</div></div>
+              <div><div class="text-xs text-tertiary">标签</div><div class="flex flex-wrap gap-1"><span class="chip">投研</span><span class="chip">新能源</span><span class="chip">ABC</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

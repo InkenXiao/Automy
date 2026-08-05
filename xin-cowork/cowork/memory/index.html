@@ -1,0 +1,199 @@
+<!-- ============================================================
+     XIN 信 · CoWork 记忆管理页
+     Agent 筛选 + 记忆类型筛选 + 搜索框 + 记忆列表
+     通过 Hash 路由懒加载,仅包含 body 内容
+     ============================================================ -->
+<link rel="stylesheet" href="../../assets/css/cowork.css" />
+
+<div class="cowork-main__scroll">
+  <!-- 页面标题 -->
+  <div class="cowork-page-header" style="margin-bottom:24px;">
+    <h2 style="margin:0;font-size:20px;">记忆管理</h2>
+    <p class="text-muted" style="margin:4px 0 0;font-size:13px;">管理 Agent 的长期记忆,支持按类型筛选与搜索。</p>
+  </div>
+
+  <!-- 筛选工具栏: Agent 筛选 + 记忆类型筛选 + 搜索框 -->
+  <div class="memory-toolbar" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+    <select id="memory-agent-select" class="builder-form__select" style="width:auto;min-width:200px;" aria-label="选择 Agent">
+      <option value="">请选择 Agent</option>
+    </select>
+    <select id="memory-type-select" class="builder-form__select" style="width:auto;min-width:160px;" aria-label="按类型筛选">
+      <option value="">全部类型</option>
+      <option value="long_term">长期记忆</option>
+      <option value="short_term">短期记忆</option>
+      <option value="profile">用户画像</option>
+      <option value="preference">偏好</option>
+    </select>
+    <input type="text" id="memory-search-input" class="builder-form__input" style="flex:1;min-width:200px;" placeholder="搜索记忆内容..." />
+  </div>
+
+  <!-- 记忆统计 -->
+  <div id="memory-stats" style="margin-bottom:16px;"></div>
+
+  <!-- 记忆列表 -->
+  <div id="memory-list">
+    <div class="text-muted">请先选择 Agent。</div>
+  </div>
+</div>
+
+<script type="module">
+  import { agentApi } from '../../assets/js/agent-api.js';
+
+  const agentSelect = document.getElementById('memory-agent-select');
+  const typeSelect = document.getElementById('memory-type-select');
+  const searchInput = document.getElementById('memory-search-input');
+  const statsEl = document.getElementById('memory-stats');
+  const listEl = document.getElementById('memory-list');
+
+  /** 当前筛选状态 */
+  let agentId = null;
+  let type = '';
+  /** 已加载的记忆列表(用于前端搜索过滤) */
+  let memories = [];
+
+  /** HTML 转义 */
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** 格式化时间 */
+  function formatTime(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN');
+  }
+
+  /** 加载 Agent 列表填充筛选下拉,并自动选中第一个 */
+  async function loadAgents() {
+    try {
+      const agents = await agentApi.getAgents();
+      (Array.isArray(agents) ? agents : []).forEach((a) => {
+        const option = document.createElement('option');
+        option.value = a.id;
+        option.textContent = a.name || `Agent #${a.id}`;
+        agentSelect.appendChild(option);
+      });
+      // 自动选中第一个 Agent 并加载其记忆
+      if (agentSelect.options.length > 1) {
+        agentSelect.selectedIndex = 1;
+        agentId = agentSelect.value;
+        loadMemories();
+      }
+    } catch (err) {
+      console.error('[CoWork] 加载 Agent 列表失败:', err);
+      listEl.innerHTML = `<div class="alert alert-danger">加载 Agent 列表失败: ${esc(err.message)}</div>`;
+    }
+  }
+
+  /** 加载记忆列表 */
+  async function loadMemories() {
+    if (!agentId) {
+      listEl.innerHTML = '<div class="text-muted">请先选择 Agent。</div>';
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="cowork-loading cowork-loading--block">
+        <span class="cowork-loading__spinner"></span>
+        <span>加载中...</span>
+      </div>`;
+    try {
+      memories = await agentApi.getMemories(agentId, type || undefined);
+      memories = Array.isArray(memories) ? memories : [];
+      searchInput.value = '';
+      renderStats(memories);
+      renderMemories(memories);
+    } catch (err) {
+      console.error('[CoWork] 加载记忆失败:', err);
+      listEl.innerHTML = `<div class="alert alert-danger">加载失败: ${esc(err.message)}</div>`;
+    }
+  }
+
+  /** 渲染记忆列表(类型标签、键、内容、时间、删除按钮) */
+  function renderMemories(list) {
+    if (list.length === 0) {
+      listEl.innerHTML = `
+        <div class="cowork-empty">
+          <div class="cowork-empty__icon">🧠</div>
+          <div class="cowork-empty__title">暂无记忆</div>
+          <div class="cowork-empty__desc">该 Agent 在当前筛选条件下没有记忆记录。</div>
+        </div>`;
+      return;
+    }
+    listEl.innerHTML = list.map((m) => `
+      <div class="card" style="margin-bottom:12px;" data-memory-id="${m.id}">
+        <div class="card-body" style="padding:16px 20px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span class="badge badge-primary">${esc(m.type || m.memory_type || '未分类')}</span>
+            ${(m.key) ? `<span class="badge">${esc(m.key)}</span>` : ''}
+            <span class="text-muted" style="font-size:12px;margin-left:auto;">${esc(formatTime(m.created_at))}</span>
+            <button class="btn btn-ghost btn-sm memory-delete-btn" data-memory-id="${m.id}">删除</button>
+          </div>
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">${esc(m.content || m.value || '')}</div>
+        </div>
+      </div>`).join('');
+
+    // 绑定删除按钮
+    listEl.querySelectorAll('.memory-delete-btn').forEach((btn) => {
+      btn.addEventListener('click', () => deleteMemory(btn.dataset.memoryId));
+    });
+  }
+
+  /** 渲染记忆统计(按类型计数) */
+  function renderStats(list) {
+    const byType = {};
+    list.forEach((m) => {
+      const t = m.type || m.memory_type || '未分类';
+      byType[t] = (byType[t] || 0) + 1;
+    });
+    statsEl.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;">
+        <span class="text-muted">共 ${list.length} 条记忆</span>
+        ${Object.entries(byType).map(([t, count]) => `<span class="badge">${esc(t)}: ${count}</span>`).join('')}
+      </div>`;
+  }
+
+  /** 搜索过滤(前端过滤已加载的列表) */
+  function filterMemories() {
+    const keyword = searchInput.value.trim().toLowerCase();
+    if (!keyword) {
+      renderMemories(memories);
+      return;
+    }
+    const filtered = memories.filter((m) => {
+      const text = `${m.content || ''} ${m.value || ''} ${m.key || ''} ${m.type || ''} ${m.memory_type || ''}`.toLowerCase();
+      return text.includes(keyword);
+    });
+    renderMemories(filtered);
+  }
+
+  /** 删除记忆 */
+  async function deleteMemory(memoryId) {
+    if (!confirm('确定删除这条记忆吗?删除后不可恢复。')) return;
+    try {
+      await agentApi.deleteMemory(agentId, memoryId);
+      memories = memories.filter((m) => String(m.id) !== String(memoryId));
+      renderStats(memories);
+      filterMemories();
+    } catch (err) {
+      console.error('[CoWork] 删除记忆失败:', err);
+      alert('删除失败: ' + err.message);
+    }
+  }
+
+  agentSelect.addEventListener('change', () => {
+    agentId = agentSelect.value || null;
+    loadMemories();
+  });
+  typeSelect.addEventListener('change', () => {
+    type = typeSelect.value;
+    loadMemories();
+  });
+  searchInput.addEventListener('input', filterMemories);
+
+  loadAgents();
+  document.title = '记忆管理 · CoWork · XIN';
+</script>

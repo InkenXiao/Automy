@@ -1,0 +1,1047 @@
+/* ==========================================================================
+   XIN CoWork · 智能体工作台样式
+   三栏布局 / 侧边导航 / Agent 对话 / 右侧面板 / 卡片 / 表单 / 动画
+   依赖 style.css 中的 CSS 变量主题系统（主色 #FF8C00）
+   ========================================================================== */
+
+/* ------------------------------------------------------------------
+   工作台局部变量（随主题切换）
+   ------------------------------------------------------------------ */
+:root {
+  /* 左侧导航深色背景（浅色主题下使用品牌深色） */
+  --cowork-sidebar-bg: #1A0F00;
+  --cowork-sidebar-bg-hover: rgba(255, 255, 255, 0.08);
+  --cowork-sidebar-text: rgba(255, 255, 255, 0.72);
+  --cowork-sidebar-text-active: #FFFFFF;
+  --cowork-sidebar-border: rgba(255, 255, 255, 0.08);
+  /* 代码块背景（深色底，适配 JetBrains Mono） */
+  --cowork-code-bg: #0F172A;
+  --cowork-code-text: #E2E8F0;
+  /* 布局尺寸 */
+  --cowork-sidebar-width: 240px;
+  --cowork-sidebar-width-collapsed: 64px;
+  --cowork-panel-width: 320px;
+}
+
+[data-theme="dark"] {
+  /* 深色主题下侧栏比页面背景更深一层 */
+  --cowork-sidebar-bg: #060B14;
+  --cowork-sidebar-bg-hover: rgba(255, 255, 255, 0.06);
+  --cowork-sidebar-text: rgba(241, 245, 249, 0.68);
+  --cowork-sidebar-text-active: #FFFFFF;
+  --cowork-sidebar-border: rgba(255, 255, 255, 0.06);
+  --cowork-code-bg: #0A1220;
+  --cowork-code-text: #E2E8F0;
+}
+
+/* ------------------------------------------------------------------
+   1. 三栏布局：左侧导航(240px) + 中间工作区(1fr) + 右侧面板(320px)
+   ------------------------------------------------------------------ */
+.cowork-layout {
+  display: grid;
+  grid-template-columns: var(--cowork-sidebar-width) 1fr var(--cowork-panel-width);
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+  transition: grid-template-columns var(--transition-base);
+}
+
+/* 左侧导航折叠态（桌面端：仅保留图标栏） */
+.cowork-layout--sidebar-collapsed {
+  grid-template-columns: var(--cowork-sidebar-width-collapsed) 1fr var(--cowork-panel-width);
+}
+
+/* ------------------------------------------------------------------
+   2. 左侧导航：深色背景 + logo 区 + 导航链接 + 底部返回首页
+   ------------------------------------------------------------------ */
+.cowork-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--cowork-sidebar-bg);
+  color: var(--cowork-sidebar-text);
+  transition: width var(--transition-base), transform var(--transition-base);
+}
+
+/* logo 区 */
+.cowork-sidebar__logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--cowork-sidebar-border);
+  flex-shrink: 0;
+}
+.cowork-sidebar__logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--gradient-primary);
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}
+.cowork-sidebar__logo-text {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: #FFFFFF;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+.cowork-sidebar__logo-text small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--cowork-sidebar-text);
+}
+
+/* 导航链接列表（中间可滚动区域） */
+.cowork-sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cowork-sidebar__nav::-webkit-scrollbar { width: 6px; }
+.cowork-sidebar__nav::-webkit-scrollbar-thumb {
+  background: var(--cowork-sidebar-border);
+  border: none;
+}
+
+/* 底部返回首页链接 */
+.cowork-sidebar__footer {
+  flex-shrink: 0;
+  padding: var(--space-3);
+  border-top: 1px solid var(--cowork-sidebar-border);
+}
+.cowork-sidebar__back {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--cowork-sidebar-text);
+  transition: all var(--transition-fast);
+}
+.cowork-sidebar__back:hover {
+  background: var(--cowork-sidebar-bg-hover);
+  color: var(--cowork-sidebar-text-active);
+}
+
+/* ------------------------------------------------------------------
+   3. 导航项：图标 + 文字，hover / active 状态，分组 label
+   ------------------------------------------------------------------ */
+.cowork-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--cowork-sidebar-text);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.cowork-nav-item:hover {
+  background: var(--cowork-sidebar-bg-hover);
+  color: var(--cowork-sidebar-text-active);
+}
+.cowork-nav-item.active {
+  background: var(--color-primary);
+  color: var(--cowork-sidebar-text-active);
+  box-shadow: var(--shadow-primary);
+}
+.cowork-nav-item__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 分组 label */
+.cowork-nav-section {
+  padding: var(--space-4) var(--space-3) var(--space-2);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cowork-sidebar-text);
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+/* 折叠态：隐藏文字，仅显示图标 */
+.cowork-layout--sidebar-collapsed .cowork-sidebar__logo-text,
+.cowork-layout--sidebar-collapsed .cowork-nav-item__text,
+.cowork-layout--sidebar-collapsed .cowork-nav-section,
+.cowork-layout--sidebar-collapsed .cowork-sidebar__back span {
+  display: none;
+}
+.cowork-layout--sidebar-collapsed .cowork-nav-item,
+.cowork-layout--sidebar-collapsed .cowork-sidebar__back {
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------------
+   4. 中间工作区：白色背景，纵向排布，可滚动
+   ------------------------------------------------------------------ */
+.cowork-main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+/* 工作区通用滚动容器（列表页 / 构建器页等） */
+.cowork-main__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-8);
+}
+.cowork-main__header {
+  flex-shrink: 0;
+  padding: var(--space-5) var(--space-8);
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg);
+}
+
+/* ------------------------------------------------------------------
+   5. 右侧面板：浅灰背景，包含 Agent 信息 / 上下文 / 记忆 / 工具日志
+   ------------------------------------------------------------------ */
+.cowork-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-bg-subtle);
+  border-left: 1px solid var(--color-border-light);
+}
+
+/* 面板内的键值信息行（Agent 信息 / 上下文） */
+.cowork-panel__kv {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  font-size: var(--font-size-sm);
+}
+.cowork-panel__kv dt {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+.cowork-panel__kv dd {
+  margin: 0;
+  color: var(--color-text);
+  text-align: right;
+  word-break: break-all;
+}
+
+/* 工具日志条目 */
+.cowork-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  border-bottom: 1px dashed var(--color-border-light);
+}
+.cowork-log-item:last-child { border-bottom: none; }
+.cowork-log-item__time {
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------
+   6. 面板区块：标题 + 内容，可折叠
+   ------------------------------------------------------------------ */
+.cowork-panel-section {
+  border-bottom: 1px solid var(--color-border-light);
+}
+.cowork-panel-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-4);
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+}
+.cowork-panel-section__header:hover { color: var(--color-primary); }
+/* 折叠箭头 */
+.cowork-panel-section__chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-fast);
+}
+.cowork-panel-section__body {
+  padding: 0 var(--space-4) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+/* 折叠态：隐藏内容，旋转箭头 */
+.cowork-panel-section.collapsed .cowork-panel-section__body { display: none; }
+.cowork-panel-section.collapsed .cowork-panel-section__chevron { transform: rotate(-90deg); }
+
+/* ------------------------------------------------------------------
+   7. Agent 对话区：消息列表，flex column + gap，占满剩余空间
+   ------------------------------------------------------------------ */
+.chat-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-8);
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------
+   8. 消息气泡：用户(右侧,主色) / 助手(左侧,浅色) / 系统(居中,小字)
+   ------------------------------------------------------------------ */
+.chat-message {
+  display: flex;
+  gap: var(--space-3);
+  max-width: 82%;
+  animation: fadeIn var(--transition-base) ease-out both;
+}
+.chat-message__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* 用户消息：靠右，主色背景 */
+.chat-message--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.chat-message--user .chat-message__avatar { background: var(--color-secondary); }
+.chat-message--user .chat-message-content {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+  border-radius: var(--radius-lg) var(--radius-xs) var(--radius-lg) var(--radius-lg);
+}
+
+/* 助手消息：靠左，浅色背景 */
+.chat-message--assistant { align-self: flex-start; }
+.chat-message--assistant .chat-message-content {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+}
+
+/* 系统消息：居中，小字，无气泡 */
+.chat-message--system {
+  align-self: center;
+  max-width: 100%;
+}
+.chat-message--system .chat-message-content {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------
+   9. 消息内容：支持 Markdown 渲染（代码块 / 列表 / 粗体 / 表格）
+   ------------------------------------------------------------------ */
+.chat-message-content {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-normal);
+  border-radius: var(--radius-lg);
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.chat-message-content > :first-child { margin-top: 0; }
+.chat-message-content > :last-child { margin-bottom: 0; }
+.chat-message-content p { margin: 0 0 var(--space-3); line-height: var(--line-normal); }
+.chat-message-content ul,
+.chat-message-content ol { margin: 0 0 var(--space-3); padding-left: var(--space-5); }
+.chat-message-content li { margin-bottom: var(--space-1); }
+.chat-message-content strong { font-weight: 600; }
+.chat-message-content a { color: inherit; text-decoration: underline; }
+.chat-message-content h1,
+.chat-message-content h2,
+.chat-message-content h3,
+.chat-message-content h4 {
+  font-size: var(--font-size-md);
+  margin: var(--space-4) 0 var(--space-2);
+}
+/* 行内代码：JetBrains Mono */
+.chat-message-content code:not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--color-bg-muted);
+  color: var(--color-primary-active);
+}
+/* 代码块：深色底 + JetBrains Mono */
+.chat-message-content pre {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--cowork-code-bg);
+  color: var(--cowork-code-text);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-normal);
+}
+.chat-message-content pre code {
+  font-family: var(--font-mono);
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+/* 表格 */
+.chat-message-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-xs);
+}
+.chat-message-content th,
+.chat-message-content td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+.chat-message-content th { background: var(--color-bg-subtle); font-weight: 600; }
+/* 用户气泡内的行内代码反色处理 */
+.chat-message--user .chat-message-content code:not(pre code) {
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+}
+.chat-message--user .chat-message-content th { background: rgba(255, 255, 255, 0.12); }
+.chat-message--user .chat-message-content th,
+.chat-message--user .chat-message-content td { border-color: rgba(255, 255, 255, 0.3); }
+
+/* ------------------------------------------------------------------
+   10. 工具调用标签：小标签，显示工具名和状态
+   ------------------------------------------------------------------ */
+.tool-call-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  margin: var(--space-1) 0;
+}
+/* 状态点 */
+.tool-call-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+/* 运行中：主色 + 呼吸动画 */
+.tool-call-badge--running {
+  background: var(--color-primary-lighter);
+  border-color: var(--color-primary-border);
+  color: var(--color-primary-active);
+}
+.tool-call-badge--running .tool-call-badge__dot {
+  background: var(--color-primary);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+/* 成功：绿色 */
+.tool-call-badge--success {
+  background: var(--color-success-light);
+  border-color: var(--color-success-border);
+  color: var(--color-success);
+}
+.tool-call-badge--success .tool-call-badge__dot { background: var(--color-success); }
+/* 失败：红色 */
+.tool-call-badge--error {
+  background: var(--color-danger-light);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger);
+}
+.tool-call-badge--error .tool-call-badge__dot { background: var(--color-danger); }
+
+/* ------------------------------------------------------------------
+   11. 输入区：固定在对话区底部，输入框 + 发送按钮
+   ------------------------------------------------------------------ */
+.chat-input-area {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-8);
+  border-top: 1px solid var(--color-border-light);
+  background: var(--color-bg);
+}
+
+/* ------------------------------------------------------------------
+   12. 输入框：多行 textarea，自动高度（JS 驱动），圆角
+   ------------------------------------------------------------------ */
+.chat-input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 10px var(--space-4);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-normal);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  outline: none;
+  min-height: 40px;
+  max-height: 160px;
+  overflow-y: auto;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.chat-input::placeholder { color: var(--color-text-tertiary); }
+.chat-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+  background: var(--color-bg);
+}
+
+/* ------------------------------------------------------------------
+   13. 发送按钮：圆形按钮，主色
+   ------------------------------------------------------------------ */
+.chat-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-primary);
+  transition: all var(--transition-fast);
+}
+.chat-send-btn:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+.chat-send-btn:active { transform: translateY(0); }
+.chat-send-btn:disabled {
+  background: var(--color-bg-muted);
+  color: var(--color-text-tertiary);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ------------------------------------------------------------------
+   14. Agent 卡片：图标 + 名称 + 描述 + 状态标签，hover 效果
+   ------------------------------------------------------------------ */
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.agent-card:hover {
+  border-color: var(--color-primary-border);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  background-image: var(--gradient-card-hover);
+}
+.agent-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.agent-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+}
+.agent-card__name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.agent-card__desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-snug);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.agent-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+/* 状态标签：运行中 / 已停用 */
+.agent-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+.agent-card__status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.agent-card__status--active { color: var(--color-success); }
+.agent-card__status--inactive { color: var(--color-text-tertiary); }
+
+/* ------------------------------------------------------------------
+   15. Agent 类型标签：不同颜色对应不同类型
+   ------------------------------------------------------------------ */
+.agent-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+}
+/* 规划型：蓝色 */
+.agent-type-badge--planner {
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+/* 执行型：主色橙 */
+.agent-type-badge--executor {
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
+}
+/* 评审型：绿色 */
+.agent-type-badge--reviewer {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+/* 自定义型：紫色 */
+.agent-type-badge--custom {
+  background: #F3E8FF;
+  color: #7C3AED;
+}
+[data-theme="dark"] .agent-type-badge--custom {
+  background: #2E1065;
+  color: #C4B5FD;
+}
+
+/* ------------------------------------------------------------------
+   16. 会话列表：会话项 = 标题 + 时间 + 删除按钮
+   ------------------------------------------------------------------ */
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.session-item:hover { background: var(--cowork-sidebar-bg-hover); }
+.session-item.active { background: var(--cowork-sidebar-bg-hover); }
+.session-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.session-item__title {
+  font-size: var(--font-size-sm);
+  color: var(--cowork-sidebar-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-item.active .session-item__title,
+.session-item:hover .session-item__title { color: var(--cowork-sidebar-text-active); }
+.session-item__time {
+  font-size: 11px;
+  color: var(--cowork-sidebar-text);
+  opacity: 0.6;
+}
+/* 删除按钮：默认隐藏，hover 会话项时显示 */
+.session-item__delete {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--cowork-sidebar-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+.session-item:hover .session-item__delete { opacity: 1; }
+.session-item__delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #F87171;
+}
+
+/* 会话列表用于浅色区域（如面板内）时的适配 */
+.cowork-panel .session-item:hover,
+.cowork-panel .session-item.active { background: var(--color-bg-muted); }
+.cowork-panel .session-item__title { color: var(--color-text); }
+.cowork-panel .session-item__time { color: var(--color-text-tertiary); opacity: 1; }
+.cowork-panel .session-item__delete { color: var(--color-text-tertiary); }
+.cowork-panel .session-item__delete:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------------
+   17. Skill 卡片：样式与 agent-card 一致
+   ------------------------------------------------------------------ */
+.skill-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.skill-card:hover {
+  border-color: var(--color-primary-border);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  background-image: var(--gradient-card-hover);
+}
+.skill-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.skill-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-info-light);
+  color: var(--color-info);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+}
+.skill-card__name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.skill-card__desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-snug);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.skill-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* ------------------------------------------------------------------
+   18. 构建器表单：表单组样式
+   ------------------------------------------------------------------ */
+.builder-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 640px;
+}
+.builder-form__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.builder-form__label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.builder-form__label .required { color: var(--color-danger); margin-left: 2px; }
+.builder-form__hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+.builder-form__input,
+.builder-form__select,
+.builder-form__textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.builder-form__textarea {
+  resize: vertical;
+  min-height: 96px;
+  line-height: var(--line-normal);
+}
+.builder-form__input:focus,
+.builder-form__select:focus,
+.builder-form__textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+.builder-form__input::placeholder,
+.builder-form__textarea::placeholder { color: var(--color-text-tertiary); }
+/* 表单底部操作按钮行 */
+.builder-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+/* ------------------------------------------------------------------
+   19. 空状态：居中图标 + 文字
+   ------------------------------------------------------------------ */
+.cowork-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-16) var(--space-6);
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+.cowork-empty__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-muted);
+  color: var(--color-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-2xl);
+}
+.cowork-empty__title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.cowork-empty__desc {
+  font-size: var(--font-size-sm);
+  max-width: 320px;
+  line-height: var(--line-normal);
+}
+
+/* ------------------------------------------------------------------
+   20. 加载动画：spinner
+   ------------------------------------------------------------------ */
+.cowork-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+}
+.cowork-loading__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: cowork-spin 0.8s linear infinite;
+}
+/* 全页居中的加载态 */
+.cowork-loading--block {
+  display: flex;
+  padding: var(--space-16) 0;
+}
+@keyframes cowork-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ------------------------------------------------------------------
+   21. 流式打字动画：三个点
+   ------------------------------------------------------------------ */
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-2) 0;
+}
+.typing-indicator__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
+  animation: cowork-typing 1.4s ease-in-out infinite;
+}
+.typing-indicator__dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator__dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes cowork-typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ------------------------------------------------------------------
+   22. 响应式：小屏幕隐藏右侧面板，左侧导航可折叠
+   ------------------------------------------------------------------ */
+
+/* 中等屏幕：右侧面板默认隐藏，布局退化为两栏；
+   通过 .cowork-layout--panel-open 以抽屉形式临时打开面板 */
+@media (max-width: 1280px) {
+  .cowork-layout,
+  .cowork-layout--sidebar-collapsed {
+    grid-template-columns: var(--cowork-sidebar-width) 1fr;
+  }
+  .cowork-layout--sidebar-collapsed {
+    grid-template-columns: var(--cowork-sidebar-width-collapsed) 1fr;
+  }
+  .cowork-panel { display: none; }
+  .cowork-layout--panel-open .cowork-panel {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--cowork-panel-width);
+    z-index: var(--z-overlay);
+    box-shadow: var(--shadow-xl);
+  }
+}
+
+/* 小屏幕：左侧导航变为可滑出的抽屉，布局退化为单栏 */
+@media (max-width: 768px) {
+  .cowork-layout,
+  .cowork-layout--sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+  .cowork-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--cowork-sidebar-width);
+    z-index: var(--z-overlay);
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-xl);
+  }
+  /* 打开导航抽屉 */
+  .cowork-layout--sidebar-open .cowork-sidebar { transform: translateX(0); }
+  /* 抽屉打开时显示遮罩 */
+  .cowork-layout--sidebar-open::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: var(--color-bg-overlay);
+    z-index: calc(var(--z-overlay) - 1);
+  }
+  /* 折叠态文字隐藏规则在抽屉模式下不生效 */
+  .cowork-layout--sidebar-collapsed .cowork-sidebar__logo-text,
+  .cowork-layout--sidebar-collapsed .cowork-nav-item__text,
+  .cowork-layout--sidebar-collapsed .cowork-nav-section,
+  .cowork-layout--sidebar-collapsed .cowork-sidebar__back span {
+    display: block;
+  }
+  .cowork-layout--sidebar-collapsed .cowork-nav-item,
+  .cowork-layout--sidebar-collapsed .cowork-sidebar__back {
+    justify-content: flex-start;
+  }
+  /* 对话区与输入区在小屏收紧内边距 */
+  .chat-container { padding: var(--space-4); }
+  .chat-input-area { padding: var(--space-3) var(--space-4); }
+  .chat-message { max-width: 94%; }
+  .cowork-main__scroll { padding: var(--space-4); }
+  .cowork-main__header { padding: var(--space-4); }
+}
+
+/* 动效偏好：尊重系统减少动画设置 */
+@media (prefers-reduced-motion: reduce) {
+  .cowork-loading__spinner,
+  .typing-indicator__dot,
+  .tool-call-badge--running .tool-call-badge__dot {
+    animation: none;
+  }
+}

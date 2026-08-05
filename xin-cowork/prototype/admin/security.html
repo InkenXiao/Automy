@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>安全策略配置 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/admin" class="app-nav-item active"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">管理</div>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">📊</span><span class="app-nav-item__label">仪表盘</span></a>
+        <a href="#/prototype/admin/users" class="app-nav-item"><span class="app-nav-item__icon">👥</span><span class="app-nav-item__label">用户管理</span></a>
+        <a href="#/prototype/admin/roles" class="app-nav-item"><span class="app-nav-item__icon">🔑</span><span class="app-nav-item__label">角色权限</span></a>
+        <a href="#/prototype/admin/models" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">模型网关</span></a>
+        <a href="#/prototype/admin/mcp-services" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 服务</span></a>
+        <a href="#/prototype/admin/skills-experts" class="app-nav-item"><span class="app-nav-item__icon">📦</span><span class="app-nav-item__label">技能与专家</span></a>
+        <a href="#/prototype/admin/audit" class="app-nav-item"><span class="app-nav-item__icon">📜</span><span class="app-nav-item__label">审计日志</span></a>
+        <a href="#/prototype/admin/billing" class="app-nav-item"><span class="app-nav-item__icon">💰</span><span class="app-nav-item__label">计费账单</span></a>
+        <a href="#/prototype/admin/security" class="app-nav-item active"><span class="app-nav-item__icon">🔐</span><span class="app-nav-item__label">安全策略</span></a>
+        <a href="#/prototype/admin/market-review" class="app-nav-item"><span class="app-nav-item__icon">🛡</span><span class="app-nav-item__label">市场审核</span></a>
+        <a href="#/prototype/admin/settings" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">系统配置</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">钱</div>
+          <span class="app-nav-item__label">钱七 · 管理员</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div class="app-topbar__title">安全策略配置</div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">📤 导出安全报告</button>
+          <button class="btn btn-primary btn-sm">💾 保存策略</button>
+        </div>
+      </div>
+      <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/admin">管理后台</a></li>
+          <li>安全策略</li>
+        </ul>
+
+        <!-- 安全概览指标 -->
+        <div class="stat-grid" style="margin-bottom: 16px;">
+          <div class="stat-card">
+            <div class="stat-card__label">今日拦截事件</div>
+            <div class="stat-card__value">23</div>
+            <div class="stat-card__trend stat-card__trend--down">▼ -15%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__label">安全评分</div>
+            <div class="stat-card__value">94.5<span class="text-sm text-tertiary"> / 100</span></div>
+            <div class="stat-card__trend stat-card__trend--up">▲ +2.1</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__label">活跃 API 密钥</div>
+            <div class="stat-card__value">18</div>
+            <div class="stat-card__trend stat-card__trend--up">▲ +2</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__label">数据密级覆盖</div>
+            <div class="stat-card__value" style="color: var(--color-success);">100<span class="text-sm text-tertiary">%</span></div>
+            <div class="stat-card__trend stat-card__trend--up">▲ 已全覆盖</div>
+          </div>
+        </div>
+
+        <!-- 密码与认证策略 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">密码与认证策略</div>
+            <span class="badge badge-info">等保三级</span>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-cols-2" style="gap: 16px;">
+              <div class="form-group" style="margin: 0;">
+                <label class="form-label">密码最小长度</label>
+                <input type="number" class="input" value="8" />
+              </div>
+              <div class="form-group" style="margin: 0;">
+                <label class="form-label">密码过期天数</label>
+                <select class="select"><option>30 天</option><option selected>90 天</option><option>180 天</option><option>永不</option></select>
+              </div>
+              <div class="form-group" style="margin: 0;">
+                <label class="form-label">登录失败锁定阈值</label>
+                <input type="number" class="input" value="5" />
+              </div>
+              <div class="form-group" style="margin: 0;">
+                <label class="form-label">锁定时长</label>
+                <select class="select"><option>15 分钟</option><option selected>30 分钟</option><option>60 分钟</option><option>永久</option></select>
+              </div>
+              <div class="flex items-center justify-between" style="padding: 4px 0;">
+                <div>
+                  <div class="text-sm font-medium">强制多因素认证 (MFA)</div>
+                  <div class="text-xs text-tertiary">所有用户登录需通过 MFA 校验</div>
+                </div>
+                <label class="switch"><input type="checkbox" checked><span class="switch__track"><span class="switch__thumb"></span></span></label>
+              </div>
+              <div class="flex items-center justify-between" style="padding: 4px 0;">
+                <div>
+                  <div class="text-sm font-medium">单点登录 (SSO)</div>
+                  <div class="text-xs text-tertiary">对接企业 SAML / OIDC IdP</div>
+                </div>
+                <label class="switch"><input type="checkbox" checked><span class="switch__track"><span class="switch__thumb"></span></span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- IP 访问控制 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">IP 访问控制</div>
+            <button class="btn btn-primary btn-sm">+ 新增规则</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead><tr><th>IP 段</th><th>类型</th><th>策略</th><th>备注</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><code class="text-sm">10.0.0.0/8</code></td>
+                  <td><span class="badge badge-primary">内网</span></td>
+                  <td><span class="badge badge-success">允许</span></td>
+                  <td class="text-sm">总部办公网段</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+                <tr>
+                  <td><code class="text-sm">172.16.0.0/12</code></td>
+                  <td><span class="badge badge-primary">内网</span></td>
+                  <td><span class="badge badge-success">允许</span></td>
+                  <td class="text-sm">机房内网互通</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+                <tr>
+                  <td><code class="text-sm">202.96.128.86/32</code></td>
+                  <td><span class="badge badge-secondary">外网</span></td>
+                  <td><span class="badge badge-success">允许</span></td>
+                  <td class="text-sm">异地灾备专线出口</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+                <tr>
+                  <td><code class="text-sm">0.0.0.0/0</code></td>
+                  <td><span class="badge badge-secondary">外网</span></td>
+                  <td><span class="badge badge-danger">拒绝</span></td>
+                  <td class="text-sm">默认拒绝公网访问管理后台</td>
+                  <td><button class="btn btn-ghost btn-sm">编辑</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 数据安全与密级 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">数据安全与密级</div>
+            <span class="text-xs text-tertiary">分级保护策略</span>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead><tr><th>数据密级</th><th>加密方式</th><th>访问角色限制</th><th>审计要求</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge badge-secondary">公开</span></td>
+                  <td class="text-sm">传输层 TLS 1.3</td>
+                  <td class="text-sm">全员可读</td>
+                  <td class="text-sm">不审计</td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-info">内部</span></td>
+                  <td class="text-sm">TLS + 信封加密</td>
+                  <td class="text-sm">登录用户可读</td>
+                  <td class="text-sm">访问日志留存 90 天</td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-warning">机密</span></td>
+                  <td class="text-sm">AES-256-GCM + KMS</td>
+                  <td class="text-sm">部门负责人 / 合规官</td>
+                  <td class="text-sm">访问日志留存 365 天</td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-danger">绝密</span></td>
+                  <td class="text-sm">国密 SM4 + 硬件 HSM</td>
+                  <td class="text-sm">仅授权高管 / 风控委员会</td>
+                  <td class="text-sm">访问日志留存 1095 天 + 实时告警</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- API 密钥管理 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">API 密钥管理</div>
+            <button class="btn btn-primary btn-sm">+ 创建密钥</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead><tr><th>密钥名称</th><th>密钥前缀</th><th>创建者</th><th>创建时间</th><th>最后使用</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="text-sm font-medium">投研数据接入</td>
+                  <td><code class="text-xs">sk-abc...x921</code></td>
+                  <td class="text-sm">钱七</td>
+                  <td class="text-sm text-tertiary">2026-06-01 10:23</td>
+                  <td class="text-sm">3 分钟前</td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td><button class="btn btn-ghost btn-sm">吊销</button></td>
+                </tr>
+                <tr>
+                  <td class="text-sm font-medium">CRM 同步服务</td>
+                  <td><code class="text-xs">sk-crm...3f08</code></td>
+                  <td class="text-sm">钱七</td>
+                  <td class="text-sm text-tertiary">2026-05-15 14:12</td>
+                  <td class="text-sm">1 小时前</td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td><button class="btn btn-ghost btn-sm">吊销</button></td>
+                </tr>
+                <tr>
+                  <td class="text-sm font-medium">Wind 行情桥接</td>
+                  <td><code class="text-xs">sk-wnd...8a55</code></td>
+                  <td class="text-sm">张三</td>
+                  <td class="text-sm text-tertiary">2026-04-20 09:05</td>
+                  <td class="text-sm">12 分钟前</td>
+                  <td><span class="badge badge-success">启用</span></td>
+                  <td><button class="btn btn-ghost btn-sm">吊销</button></td>
+                </tr>
+                <tr>
+                  <td class="text-sm font-medium">旧版 OA 集成</td>
+                  <td><code class="text-xs">sk-oas...1c7e</code></td>
+                  <td class="text-sm">李四</td>
+                  <td class="text-sm text-tertiary">2026-01-10 16:48</td>
+                  <td class="text-sm text-tertiary">2026-06-30 08:00</td>
+                  <td><span class="badge badge-warning">已过期</span></td>
+                  <td><button class="btn btn-ghost btn-sm">吊销</button></td>
+                </tr>
+                <tr>
+                  <td class="text-sm font-medium">测试环境密钥</td>
+                  <td><code class="text-xs">sk-tst...9d34</code></td>
+                  <td class="text-sm">王五</td>
+                  <td class="text-sm text-tertiary">2026-03-05 11:30</td>
+                  <td class="text-sm text-tertiary">2026-07-01 18:22</td>
+                  <td><span class="badge badge-danger">已吊销</span></td>
+                  <td><button class="btn btn-ghost btn-sm" disabled>已吊销</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 安全告警事件 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">安全告警事件</div>
+            <div class="flex gap-2">
+              <select class="select" style="height: 32px; font-size: 13px;"><option>全部严重级别</option><option>高</option><option>中</option><option>低</option></select>
+              <select class="select" style="height: 32px; font-size: 13px;"><option>全部状态</option><option>已处理</option><option>待处理</option></select>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead><tr><th>时间</th><th>事件类型</th><th>来源 IP</th><th>目标</th><th>严重级别</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-16 09:42:11</td>
+                  <td><span class="badge badge-danger">暴力破解</span></td>
+                  <td class="text-xs text-tertiary">203.95.45.18</td>
+                  <td class="text-sm">用户 zhangsan</td>
+                  <td><span class="badge badge-danger">高</span></td>
+                  <td><span class="badge badge-success">已处理</span></td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-16 08:15:33</td>
+                  <td><span class="badge badge-warning">异常登录</span></td>
+                  <td class="text-xs text-tertiary">118.24.66.92</td>
+                  <td class="text-sm">用户 lisi (异地登录)</td>
+                  <td><span class="badge badge-warning">中</span></td>
+                  <td><span class="badge badge-success">已处理</span></td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-16 07:58:02</td>
+                  <td><span class="badge badge-warning">越权访问</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.78</td>
+                  <td class="text-sm">绝密文件 /投研/ABC新能源/估值模型.xlsx</td>
+                  <td><span class="badge badge-danger">高</span></td>
+                  <td><span class="badge badge-warning">待处理</span></td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 22:31:47</td>
+                  <td><span class="badge badge-warning">API 滥用</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.34</td>
+                  <td class="text-sm">密钥 sk-wnd...8a55 (频率超限)</td>
+                  <td><span class="badge badge-warning">中</span></td>
+                  <td><span class="badge badge-success">已处理</span></td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 16:08:25</td>
+                  <td><span class="badge badge-danger">暴力破解</span></td>
+                  <td class="text-xs text-tertiary">45.83.21.6</td>
+                  <td class="text-sm">用户 qianqi</td>
+                  <td><span class="badge badge-danger">高</span></td>
+                  <td><span class="badge badge-success">已处理</span></td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 10:22:09</td>
+                  <td><span class="badge badge-secondary">异常登录</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.45</td>
+                  <td class="text-sm">用户 wangwu (非工作时段)</td>
+                  <td><span class="badge badge-info">低</span></td>
+                  <td><span class="badge badge-success">已处理</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

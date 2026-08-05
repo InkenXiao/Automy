@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>用户中心 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/notifications" class="app-nav-item"><span class="app-nav-item__icon">🔔</span><span class="app-nav-item__label">通知中心</span></a>
+        <a href="#/prototype/im-channels" class="app-nav-item"><span class="app-nav-item__icon">📢</span><span class="app-nav-item__label">IM 通道</span></a>
+        <a href="#/prototype/profile" class="app-nav-item active"><span class="app-nav-item__icon">👤</span><span class="app-nav-item__label">用户中心</span></a>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">用户中心</div>
+        <a href="#/prototype/profile" class="app-nav-item active"><span class="app-nav-item__icon">👤</span><span class="app-nav-item__label">个人资料</span></a>
+        <a href="#/prototype/profile?tab=preference" class="app-nav-item"><span class="app-nav-item__icon">🎨</span><span class="app-nav-item__label">偏好设置</span></a>
+        <a href="#/prototype/profile?tab=subscription" class="app-nav-item"><span class="app-nav-item__icon">📦</span><span class="app-nav-item__label">我的订阅</span></a>
+        <a href="#/prototype/profile?tab=memory" class="app-nav-item"><span class="app-nav-item__icon">🧠</span><span class="app-nav-item__label">记忆与上下文</span></a>
+        <a href="#/prototype/profile?tab=apikeys" class="app-nav-item"><span class="app-nav-item__icon">🔑</span><span class="app-nav-item__label">API 凭证</span></a>
+        <a href="#/prototype/profile?tab=notifications" class="app-nav-item"><span class="app-nav-item__icon">🔔</span><span class="app-nav-item__label">通知设置</span></a>
+        <a href="#/prototype/profile?tab=logs" class="app-nav-item"><span class="app-nav-item__icon">📜</span><span class="app-nav-item__label">操作日志</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="app-frame__main">
+      <div class="app-frame__header">
+        <div>
+          <h2 class="app-frame__title">用户中心</h2>
+          <p class="app-frame__subtitle">管理个人信息、偏好、订阅、记忆与凭证</p>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost btn-sm">📤 导出资料</button>
+          <button class="btn btn-primary btn-sm">💾 保存全部</button>
+        </div>
+      </div>
+
+      <div class="app-frame__body">
+        <!-- 头部信息卡 -->
+        <div class="profile-hero">
+          <div class="profile-hero__cover"></div>
+          <div class="profile-hero__body">
+            <div class="profile-hero__avatar">张</div>
+            <div class="profile-hero__info">
+              <div class="profile-hero__name">
+                张三
+                <span class="badge badge-primary">Pro</span>
+                <span class="badge badge-success">已实名</span>
+              </div>
+              <div class="profile-hero__meta">
+                投研部 · 高级分析师 · zhangsan@automy.cn · 加入于 2025-08-12
+              </div>
+              <div class="profile-hero__tags">
+                <span class="chip">📈 一级市场</span>
+                <span class="chip">🔋 新能源</span>
+                <span class="chip">💻 半导体</span>
+                <span class="chip">🏭 智能制造</span>
+              </div>
+            </div>
+            <div class="profile-hero__actions">
+              <button class="btn btn-outline btn-sm">📷 修改头像</button>
+              <button class="btn btn-primary btn-sm">✏ 编辑资料</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 顶部统计 -->
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--blue">💬</div>
+            <div class="stat-card__data">
+              <div class="stat-card__value">128</div>
+              <div class="stat-card__label">本月会话数</div>
+            </div>
+            <div class="stat-card__trend stat-card__trend--up">▲ +18% 环比</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--purple">🤖</div>
+            <div class="stat-card__data">
+              <div class="stat-card__value">3</div>
+              <div class="stat-card__label">已订阅专家</div>
+            </div>
+            <div class="stat-card__trend" style="color: var(--color-text-tertiary);">投研/法务/风控</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--green">⚡</div>
+            <div class="stat-card__data">
+              <div class="stat-card__value">8</div>
+              <div class="stat-card__label">已安装技能</div>
+            </div>
+            <div class="stat-card__trend" style="color: var(--color-text-tertiary);">本月 +2</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--orange">🔥</div>
+            <div class="stat-card__data">
+              <div class="stat-card__value">2.4<span class="text-sm text-tertiary"> M</span></div>
+              <div class="stat-card__label">累计 Tokens</div>
+            </div>
+            <div class="stat-card__trend stat-card__trend--up">▲ +12% 环比</div>
+          </div>
+        </div>
+
+        <!-- 主体: 左侧 Tab + 右侧内容 -->
+        <div class="profile-layout">
+
+          <!-- 左侧 Tab + 套餐 -->
+          <aside class="profile-side">
+            <div class="card profile-side__nav">
+              <div class="card-body" style="padding: 6px;">
+                <a class="profile-tab active" data-tab="profile">
+                  <span class="profile-tab__icon">👤</span>
+                  <span class="profile-tab__label">个人资料</span>
+                </a>
+                <a class="profile-tab" data-tab="preference">
+                  <span class="profile-tab__icon">🎨</span>
+                  <span class="profile-tab__label">偏好设置</span>
+                </a>
+                <a class="profile-tab" data-tab="subscription">
+                  <span class="profile-tab__icon">📦</span>
+                  <span class="profile-tab__label">我的订阅</span>
+                </a>
+                <a class="profile-tab" data-tab="memory">
+                  <span class="profile-tab__icon">🧠</span>
+                  <span class="profile-tab__label">记忆与上下文</span>
+                </a>
+                <a class="profile-tab" data-tab="apikeys">
+                  <span class="profile-tab__icon">🔑</span>
+                  <span class="profile-tab__label">API 凭证</span>
+                </a>
+                <a class="profile-tab" data-tab="notifications">
+                  <span class="profile-tab__icon">🔔</span>
+                  <span class="profile-tab__label">通知设置</span>
+                </a>
+                <a class="profile-tab" data-tab="logs">
+                  <span class="profile-tab__icon">📜</span>
+                  <span class="profile-tab__label">操作日志</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="card profile-plan">
+              <div class="card-body">
+                <div class="profile-plan__header">
+                  <span class="text-xs text-tertiary uppercase">当前套餐</span>
+                  <span class="badge badge-primary">Pro</span>
+                </div>
+                <div class="profile-plan__name">Pro 专业版</div>
+                <div class="text-xs text-secondary">有效期至 2027-08-12</div>
+                <div class="profile-plan__bar">
+                  <div class="profile-plan__bar-fill" style="width: 64%;"></div>
+                </div>
+                <div class="profile-plan__usage">
+                  <span>已用 1.6M</span>
+                  <span class="text-tertiary">/ 2.5M Tokens</span>
+                </div>
+                <button class="btn btn-outline btn-sm" style="width: 100%;">升级到 Team</button>
+              </div>
+            </div>
+          </aside>
+
+          <!-- 右侧内容 -->
+          <div class="profile-content">
+
+            <!-- 个人资料 -->
+            <div class="card profile-section" data-section="profile">
+              <div class="card-header">
+                <div class="card-title">个人资料</div>
+                <span class="badge badge-secondary">基础信息</span>
+              </div>
+              <div class="card-body">
+                <form class="form-grid form-grid--cols2">
+                  <div class="form-group">
+                    <label class="form-label">姓名</label>
+                    <input type="text" class="form-input" value="张三" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">英文名</label>
+                    <input type="text" class="form-input" value="Zhang San" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">邮箱</label>
+                    <input type="email" class="form-input" value="zhangsan@automy.cn" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">手机号</label>
+                    <input type="tel" class="form-input" value="138****6789" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">部门</label>
+                    <select class="form-input">
+                      <option>投研部</option>
+                      <option>法务部</option>
+                      <option>合规部</option>
+                      <option>销售部</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">职位</label>
+                    <input type="text" class="form-input" value="高级分析师" />
+                  </div>
+                  <div class="form-group form-group--full">
+                    <label class="form-label">个人简介</label>
+                    <textarea class="form-input" rows="3">8 年一级市场投研经验,关注新能源、半导体、智能制造领域。负责 XIN 平台投研分析师专家的迭代与维护。</textarea>
+                  </div>
+                </form>
+                <div class="flex gap-2" style="margin-top: 16px;">
+                  <button class="btn btn-primary btn-sm">保存修改</button>
+                  <button class="btn btn-ghost btn-sm">重置</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 偏好设置 -->
+            <div class="card profile-section" data-section="preference">
+              <div class="card-header">
+                <div class="card-title">偏好设置</div>
+                <span class="badge badge-secondary">个性化</span>
+              </div>
+              <div class="card-body">
+                <form class="form-grid form-grid--cols2">
+                  <div class="form-group">
+                    <label class="form-label">界面主题</label>
+                    <select class="form-input">
+                      <option>跟随系统</option>
+                      <option>浅色</option>
+                      <option>深色</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">语言</label>
+                    <select class="form-input">
+                      <option>简体中文</option>
+                      <option>English</option>
+                      <option>繁體中文</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">默认模型</label>
+                    <select class="form-input">
+                      <option>Claude Sonnet 4.5</option>
+                      <option>GPT-4o</option>
+                      <option>DeepSeek-V3</option>
+                      <option>Qwen2.5-72B</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">回答风格</label>
+                    <select class="form-input">
+                      <option>简洁要点</option>
+                      <option>详细分析</option>
+                      <option>数据驱动</option>
+                      <option>对话式</option>
+                    </select>
+                  </div>
+                  <div class="form-group form-group--full">
+                    <label class="form-label">输出温度 <span class="text-xs text-tertiary">(当前:0.3 偏严谨)</span></label>
+                    <input type="range" min="0" max="100" value="30" style="width: 100%;" />
+                    <div class="flex justify-between text-xs text-tertiary" style="margin-top: 4px;">
+                      <span>0 严谨</span>
+                      <span>0.5 平衡</span>
+                      <span>1.0 创意</span>
+                    </div>
+                  </div>
+                  <div class="form-group form-group--full">
+                    <label class="form-label">默认会话开场提示</label>
+                    <textarea class="form-input" rows="2">你是一名严谨的投研分析师,请基于事实和数据给出客观判断。</textarea>
+                  </div>
+                </form>
+
+                <div class="profile-prefs">
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">流式输出</div>
+                      <div class="profile-pref__desc">LLM 响应逐字输出,提升首字响应体验</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked><span class="switch__slider"></span></label>
+                  </div>
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">记忆自动写入</div>
+                      <div class="profile-pref__desc">会话结束自动提取事实/偏好写入长期记忆</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked><span class="switch__slider"></span></label>
+                  </div>
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">引用溯源</div>
+                      <div class="profile-pref__desc">回答时附上文档来源与记忆引用</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked><span class="switch__slider"></span></label>
+                  </div>
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">实验性功能</div>
+                      <div class="profile-pref__desc">提前体验 Beta 阶段的新能力</div>
+                    </div>
+                    <label class="switch"><input type="checkbox"><span class="switch__slider"></span></label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 我的订阅 -->
+            <div class="card profile-section" data-section="subscription">
+              <div class="card-header">
+                <div class="card-title">我的订阅</div>
+                <a href="#/prototype/expert-market" class="text-sm" style="color: var(--color-primary);">浏览市场 →</a>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>专家 Agent</th>
+                      <th>版本</th>
+                      <th>套餐</th>
+                      <th>到期日</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div class="flex items-center gap-2">
+                          <span class="profile-agent__icon">📈</span>
+                          <div>
+                            <div class="font-medium">投研分析师</div>
+                            <div class="text-xs text-tertiary">投研部专用</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="text-sm">v2.1.0</td>
+                      <td class="text-sm">¥199/月</td>
+                      <td class="text-sm">2027-08-12</td>
+                      <td><span class="badge badge-success">生效中</span></td>
+                      <td>
+                        <button class="btn btn-ghost btn-sm">续费</button>
+                        <button class="btn btn-ghost btn-sm">取消</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div class="flex items-center gap-2">
+                          <span class="profile-agent__icon">⚖</span>
+                          <div>
+                            <div class="font-medium">法务顾问</div>
+                            <div class="text-xs text-tertiary">合同/合规审查</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="text-sm">v1.5.2</td>
+                      <td class="text-sm">¥99/月</td>
+                      <td class="text-sm">2026-12-15</td>
+                      <td><span class="badge badge-success">生效中</span></td>
+                      <td>
+                        <button class="btn btn-ghost btn-sm">续费</button>
+                        <button class="btn btn-ghost btn-sm">取消</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div class="flex items-center gap-2">
+                          <span class="profile-agent__icon">🛡</span>
+                          <div>
+                            <div class="font-medium">风险管理师</div>
+                            <div class="text-xs text-tertiary">投资风险排查</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="text-sm">v1.8.0</td>
+                      <td class="text-sm">¥149/月</td>
+                      <td class="text-sm">2026-09-20</td>
+                      <td><span class="badge badge-warning">即将到期</span></td>
+                      <td>
+                        <button class="btn btn-primary btn-sm">续费</button>
+                        <button class="btn btn-ghost btn-sm">取消</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 记忆与上下文 -->
+            <div class="card profile-section" data-section="memory">
+              <div class="card-header">
+                <div class="card-title">记忆与上下文</div>
+                <div class="flex gap-2">
+                  <button class="btn btn-ghost btn-sm">🔍 检索测试</button>
+                  <button class="btn btn-primary btn-sm">+ 新建记忆</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="profile-memory-stats">
+                  <div class="profile-memory-stat">
+                    <div class="profile-memory-stat__value">8</div>
+                    <div class="profile-memory-stat__label">活跃记忆</div>
+                  </div>
+                  <div class="profile-memory-stat">
+                    <div class="profile-memory-stat__value">23</div>
+                    <div class="profile-memory-stat__label">已归档</div>
+                  </div>
+                  <div class="profile-memory-stat">
+                    <div class="profile-memory-stat__value">156</div>
+                    <div class="profile-memory-stat__label">累计引用</div>
+                  </div>
+                  <div class="profile-memory-stat">
+                    <div class="profile-memory-stat__value" style="color: var(--color-success);">●</div>
+                    <div class="profile-memory-stat__label">系统正常</div>
+                  </div>
+                </div>
+
+                <div class="profile-memory-list">
+                  <div class="profile-memory-item">
+                    <div class="profile-memory-item__icon">🧠</div>
+                    <div class="profile-memory-item__body">
+                      <div class="profile-memory-item__title">关注行业偏好</div>
+                      <div class="profile-memory-item__meta">
+                        <span class="chip chip-sm">偏好</span>
+                        <span class="text-xs text-tertiary">2026-06-12 创建</span>
+                      </div>
+                    </div>
+                    <span class="badge badge-primary">全局</span>
+                    <button class="btn btn-ghost btn-sm">编辑</button>
+                  </div>
+                  <div class="profile-memory-item">
+                    <div class="profile-memory-item__icon">🧠</div>
+                    <div class="profile-memory-item__body">
+                      <div class="profile-memory-item__title">分析风格:数据驱动 + 风险优先</div>
+                      <div class="profile-memory-item__meta">
+                        <span class="chip chip-sm">风格</span>
+                        <span class="text-xs text-tertiary">2026-05-08 创建</span>
+                      </div>
+                    </div>
+                    <span class="badge badge-primary">全局</span>
+                    <button class="btn btn-ghost btn-sm">编辑</button>
+                  </div>
+                  <div class="profile-memory-item">
+                    <div class="profile-memory-item__icon">🧠</div>
+                    <div class="profile-memory-item__body">
+                      <div class="profile-memory-item__title">ABC新能源项目上下文</div>
+                      <div class="profile-memory-item__meta">
+                        <span class="chip chip-sm">项目</span>
+                        <span class="text-xs text-tertiary">2026-07-08 创建 · 32 次引用</span>
+                      </div>
+                    </div>
+                    <span class="badge badge-secondary">项目</span>
+                    <button class="btn btn-ghost btn-sm">编辑</button>
+                  </div>
+                  <div class="profile-memory-item">
+                    <div class="profile-memory-item__icon">🧠</div>
+                    <div class="profile-memory-item__body">
+                      <div class="profile-memory-item__title">常用数据源:Wind 优先</div>
+                      <div class="profile-memory-item__meta">
+                        <span class="chip chip-sm">工具偏好</span>
+                        <span class="text-xs text-tertiary">2026-04-22 创建</span>
+                      </div>
+                    </div>
+                    <span class="badge badge-primary">全局</span>
+                    <button class="btn btn-ghost btn-sm">编辑</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- API 凭证 -->
+            <div class="card profile-section" data-section="apikeys">
+              <div class="card-header">
+                <div class="card-title">API 凭证</div>
+                <button class="btn btn-primary btn-sm">+ 创建凭证</button>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>名称</th>
+                      <th>Key</th>
+                      <th>权限范围</th>
+                      <th>最后使用</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="font-medium">投研工作流</td>
+                      <td><code class="code-inline">automy-sk-***8a3f</code></td>
+                      <td>
+                        <span class="chip chip-sm">sessions:write</span>
+                        <span class="chip chip-sm">memory:read</span>
+                      </td>
+                      <td class="text-sm">2 小时前</td>
+                      <td><span class="badge badge-success">启用</span></td>
+                      <td>
+                        <button class="btn btn-ghost btn-sm">复制</button>
+                        <button class="btn btn-ghost btn-sm">禁用</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="font-medium">内部 BI 集成</td>
+                      <td><code class="code-inline">automy-sk-***2b91</code></td>
+                      <td>
+                        <span class="chip chip-sm">sessions:read</span>
+                      </td>
+                      <td class="text-sm">昨天</td>
+                      <td><span class="badge badge-success">启用</span></td>
+                      <td>
+                        <button class="btn btn-ghost btn-sm">复制</button>
+                        <button class="btn btn-ghost btn-sm">禁用</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="font-medium">测试凭证</td>
+                      <td><code class="code-inline">automy-sk-***de04</code></td>
+                      <td>
+                        <span class="chip chip-sm">sessions:write</span>
+                      </td>
+                      <td class="text-sm">7 天前</td>
+                      <td><span class="badge badge-secondary">已禁用</span></td>
+                      <td>
+                        <button class="btn btn-ghost btn-sm">启用</button>
+                        <button class="btn btn-ghost btn-sm">删除</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 通知设置 -->
+            <div class="card profile-section" data-section="notifications">
+              <div class="card-header">
+                <div class="card-title">通知设置</div>
+                <span class="badge badge-secondary">渠道与频率</span>
+              </div>
+              <div class="card-body">
+                <div class="profile-prefs">
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">📧 邮件通知</div>
+                      <div class="profile-pref__desc">接收会话摘要、订阅到期提醒</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked><span class="switch__slider"></span></label>
+                  </div>
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">💬 IM 推送</div>
+                      <div class="profile-pref__desc">通过飞书/企微推送 Agent 主动通知</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked><span class="switch__slider"></span></label>
+                  </div>
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">🔔 站内消息</div>
+                      <div class="profile-pref__desc">平台内浮层与消息中心提醒</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked><span class="switch__slider"></span></label>
+                  </div>
+                  <div class="profile-pref">
+                    <div class="profile-pref__info">
+                      <div class="profile-pref__title">🌙 勿扰时段</div>
+                      <div class="profile-pref__desc">22:00 - 08:00 不接收非紧急通知</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked><span class="switch__slider"></span></label>
+                  </div>
+                </div>
+
+                <div class="form-grid form-grid--cols2" style="margin-top: 16px;">
+                  <div class="form-group">
+                    <label class="form-label">每日摘要时间</label>
+                    <input type="time" class="form-input" value="09:00" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">摘要频率</label>
+                    <select class="form-input">
+                      <option>每日</option>
+                      <option>每周</option>
+                      <option>仅工作日</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 操作日志 -->
+            <div class="card profile-section" data-section="logs">
+              <div class="card-header">
+                <div class="card-title">操作日志</div>
+                <button class="btn btn-ghost btn-sm">📥 导出</button>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>时间</th>
+                      <th>操作</th>
+                      <th>对象</th>
+                      <th>IP</th>
+                      <th>结果</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-sm">2026-07-15 14:23</td>
+                      <td>登录</td>
+                      <td class="text-sm">—</td>
+                      <td class="text-sm text-tertiary">10.0.1.23</td>
+                      <td><span class="badge badge-success">成功</span></td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm">2026-07-15 10:12</td>
+                      <td>修改偏好</td>
+                      <td class="text-sm">默认模型 → Claude Sonnet 4.5</td>
+                      <td class="text-sm text-tertiary">10.0.1.23</td>
+                      <td><span class="badge badge-success">成功</span></td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm">2026-07-14 18:45</td>
+                      <td>创建 API 凭证</td>
+                      <td class="text-sm">投研工作流</td>
+                      <td class="text-sm text-tertiary">10.0.1.23</td>
+                      <td><span class="badge badge-success">成功</span></td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm">2026-07-14 09:30</td>
+                      <td>订阅专家</td>
+                      <td class="text-sm">风险管理师 v1.8.0</td>
+                      <td class="text-sm text-tertiary">10.0.1.23</td>
+                      <td><span class="badge badge-success">成功</span></td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm">2026-07-13 16:08</td>
+                      <td>删除记忆</td>
+                      <td class="text-sm">mem-old-2024-03</td>
+                      <td class="text-sm text-tertiary">10.0.1.23</td>
+                      <td><span class="badge badge-success">成功</span></td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm">2026-07-13 11:20</td>
+                      <td>登录</td>
+                      <td class="text-sm">—</td>
+                      <td class="text-sm text-tertiary">10.0.1.23</td>
+                      <td><span class="badge badge-danger">失败</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  // Tab 切换交互
+  (function() {
+    var tabs = document.querySelectorAll('.profile-tab');
+    var sections = document.querySelectorAll('.profile-section');
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function(e) {
+        e.preventDefault();
+        var target = tab.getAttribute('data-tab');
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        // 滚动到对应区块
+        sections.forEach(function(s) {
+          if (s.getAttribute('data-section') === target) {
+            s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+    });
+  })();
+</script>
+</body>
+</html>

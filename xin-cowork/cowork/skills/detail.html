@@ -1,0 +1,154 @@
+<!-- ============================================================
+     XIN 信 · CoWork Skill 详情 / 测试页
+     Skill 信息展示 + 执行测试 + 执行历史列表
+     通过 Hash 路由懒加载,仅包含 body 内容
+     路由: #/cowork/skills/<skillId>
+     ============================================================ -->
+<link rel="stylesheet" href="../../assets/css/cowork.css" />
+
+<div class="cowork-main__scroll">
+  <!-- 页面标题 -->
+  <div class="cowork-page-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;">
+    <div>
+      <h2 style="margin:0;font-size:20px;" id="skill-detail-title">Skill 详情</h2>
+      <p class="text-muted" style="margin:4px 0 0;font-size:13px;">查看技能配置,执行测试并浏览历史记录。</p>
+    </div>
+    <div style="display:flex;gap:12px;flex-shrink:0;">
+      <a href="#/cowork/skills" class="btn btn-ghost">返回列表</a>
+      <a href="#/cowork/skills/builder" id="skill-edit-link" class="btn btn-ghost">编辑</a>
+      <button class="btn btn-primary" id="skill-run-btn">执行测试</button>
+    </div>
+  </div>
+
+  <!-- Skill 信息展示 -->
+  <div id="skill-info">
+    <div class="cowork-loading cowork-loading--block">
+      <span class="cowork-loading__spinner"></span>
+      <span>加载中...</span>
+    </div>
+  </div>
+
+  <!-- 测试结果区 -->
+  <div id="skill-test-result" style="margin-top:16px;"></div>
+
+  <!-- 执行历史列表 -->
+  <div id="skill-execution-history" style="margin-top:24px;"></div>
+</div>
+
+<script type="module">
+  import { agentApi } from '../../assets/js/agent-api.js';
+  import { skillEngine } from '../../assets/js/skill-engine.js';
+
+  /** 触发类型中文名 */
+  const TRIGGER_LABELS = {
+    manual: '手动触发',
+    intent: '意图识别',
+    schedule: '定时触发'
+  };
+
+  const infoEl = document.getElementById('skill-info');
+  const resultEl = document.getElementById('skill-test-result');
+  const historyEl = document.getElementById('skill-execution-history');
+
+  /** 当前 Skill ID */
+  let skillId = null;
+
+  /** HTML 转义 */
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** 从 hash 路径中解析 Skill ID (#/cowork/skills/<id>) */
+  function getSkillId() {
+    const match = location.hash.match(/#\/cowork\/skills\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
+  /** 渲染 Skill 信息 */
+  function renderSkillInfo(skill) {
+    const active = skill.is_active !== false;
+    const steps = Array.isArray(skill.config?.steps) ? skill.config.steps : [];
+    document.getElementById('skill-detail-title').textContent = skill.name || 'Skill 详情';
+    document.getElementById('skill-edit-link').href = `#/cowork/skills/builder?id=${skill.id}`;
+    infoEl.innerHTML = `
+      <div class="card"><div class="card-body">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div class="skill-card__icon">⚡</div>
+          <div style="min-width:0;">
+            <div style="font-size:16px;font-weight:600;">${esc(skill.name || '未命名技能')}</div>
+            <span class="badge badge-primary">${esc(skill.category || '未分类')}</span>
+            <span class="badge badge-info">${esc(TRIGGER_LABELS[skill.trigger_type] || skill.trigger_type || '手动触发')}</span>
+            <span class="agent-card__status agent-card__status--${active ? 'active' : 'inactive'}" style="margin-left:8px;">${active ? '已启用' : '已停用'}</span>
+          </div>
+        </div>
+
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px;">描述</div>
+        <p class="text-muted" style="font-size:13px;margin:0 0 16px;">${esc(skill.description || '暂无描述')}</p>
+
+        <div style="font-weight:600;font-size:13px;margin-bottom:8px;">工具链步骤 (${steps.length})</div>
+        <div style="margin-bottom:16px;">
+          ${steps.length
+            ? steps.map((step, i) => `
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px dashed var(--color-border-light);">
+                <span class="badge">${i + 1}</span>
+                <span style="font-weight:500;">${esc(step.name || '未命名步骤')}</span>
+                <span class="text-muted">${esc(step.tool || '')}</span>
+              </div>`).join('')
+            : '<span class="text-muted" style="font-size:13px;">未配置步骤</span>'}
+        </div>
+
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px;">执行代码</div>
+        <pre style="background:var(--cowork-code-bg);color:var(--cowork-code-text);border-radius:var(--radius-md);padding:12px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:0;max-height:240px;overflow-y:auto;">${esc(skill.code || '(未设置)')}</pre>
+      </div></div>`;
+  }
+
+  /** 加载执行历史 */
+  async function loadExecutions() {
+    try {
+      const executions = await agentApi.getSkillExecutions(skillId);
+      skillEngine.renderExecutionHistory(executions, historyEl);
+    } catch (err) {
+      console.error('[CoWork] 加载 Skill 执行历史失败:', err);
+      historyEl.innerHTML = `<div class="alert alert-danger">加载执行历史失败: ${esc(err.message)}</div>`;
+    }
+  }
+
+  /** 执行测试并刷新历史 */
+  document.getElementById('skill-run-btn').addEventListener('click', async () => {
+    if (!skillId) return;
+    resultEl.innerHTML = `
+      <div class="cowork-loading"><span class="cowork-loading__spinner"></span><span>执行中...</span></div>`;
+    try {
+      const result = await skillEngine.executeSkill(skillId, { test: true });
+      skillEngine.renderExecutionResult(result, resultEl);
+      loadExecutions();
+    } catch (err) {
+      console.error('[CoWork] 测试 Skill 失败:', err);
+      resultEl.innerHTML = `<div class="alert alert-danger">执行失败: ${esc(err.message)}</div>`;
+    }
+  });
+
+  /** 加载 Skill 详情 */
+  async function loadSkillDetail() {
+    skillId = getSkillId();
+    if (!skillId) {
+      infoEl.innerHTML = '<div class="alert alert-warning">缺少 Skill ID。</div>';
+      return;
+    }
+    try {
+      const skill = await agentApi.getSkill(skillId);
+      renderSkillInfo(skill);
+      loadExecutions();
+    } catch (err) {
+      console.error('[CoWork] 加载 Skill 详情失败:', err);
+      infoEl.innerHTML = `<div class="alert alert-danger">加载失败: ${esc(err.message)}</div>`;
+    }
+  }
+
+  loadSkillDetail();
+  document.title = 'Skill 详情 · CoWork · XIN';
+</script>

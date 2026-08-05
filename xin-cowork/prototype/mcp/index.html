@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>MCP 集成管理 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item active"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/notifications" class="app-nav-item"><span class="app-nav-item__icon">🔔</span><span class="app-nav-item__label">通知中心</span></a>
+        <a href="#/prototype/im-channels" class="app-nav-item"><span class="app-nav-item__icon">📢</span><span class="app-nav-item__label">IM 通道</span></a>
+        <a href="#/prototype/profile" class="app-nav-item"><span class="app-nav-item__icon">👤</span><span class="app-nav-item__label">用户中心</span></a>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">MCP</div>
+        <a href="#/prototype/mcp" class="app-nav-item active"><span class="app-nav-item__icon">🏪</span><span class="app-nav-item__label">服务市场</span></a>
+        <a href="#/prototype/mcp/connections" class="app-nav-item"><span class="app-nav-item__icon">🔗</span><span class="app-nav-item__label">连接管理</span></a>
+        <a href="#/prototype/admin/audit" class="app-nav-item"><span class="app-nav-item__icon">📜</span><span class="app-nav-item__label">调用日志</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="app-frame__main">
+      <div class="app-frame__body" style="padding: 24px;">
+    <!-- 顶部 -->
+    <div class="flex justify-between items-center" style="margin-bottom: 20px;">
+      <div>
+        <h2 style="margin-bottom: 4px;">MCP 集成管理</h2>
+        <p class="text-sm text-secondary">连接外部系统与工具,扩展智能体能力边界</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm">🔄 刷新状态</button>
+        <button class="btn btn-primary btn-sm">+ 添加 MCP 服务</button>
+      </div>
+    </div>
+
+    <!-- 状态总览 -->
+    <div class="stat-grid" style="margin-bottom: 24px;">
+      <div class="stat-card">
+        <div class="stat-card__label">已连接服务</div>
+        <div class="stat-card__value">6</div>
+        <div class="stat-card__trend stat-card__trend--up">▲ 较上周 +2</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">可用工具数</div>
+        <div class="stat-card__value">42</div>
+        <div class="stat-card__trend stat-card__trend--up">▲ 较上周 +8</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">今日调用次数</div>
+        <div class="stat-card__value">1,284</div>
+        <div class="stat-card__trend stat-card__trend--up">▲ +12%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">平均响应耗时</div>
+        <div class="stat-card__value">280<span class="text-sm text-tertiary"> ms</span></div>
+        <div class="stat-card__trend stat-card__trend--down">▼ -23 ms</div>
+      </div>
+    </div>
+
+    <!-- 筛选条 -->
+    <div data-filter-group class="flex gap-2" style="margin-bottom: 20px; flex-wrap: wrap;">
+      <button class="chip chip-hover active" data-filter="all" style="background: var(--color-primary); color: white; border-color: var(--color-primary);">全部 (8)</button>
+      <button class="chip chip-hover" data-filter="connected">已连接 (6)</button>
+      <button class="chip chip-hover" data-filter="disconnected">未连接 (2)</button>
+      <button class="chip chip-hover" data-filter="数据">数据源</button>
+      <button class="chip chip-hover" data-filter="知识">知识库</button>
+      <button class="chip chip-hover" data-filter="协作">协作工具</button>
+    </div>
+
+    <!-- MCP 服务卡片网格 -->
+    <div class="grid grid-cols-2" style="gap: 16px;">
+
+      <!-- MCP 1: CRM -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon">🎯</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">CRM 客户关系管理</div>
+            <div class="text-xs text-tertiary">Salesforce / 自研 · v2.0.0</div>
+          </div>
+          <span class="badge badge-success mcp-card__status"><span class="status-dot success"></span>已连接</span>
+        </div>
+        <p class="mcp-card__desc">连接企业 CRM 系统,查询客户、商机、合同数据,支持自然语言转结构化查询。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">crm.query</span>
+          <span class="chip">crm.customer.get</span>
+          <span class="chip">crm.opportunity.list</span>
+          <span class="chip">crm.contract.search</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 156 连接</span>
+            <span>⏱ 最近: 2026-07-14 18:23</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">日志</button>
+            <button class="btn btn-outline btn-sm">配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP 2: ERP -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon" style="background: linear-gradient(135deg, #C96500, #FFD700);">🏢</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">ERP 企业资源计划</div>
+            <div class="text-xs text-tertiary">SAP / 用友 / 金蝶 · v1.5.0</div>
+          </div>
+          <span class="badge badge-secondary mcp-card__status"><span class="status-dot"></span>未连接</span>
+        </div>
+        <p class="mcp-card__desc">连接 ERP 系统查询财务、库存、采购、人力资源等数据,实现跨系统数据整合分析。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">erp.finance.query</span>
+          <span class="chip">erp.inventory.get</span>
+          <span class="chip">erp.hr.employee</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 78 连接</span>
+            <span>🔑 API Key</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">详情</button>
+            <button class="btn btn-primary btn-sm install-btn" data-installed="false">连接</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP 3: Wind 数据 -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon" style="background: linear-gradient(135deg, #F97316, #EF4444);">💹</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">Wind 金融数据</div>
+            <div class="text-xs text-tertiary">Wind 资讯 · v3.1.0</div>
+          </div>
+          <span class="badge badge-success mcp-card__status"><span class="status-dot success"></span>已连接</span>
+        </div>
+        <p class="mcp-card__desc">接入 Wind 资讯金融数据接口,获取股票行情、财务数据、宏观数据、行业研究等。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">wind.quote.realtime</span>
+          <span class="chip">wind.finance.history</span>
+          <span class="chip">wind.macro.indicator</span>
+          <span class="chip">wind.research.report</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 234 连接</span>
+            <span>⏱ 最近: 2026-07-15 09:45</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">日志</button>
+            <button class="btn btn-outline btn-sm">配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP 4: 内部研究库 -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon" style="background: linear-gradient(135deg, #FFD700, #FF8C00);">📚</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">内部研究库</div>
+            <div class="text-xs text-tertiary">自研 / Confluence · v1.2.0</div>
+          </div>
+          <span class="badge badge-success mcp-card__status"><span class="status-dot success"></span>已连接</span>
+        </div>
+        <p class="mcp-card__desc">连接企业内部研究文档库,检索历史研究报告、行业研究、内部备忘录等。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">research.search</span>
+          <span class="chip">research.report.get</span>
+          <span class="chip">research.tag.list</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 89 连接</span>
+            <span>⏱ 最近: 2026-07-15 08:12</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">日志</button>
+            <button class="btn btn-outline btn-sm">配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP 5: 飞书协作 -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon" style="background: linear-gradient(135deg, #FF5D00, #C96500);">💬</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">飞书协作套件</div>
+            <div class="text-xs text-tertiary">Lark Suite · v2.3.0</div>
+          </div>
+          <span class="badge badge-success mcp-card__status"><span class="status-dot success"></span>已连接</span>
+        </div>
+        <p class="mcp-card__desc">接入飞书文档、表格、日历、消息,自动同步项目协作与会议信息。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">lark.doc.read</span>
+          <span class="chip">lark.sheet.query</span>
+          <span class="chip">lark.calendar.list</span>
+          <span class="chip">lark.message.send</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 412 连接</span>
+            <span>⏱ 最近: 2026-07-15 09:18</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">日志</button>
+            <button class="btn btn-outline btn-sm">配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP 6: 企业网盘 -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon" style="background: linear-gradient(135deg, #FF8C00, #FF5D00);">💾</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">企业网盘</div>
+            <div class="text-xs text-tertiary">OneDrive / 阿里云盘 · v1.8.0</div>
+          </div>
+          <span class="badge badge-success mcp-card__status"><span class="status-dot success"></span>已连接</span>
+        </div>
+        <p class="mcp-card__desc">连接企业网盘,实现文件自动上传、检索、版本管理与权限校验。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">drive.file.upload</span>
+          <span class="chip">drive.file.search</span>
+          <span class="chip">drive.version.list</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 167 连接</span>
+            <span>⏱ 最近: 2026-07-14 22:01</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">日志</button>
+            <button class="btn btn-outline btn-sm">配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP 7: 邮件服务 -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon" style="background: linear-gradient(135deg, #FF8C00, #FF5D00);">✉</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">企业邮件服务</div>
+            <div class="text-xs text-tertiary">Exchange / 腾讯企业邮 · v1.6.0</div>
+          </div>
+          <span class="badge badge-success mcp-card__status"><span class="status-dot success"></span>已连接</span>
+        </div>
+        <p class="mcp-card__desc">读取与发送企业邮件,支持模板化起草、附件处理、收件人智能匹配。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">mail.send</span>
+          <span class="chip">mail.read</span>
+          <span class="chip">mail.search</span>
+          <span class="chip">mail.draft.save</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 198 连接</span>
+            <span>⏱ 最近: 2026-07-15 07:55</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">日志</button>
+            <button class="btn btn-outline btn-sm">配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP 8: 天眼查 -->
+      <div class="mcp-card">
+        <div class="mcp-card__header">
+          <div class="mcp-card__icon" style="background: linear-gradient(135deg, #64748B, #334155);">🔍</div>
+          <div style="flex: 1;">
+            <div class="mcp-card__title">天眼查企业信息</div>
+            <div class="text-xs text-tertiary">天眼查 · v2.1.0</div>
+          </div>
+          <span class="badge badge-secondary mcp-card__status"><span class="status-dot"></span>未连接</span>
+        </div>
+        <p class="mcp-card__desc">查询企业工商信息、股权结构、法人代表、关联企业、司法风险等数据。</p>
+        <div class="mcp-card__tools">
+          <span class="chip">tianyancha.company.get</span>
+          <span class="chip">tianyancha.shareholder.list</span>
+          <span class="chip">tianyancha.risk.scan</span>
+        </div>
+        <div class="mcp-card__footer">
+          <div class="text-xs text-tertiary">
+            <span style="margin-right: 12px;">👥 124 连接</span>
+            <span>🔑 OAuth2</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm">详情</button>
+            <button class="btn btn-primary btn-sm install-btn" data-installed="false">连接</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 最近调用日志 -->
+    <div style="margin-top: 32px;">
+      <div class="flex justify-between items-center" style="margin-bottom: 16px;">
+        <h3>最近工具调用</h3>
+        <a href="#/prototype/admin" class="text-sm" style="color: var(--color-primary);">查看全部 →</a>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding: 0;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>服务</th>
+                <th>工具</th>
+                <th>调用方</th>
+                <th>耗时</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-sm text-tertiary">09:45:23</td>
+                <td><span class="chip">💹 Wind 金融</span></td>
+                <td><code class="text-sm">wind.finance.history</code></td>
+                <td class="text-sm">投研分析师</td>
+                <td class="text-sm">186 ms</td>
+                <td><span class="badge badge-success">成功</span></td>
+              </tr>
+              <tr>
+                <td class="text-sm text-tertiary">09:33:01</td>
+                <td><span class="chip">💹 Wind 金融</span></td>
+                <td><code class="text-sm">wind.quote.realtime</code></td>
+                <td class="text-sm">投研分析师</td>
+                <td class="text-sm">94 ms</td>
+                <td><span class="badge badge-success">成功</span></td>
+              </tr>
+              <tr>
+                <td class="text-sm text-tertiary">09:18:47</td>
+                <td><span class="chip">💬 飞书协作</span></td>
+                <td><code class="text-sm">lark.doc.read</code></td>
+                <td class="text-sm">会议助手</td>
+                <td class="text-sm">312 ms</td>
+                <td><span class="badge badge-success">成功</span></td>
+              </tr>
+              <tr>
+                <td class="text-sm text-tertiary">08:50:12</td>
+                <td><span class="chip">🎯 CRM</span></td>
+                <td><code class="text-sm">crm.opportunity.list</code></td>
+                <td class="text-sm">销售分析师</td>
+                <td class="text-sm">502 ms</td>
+                <td><span class="badge badge-warning">超时</span></td>
+              </tr>
+              <tr>
+                <td class="text-sm text-tertiary">08:12:39</td>
+                <td><span class="chip">📚 内部研究库</span></td>
+                <td><code class="text-sm">research.search</code></td>
+                <td class="text-sm">投研分析师</td>
+                <td class="text-sm">268 ms</td>
+                <td><span class="badge badge-success">成功</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

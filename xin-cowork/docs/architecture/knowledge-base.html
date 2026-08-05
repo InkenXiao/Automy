@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>知识库与 RAG · 技术架构 · XIN</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/architecture/overview">技术架构</a></li>
+  <li>知识库与 RAG</li>
+</nav>
+
+<h1>知识库与 RAG</h1>
+
+<p class="text-secondary">
+  检索增强生成(RAG)是 XIN 知识库的核心技术,让 Agent 能精准引用企业内部文档,提升回答准确性与可溯源性。
+  本章节面向投资公司高密度文档场景(财报、研报、尽调材料、法规、合同),介绍文档处理流水线、混合检索架构、
+  Embedding 选型、引用溯源设计、增量更新与权限隔离。
+</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">📚</div>
+  <div class="alert__body">
+    <div class="alert__title">设计目标</div>
+    <div class="alert__desc">回答可溯源到文档级 · 多模态文档(表格/图)结构化保留 · 混合检索召回率 &gt;90% · 数据权限按部门/项目隔离</div>
+  </div>
+</div>
+
+<h2>一、RAG 整体架构</h2>
+
+<p>XIN RAG 系统采用「<strong>离线写入 + 在线检索</strong>」双链路设计。离线链路负责文档接入、解析、分块、向量化、入库;
+在线链路负责查询改写、混合检索、重排序、上下文组装、引用生成。两条链路通过共享知识索引解耦,支持文档增量更新不阻塞在线服务。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">XIN RAG 整体架构</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+graph TB
+    subgraph OFF["离线写入链路"]
+        U1["文档上传<br/>(PDF/Word/Excel/PPT)"] --> P1["解析器<br/>(Unstructured/PyMuPDF)"]
+        P1 --> C1["智能分块<br/>(语义边界 + 表格保留)"]
+        C1 --> M1["元数据提取<br/>(标题/作者/日期/标签)"]
+        M1 --> E1["Embedding 生成<br/>(BGE-M3)"]
+        E1 --> V1[("Milvus<br/>向量库")]
+        M1 --> R1[("PostgreSQL<br/>文档/分块表")]
+    end
+    subgraph ON["在线检索链路"]
+        Q1["用户查询<br/>(Agent Query)"] --> QR["查询改写<br/>(Rewrite + HyDE + 多查询)"]
+        QR --> H1["混合检索<br/>(向量 + BM25 + 元数据)"]
+        H1 --> RR["Rerank 重排序<br/>(BGE-Reranker-v2)"]
+        RR --> CX["上下文组装<br/>(Token 预算压缩)"]
+        CX --> LLM["LLM 生成<br/>(Qwen / DeepSeek)"]
+        LLM --> CIT["引用标注<br/>(citations)"]
+    end
+    V1 -.向量召回.-> H1
+    R1 -.元数据过滤/全文.-> H1
+    style OFF fill:#FFE8E0,stroke:#FF5D00
+    style ON fill:#FEF3C7,stroke:#D97706
+    </div>
+  </div>
+</div>
+
+<h2>二、文档处理流水线</h2>
+
+<p>文档处理流水线是 RAG 质量的基石。投资公司文档形式复杂(扫描版财报、含图表的研报、嵌套表格的合同),
+流水线需保留语义结构,避免「分块切断表格」导致信息丢失。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">文档处理流水线(六阶段)</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+flowchart LR
+    A["1.接入<br/>上传/API拉取/邮件附件"] --> B["2.解析<br/>OCR+版面分析+表格抽取"]
+    B --> C["3.分块<br/>语义边界+表格整体+层级标题"]
+    C --> D["4.元数据<br/>标题/作者/日期/分类/权限"]
+    D --> E["5.向量化<br/>BGE-M3 + 多向量索引"]
+    E --> F["6.入库<br/>Milvus + PG + ES 三写"]
+    F --> G{{"状态: parsed"}}
+    B -.失败.-> X{{"状态: failed<br/>告警人工介入"}}
+    style G fill:#FFF8DC,stroke:#FFD700
+    style X fill:#FEE2E2,stroke:#DC2626
+    </div>
+  </div>
+</div>
+
+<h3>2.1 文档解析(关键环节)</h3>
+<table class="table">
+  <thead><tr><th>文档类型</th><th>解析方案</th><th>处理要点</th></tr></thead>
+  <tbody>
+    <tr><td>PDF(数字版)</td><td>PyMuPDF + pdfplumber</td><td>保留书签、表格抽取向量化</td></tr>
+    <tr><td>PDF(扫描版)</td><td>PaddleOCR + 版面分析</td><td>OCR 文字识别 + 表格结构还原</td></tr>
+    <tr><td>Word/Excel</td><td>python-docx / openpyxl</td><td>保留样式、公式、合并单元格</td></tr>
+    <tr><td>PPT</td><td>python-pptx</td><td>按 Slide 分块、保留备注</td></tr>
+    <tr><td>图片(JPG/PNG)</td><td>多模态模型(VLM)</td><td>图表理解生成描述,图像入向量库</td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 智能分块策略</h3>
+<div class="card">
+  <div class="card-body">
+    <p>分块大小直接影响召回精度。XIN 采用「<strong>语义优先 + 兜底窗口</strong>」策略:</p>
+    <ul>
+      <li><strong>语义边界分块</strong>:按段落、标题层级切分,块大小 300-800 tokens</li>
+      <li><strong>表格整体保留</strong>:表格不切分,作为独立 chunk,附加列名摘要</li>
+      <li><strong>重叠窗口</strong>:相邻块保留 50-100 tokens 重叠,避免上下文断裂</li>
+      <li><strong>父子分块</strong>:小块用于检索,父块(含上下文)用于喂给 LLM</li>
+      <li><strong>层级标题路径</strong>:每块携带 H1/H2/H3 路径,辅助理解</li>
+    </ul>
+  </div>
+</div>
+
+<h2>三、混合检索架构</h2>
+
+<p>单一向量检索在精确匹配(股票代码、法规编号、合同条款号)场景表现差,
+单一关键词检索无法理解语义。XIN 采用<strong>三路混合 + 重排序</strong>架构,综合语义、关键词、元数据三维信息。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">混合检索架构(三路并行 + Rerank)</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+flowchart TB
+    Q["用户查询"] --> QR["查询改写<br/>1. Rewrite 同义扩展<br/>2. HyDE 假设答案<br/>3. Multi-Query 多视角"]
+    QR --> P1["路径1: 向量检索<br/>(Dense, BGE-M3)"]
+    QR --> P2["路径2: BM25 关键词<br/>(Elasticsearch)"]
+    QR --> P3["路径3: 元数据过滤<br/>(部门/项目/标签/日期)"]
+    P1 --> RRF["RRF 倒数排名融合<br/>(Reciprocal Rank Fusion)"]
+    P2 --> RRF
+    P3 -->|作为预过滤| P1
+    P3 -->|作为预过滤| P2
+    RRF --> TOP["Top-K=50 候选"]
+    TOP --> RER["Rerank 精排<br/>(BGE-Reranker-v2-m3)<br/>Cross-Encoder"]
+    RER --> FINAL["Top-N=5 最终"]
+    FINAL --> DEDUP["去重 + 权限校验"]
+    style RRF fill:#FEF3C7,stroke:#D97706
+    style RER fill:#FFE4D0,stroke:#C96500
+    </div>
+  </div>
+</div>
+
+<h3>3.1 检索策略对比</h3>
+<table class="table">
+  <thead><tr><th>策略</th><th>原理</th><th>优势</th><th>短板</th><th>适用场景</th></tr></thead>
+  <tbody>
+    <tr><td>向量检索(Dense)</td><td>Embedding 余弦相似度</td><td>理解语义、抗拼写误差</td><td>精确匹配弱</td><td>语义相似查询</td></tr>
+    <tr><td>BM25(Sparse)</td><td>TF-IDF 改进</td><td>精确匹配、术语命中</td><td>无法理解同义</td><td>代码、股票代码、法规号</td></tr>
+    <tr><td>元数据过滤</td><td>结构化字段筛选</td><td>权限隔离、范围限定</td><td>不能解决语义</td><td>权限控制、时间范围</td></tr>
+    <tr><td>RRF 融合</td><td>排名倒数加权</td><td>无需调参、综合两路</td><td>需精排补充</td><td>默认召回策略</td></tr>
+    <tr><td>Cross-Encoder Rerank</td><td>Query-Doc 联合编码</td><td>精度最高</td><td>计算开销大</td><td>Top-K 精排</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 查询改写(提升召回)</h3>
+<div class="card">
+  <div class="card-body">
+    <ul>
+      <li><strong>Query Rewriting</strong>:LLM 改写用户口语化查询为规范化检索 query,扩展同义词</li>
+      <li><strong>HyDE(Hypothetical Document Embedding)</strong>:先让 LLM 生成假设性答案,用答案向量检索(适合长尾问题)</li>
+      <li><strong>Multi-Query</strong>:LLM 生成 3-5 个不同视角的子查询,并行检索后融合</li>
+      <li><strong>查询路由</strong>:根据查询类型(事实型/分析型/列表型)选择不同检索参数</li>
+    </ul>
+  </div>
+</div>
+
+<h2>四、Embedding 模型选型</h2>
+
+<p>Embedding 模型决定向量检索上限。XIN 私有化部署,需在「中文效果 + 多语言 + 部署成本」之间平衡。</p>
+
+<table class="table">
+  <thead><tr><th>模型</th><th>维度</th><th>中文</th><th>多语言</th><th>长度</th><th>许可</th><th>推荐场景</th></tr></thead>
+  <tbody>
+    <tr><td><strong>BGE-M3</strong></td><td>1024</td><td>⭐⭐⭐⭐⭐</td><td>✓(100+ 语言)</td><td>8192</td><td>MIT</td><td><span class="badge badge-success">默认选型</span> 投研文档</td></tr>
+    <tr><td>BGE-large-zh-v1.5</td><td>1024</td><td>⭐⭐⭐⭐⭐</td><td>✗</td><td>512</td><td>MIT</td><td>纯中文场景</td></tr>
+    <tr><td>m3e-base</td><td>768</td><td>⭐⭐⭐⭐</td><td>弱</td><td>512</td><td>Apache-2.0</td><td>通用中文</td></tr>
+    <tr><td>text-embedding-3-large</td><td>3072</td><td>⭐⭐⭐⭐</td><td>✓</td><td>8192</td><td>商用 API</td><td><span class="badge badge-warning">不可用</span> 私有化禁用</td></tr>
+    <tr><td>GTE-Qwen2-7B</td><td>3584</td><td>⭐⭐⭐⭐⭐</td><td>✓</td><td>32K</td><td>Apache-2.0</td><td>长文档、高资源</td></tr>
+  </tbody>
+</table>
+
+<div class="alert alert-success">
+  <div class="alert__icon">✅</div>
+  <div class="alert__body">
+    <div class="alert__title">选型决策:BGE-M3</div>
+    <div class="alert__desc">支持稠密向量 + 稀疏向量 + 多向量三合一,长文本 8192 tokens,中文 MTEB 排名前列,MIT 许可可商用,显存占用 ~2GB,适合单卡部署。</div>
+  </div>
+</div>
+
+<h2>五、引用溯源设计</h2>
+
+<p>引用溯源是投资公司 RAG 的硬性要求:分析师撰写报告时,每个数据点必须可追溯到原始文档与页码,便于复核与合规审计。
+XIN 设计了「<strong>块级 + 页级 + 文档级</strong>」三级引用标注。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">引用溯源数据结构</span>
+  </div>
+  <div class="card-body">
+    <div class="code-block">
+<pre><code>{
+  <span class="token-property">"answer"</span>: <span class="token-string">"ABC新能源 2025 年营收 12 亿元,同比增长 35%,主要受益于动力电池出货量提升[1][2]..."</span>,
+  <span class="token-property">"citations"</span>: [
+    {
+      <span class="token-property">"ref_id"</span>: <span class="token-number">1</span>,
+      <span class="token-property">"text"</span>: <span class="token-string">"营收 12 亿元,同比增长 35%"</span>,
+      <span class="token-property">"source"</span>: {
+        <span class="token-property">"document_id"</span>: <span class="token-string">"doc-2025-abc-financial"</span>,
+        <span class="token-property">"document_title"</span>: <span class="token-string">"ABC新能源_2025年度财报.pdf"</span>,
+        <span class="token-property">"page"</span>: <span class="token-number">12</span>,
+        <span class="token-property">"chunk_id"</span>: <span class="token-string">"chunk-0048"</span>,
+        <span class="token-property">"bbox"</span>: { <span class="token-property">"x"</span>: <span class="token-number">120</span>, <span class="token-property">"y"</span>: <span class="token-number">340</span>, <span class="token-property">"w"</span>: <span class="token-number">280</span>, <span class="token-property">"h"</span>: <span class="token-number">45</span> },
+        <span class="token-property">"confidence"</span>: <span class="token-number">0.94</span>,
+        <span class="token-property">"access_level"</span>: <span class="token-string">"L3 机密"</span>
+      }
+    },
+    {
+      <span class="token-property">"ref_id"</span>: <span class="token-number">2</span>,
+      <span class="token-property">"text"</span>: <span class="token-string">"动力电池出货量同比 +48%"</span>,
+      <span class="token-property">"source"</span>: {
+        <span class="token-property">"document_id"</span>: <span class="token-string">"doc-2025-battery-research"</span>,
+        <span class="token-property">"document_title"</span>: <span class="token-string">"动力电池行业研究报告.docx"</span>,
+        <span class="token-property">"page"</span>: <span class="token-number">8</span>,
+        <span class="token-property">"chunk_id"</span>: <span class="token-string">"chunk-0213"</span>,
+        <span class="token-property">"confidence"</span>: <span class="token-number">0.89</span>,
+        <span class="token-property">"access_level"</span>: <span class="token-string">"L2 内部"</span>
+      }
+    }
+  ],
+  <span class="token-property">"meta"</span>: {
+    <span class="token-property">"retrieval_latency_ms"</span>: <span class="token-number">187</span>,
+    <span class="token-property">"rerank_latency_ms"</span>: <span class="token-number">312</span>,
+    <span class="token-property">"total_chunks_retrieved"</span>: <span class="token-number">5</span>
+  }
+}</code></pre>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">引用展示交互流程</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+sequenceDiagram
+    participant U as 用户
+    participant F as 前端
+    participant A as Agent
+    participant R as RAG 服务
+    participant L as LLM
+    U->>F: 提问"ABC 新能源营收?"
+    F->>A: 转发查询
+    A->>R: 检索(query)
+    R-->>A: 返回 Top-5 chunks + 元数据
+    A->>L: 生成回答(带 [n] 标注)
+    L-->>A: answer + 引用映射
+    A-->>F: 渲染回答 + 引用脚注
+    F->>U: 显示带超链接的 [1][2]
+    U->>F: 点击 [1]
+    F->>R: 获取 chunk 详情 + bbox
+    R-->>F: 返回文档预览片段
+    F->>U: 弹窗高亮原文(页 12,表格区域)
+    </div>
+  </div>
+</div>
+
+<h2>六、增量更新与索引维护</h2>
+
+<p>文档会更新、修订、废止。RAG 系统必须支持增量更新,避免「全量重建」带来的服务中断与算力浪费。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">文档增量更新流程</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+flowchart LR
+    N["新版本文档上传"] --> HASH["内容哈希比对<br/>(SHA-256)"]
+    HASH -->|哈希一致| SKIP["跳过,无需更新"]
+    HASH -->|哈希变化| DIFF["Diff 计算<br/>变更分块识别"]
+    DIFF --> DEL["删除旧分块向量<br/>(Milvus delete by filter)"]
+    DEL --> ADD["新分块入向量库 + PG"]
+    ADD --> UPD{{"状态: reparsed"}}
+    ADD --> NOTIFY["通知相关 Agent<br/>记忆失效"]
+    style SKIP fill:#E5E7EB,stroke:#6B7280
+    style UPD fill:#FFF8DC,stroke:#FFD700
+    style NOTIFY fill:#FEF3C7,stroke:#D97706
+    </div>
+  </div>
+</div>
+
+<h2>七、权限隔离设计</h2>
+
+<p>投资公司文档高度敏感(未公开的尽调材料、内部研究),RAG 检索必须强制按权限过滤,避免越权访问。
+XIN 在<strong>检索前预过滤</strong>(而非检索后过滤),保证低权限用户无法接触到敏感向量。</p>
+
+<table class="table">
+  <thead><tr><th>维度</th><th>过滤机制</th><th>实现</th></tr></thead>
+  <tbody>
+    <tr><td>部门</td><td>用户部门 ↔ 文档部门</td><td>Milvus metadata filter: dept_id IN (用户部门+祖先)</td></tr>
+    <tr><td>项目</td><td>项目成员 ↔ 文档项目</td><td>project_id IN (用户参与项目列表)</td></tr>
+    <tr><td>密级</td><td>用户密级 ≥ 文档密级</td><td>access_level &lt;= user_clearance</td></tr>
+    <tr><td>角色</td><td>RBAC 资源权限</td><td>PG ACL 表查询</td></tr>
+    <tr><td>时间</td><td>临时授权窗口</td><td>auth_window 字段校验</td></tr>
+  </tbody>
+</table>
+
+<h2>八、技术选型汇总</h2>
+
+<table class="table">
+  <thead><tr><th>组件</th><th>选型</th><th>版本</th><th>选型理由</th></tr></thead>
+  <tbody>
+    <tr><td>向量数据库</td><td>Milvus</td><td>2.4.x</td><td>分布式、十亿级向量、IVF/HNSW 索引</td></tr>
+    <tr><td>文档解析</td><td>Unstructured + PyMuPDF + PaddleOCR</td><td>latest</td><td>多格式 + 扫描件 OCR + 表格抽取</td></tr>
+    <tr><td>Embedding</td><td>BGE-M3</td><td>1.0</td><td>中英多语言、8192 长文本、三合一向量</td></tr>
+    <tr><td>重排序</td><td>BGE-Reranker-v2-m3</td><td>latest</td><td>Cross-Encoder、多语言、精度领先</td></tr>
+    <tr><td>关键词检索</td><td>Elasticsearch</td><td>8.x</td><td>BM25、中文分词(IK)、分布式</td></tr>
+    <tr><td>元数据存储</td><td>PostgreSQL</td><td>15+</td><td>JSONB、外键关联、事务一致性</td></tr>
+    <tr><td>融合策略</td><td>RRF(Reciprocal Rank Fusion)</td><td>-</td><td>无需调参、鲁棒性强</td></tr>
+  </tbody>
+</table>
+
+<h2>九、业务场景示例:投研尽调</h2>
+
+<details class="collapse" open>
+  <summary><span>📋 场景:分析师撰写「ABC 新能源」尽调报告</span></summary>
+  <div class="collapse__body">
+    <ol>
+      <li>分析师提问:「ABC 新能源近三年毛利率变化趋势及驱动因素?」</li>
+      <li>查询改写:扩展为「ABC 新能源 毛利率 2022 2023 2024 2025 同比 变动 原因」</li>
+      <li>三路检索:向量(语义相似) + BM25(精确年份/科目) + 元数据(部门=投研、密级≤L3)</li>
+      <li>RRF 融合 Top-50 → Rerank 精排 Top-5(财报 + 研报 + 行业数据)</li>
+      <li>LLM 生成带 [1][2][3] 引用的分析,每个数据点带文档+页码</li>
+      <li>分析师点击 [1] 验证 → 弹出 ABC 财报第 12 页原文高亮</li>
+      <li>导出报告时,引用自动转为脚注,符合合规审计要求</li>
+    </ol>
+  </div>
+</details>
+
+<div class="alert alert-warning">
+  <div class="alert__icon">⚠</div>
+  <div class="alert__body">
+    <div class="alert__title">已知的局限与对策</div>
+    <div class="alert__desc">
+      <strong>表格复杂场景</strong>:跨页大表分块易丢失结构 → 父子分块 + 表格摘要补充<br/>
+      <strong>多模态图表</strong>:折线图/柱状图数据无法精确召回 → VLM 生成图表描述入向量库<br/>
+      <strong>长文档全局语义</strong>:单块检索缺乏全局视角 → 文档级摘要单独索引
+    </div>
+  </div>
+</div>
+
+<h2>下一章</h2>
+<p><a href="#/docs/architecture/security" class="card-link">安全与合规 →</a></p>
+
+<script>
+  (function() {
+    function initMermaid() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+      try { window.mermaid.run({ querySelector: '.mermaid' }); } catch(e) { console.error('mermaid render error:', e); }
+    }
+    if (window.mermaid) { initMermaid(); }
+    else {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+      s.onload = initMermaid;
+      document.head.appendChild(s);
+    }
+  })();
+</script>
+</body>
+</html>

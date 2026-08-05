@@ -8,11 +8,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
 from app.routers import (
+    agents,
     meetings,
     modules,
     phases,
     progress_tasks,
     projects,
+    skills,
     weekly_reports,
     work_tasks,
 )
@@ -29,8 +31,14 @@ class NoCacheStaticFiles(StaticFiles):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期: 启动时初始化数据库"""
+    """应用生命周期: 启动时初始化数据库 + 预置 Agent"""
     await init_db()
+    # 预置四大智能体
+    from app.database import AsyncSessionLocal
+    from app.services.agent_presets import seed_preset_agents
+    async with AsyncSessionLocal() as session:
+        await seed_preset_agents(session)
+        await session.commit()
     yield
 
 
@@ -46,11 +54,13 @@ app.add_middleware(
 
 # 注册 API 路由 (统一前缀 /api)
 for router in [
+    agents.router,
     meetings.router,
     modules.router,
     phases.router,
     progress_tasks.router,
     projects.router,
+    skills.router,
     weekly_reports.router,
     work_tasks.router,
 ]:

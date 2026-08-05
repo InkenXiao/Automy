@@ -1,0 +1,129 @@
+<!-- ============================================================
+     XIN 信 · CoWork 会话历史页
+     Agent 筛选 + 会话列表(标题 / Agent名 / 时间 / 消息数 / 操作)
+     通过 Hash 路由懒加载,仅包含 body 内容
+     ============================================================ -->
+<link rel="stylesheet" href="../../assets/css/cowork.css" />
+
+<div class="cowork-main__scroll">
+  <!-- 页面标题 -->
+  <div class="cowork-page-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;">
+    <div>
+      <h2 style="margin:0;font-size:20px;">会话历史</h2>
+      <p class="text-muted" style="margin:4px 0 0;font-size:13px;">浏览各 Agent 的历史会话,随时继续对话。</p>
+    </div>
+    <!-- Agent 筛选下拉 -->
+    <select id="session-agent-filter" class="builder-form__select" style="width:auto;min-width:200px;" aria-label="按 Agent 筛选">
+      <option value="">全部 Agent</option>
+    </select>
+  </div>
+
+  <!-- 会话列表 -->
+  <div id="session-list">
+    <div class="cowork-loading cowork-loading--block">
+      <span class="cowork-loading__spinner"></span>
+      <span>加载中...</span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { agentApi } from '../../assets/js/agent-api.js';
+
+  const listEl = document.getElementById('session-list');
+  const filterEl = document.getElementById('session-agent-filter');
+
+  /** 全部会话(扁平化,带 Agent 信息) */
+  let allSessions = [];
+
+  /** HTML 转义 */
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** 格式化时间 */
+  function formatTime(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN');
+  }
+
+  /** 加载 Agent 列表及各 Agent 的会话 */
+  async function loadSessions() {
+    listEl.innerHTML = `
+      <div class="cowork-loading cowork-loading--block">
+        <span class="cowork-loading__spinner"></span>
+        <span>加载中...</span>
+      </div>`;
+    try {
+      const agents = await agentApi.getAgents();
+      // 填充 Agent 筛选下拉
+      (Array.isArray(agents) ? agents : []).forEach((a) => {
+        const option = document.createElement('option');
+        option.value = a.id;
+        option.textContent = a.name || `Agent #${a.id}`;
+        filterEl.appendChild(option);
+      });
+      // 汇总各 Agent 的会话
+      const groups = await Promise.all(
+        (Array.isArray(agents) ? agents : []).map(async (agent) => {
+          try {
+            const sessions = await agentApi.getSessions(agent.id);
+            return { agent, sessions: Array.isArray(sessions) ? sessions : [] };
+          } catch (e) {
+            return { agent, sessions: [] };
+          }
+        })
+      );
+      allSessions = groups.flatMap((g) =>
+        g.sessions.map((s) => ({ ...s, agentName: g.agent.name || `Agent #${g.agent.id}`, agentId: g.agent.id }))
+      );
+      // 按更新时间倒序
+      allSessions.sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+      renderSessions();
+    } catch (err) {
+      console.error('[CoWork] 加载会话历史失败:', err);
+      listEl.innerHTML = `<div class="alert alert-danger">加载失败: ${esc(err.message)}</div>`;
+    }
+  }
+
+  /** 渲染会话列表(按当前筛选条件) */
+  function renderSessions() {
+    const filterId = filterEl.value;
+    const sessions = filterId
+      ? allSessions.filter((s) => String(s.agentId) === String(filterId))
+      : allSessions;
+    if (sessions.length === 0) {
+      listEl.innerHTML = `
+        <div class="cowork-empty">
+          <div class="cowork-empty__icon">💬</div>
+          <div class="cowork-empty__title">暂无会话</div>
+          <div class="cowork-empty__desc">当前筛选条件下没有会话记录,去工作台发起新对话吧。</div>
+          <a href="#/cowork/workspace" class="btn btn-primary">前往工作台</a>
+        </div>`;
+      return;
+    }
+    listEl.innerHTML = `
+      <div class="card"><div class="card-body" style="padding:0;">
+        ${sessions.map((s) => `
+          <div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--color-border-light);">
+            <span style="font-size:18px;flex-shrink:0;">💬</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.title || '未命名会话')}</div>
+              <div class="text-muted" style="font-size:12px;">${esc(s.agentName)} · ${esc(formatTime(s.updated_at || s.created_at))}</div>
+            </div>
+            <span class="badge" style="flex-shrink:0;">${s.message_count ?? s.messageCount ?? '—'} 条消息</span>
+            <a class="btn btn-ghost btn-sm" style="flex-shrink:0;" href="#/cowork/workspace">继续对话</a>
+          </div>`).join('')}
+      </div></div>`;
+  }
+
+  filterEl.addEventListener('change', renderSessions);
+
+  loadSessions();
+  document.title = '会话历史 · CoWork · XIN';
+</script>

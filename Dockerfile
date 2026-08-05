@@ -1,8 +1,10 @@
 # ============================================================
-# XIN-AI 三合一容器镜像 (开发模式: 源码挂载, 改代码无需 rebuild)
+# XIN-AI 五合一容器镜像 (开发模式: 源码挂载, 改代码无需 rebuild)
 #   xin-site  : 8087  (Vite dev 热更新)
 #   pro-site  : 8088  (FastAPI + uvicorn --reload)
 #   abs-site  : 8089  (FastAPI + uvicorn --reload)
+#   xin-cowork: 8090  (Vite dev 热更新)
+#   pro-cowork: 8091  (FastAPI + uvicorn --reload, 智能体平台)
 #
 # 镜像只安装运行时和依赖, 源码通过 docker-compose 卷挂载
 # 仅当依赖变更 (requirements.txt / package.json) 时才需重新 build
@@ -48,12 +50,15 @@ WORKDIR /app
 
 # ---------- 1. 安装 Python 依赖 (只 COPY requirements.txt, 源码运行时挂载) ----------
 # abs-site 共用 pro-site 的依赖 (均为 FastAPI + SQLAlchemy + Pydantic)
+# pro-cowork 额外依赖 openai (智能体 LLM 调用), 单独安装
 # 显式指定清华镜像, 避免 pip.conf 在某些版本不生效
 COPY pro-site/requirements.txt /tmp/requirements.txt
+COPY pro-cowork/requirements.txt /tmp/requirements-cowork.txt
 RUN python -m venv /app/venv \
     && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip \
     && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements.txt \
-    && rm /tmp/requirements.txt
+    && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements-cowork.txt \
+    && rm /tmp/requirements.txt /tmp/requirements-cowork.txt
 
 ENV PATH="/app/venv/bin:$PATH"
 
@@ -62,11 +67,14 @@ ENV PATH="/app/venv/bin:$PATH"
 COPY xin-site/package.json xin-site/package-lock.json* /app/xin-site/
 RUN cd /app/xin-site && npm install
 
+COPY xin-cowork/package.json xin-cowork/package-lock.json* /app/xin-cowork/
+RUN cd /app/xin-cowork && npm install
+
 # ---------- 3. 入口脚本 ----------
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-EXPOSE 8087 8088 8089
+EXPOSE 8087 8088 8089 8090 8091
 RUN mkdir -p /app/logs
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

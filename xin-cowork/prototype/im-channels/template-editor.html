@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>通知模板编辑器 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">IM 通道</span>
+        <button class="app-sidebar__new" title="新增模板">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/notifications" class="app-nav-item"><span class="app-nav-item__icon">🔔</span><span class="app-nav-item__label">通知中心</span></a>
+        <a href="#/prototype/im-channels" class="app-nav-item active"><span class="app-nav-item__icon">📢</span><span class="app-nav-item__label">IM 通道</span></a>
+        <a href="#/prototype/profile" class="app-nav-item"><span class="app-nav-item__icon">👤</span><span class="app-nav-item__label">用户中心</span></a>
+<a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">通道管理</div>
+        <a href="#/prototype/im-channels" class="app-nav-item"><span class="app-nav-item__icon">🔗</span><span class="app-nav-item__label">通道配置</span></a>
+        <a href="#/prototype/im-channels/template-editor" class="app-nav-item active"><span class="app-nav-item__icon">📝</span><span class="app-nav-item__label">通知模板</span></a>
+        <a href="#/prototype/im-channels/reminder-rules" class="app-nav-item"><span class="app-nav-item__icon">⏰</span><span class="app-nav-item__label">主动提醒规则</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div>
+          <div class="app-topbar__title">通知模板编辑器</div>
+          <div class="text-xs text-tertiary">任务完成通知 · 草稿 v1.3 · 自动保存于 09:42</div>
+        </div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">↩ 版本回滚</button>
+          <button class="btn btn-outline btn-sm">💾 保存草稿</button>
+          <button class="btn btn-primary btn-sm">发布 v1.4</button>
+        </div>
+      </div>
+
+      <div style="padding: 20px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb" style="margin-bottom: 16px;">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/im-channels">IM 通道</a></li>
+          <li>通知模板</li>
+        </ul>
+
+        <div class="grid" style="grid-template-columns: 220px 1fr; gap: 16px;">
+
+          <!-- 左侧:模板列表 -->
+          <aside class="card" style="height: fit-content;">
+            <div class="card-header"><div class="card-title text-sm">模板列表</div></div>
+            <div class="card-body" style="padding: 6px;">
+              <a class="app-nav-item active" style="display:flex;"><span class="app-nav-item__icon">✅</span><span class="app-nav-item__label">任务完成通知</span></a>
+              <a class="app-nav-item" style="display:flex;"><span class="app-nav-item__icon">⏰</span><span class="app-nav-item__label">会议提醒</span></a>
+              <a class="app-nav-item" style="display:flex;"><span class="app-nav-item__icon">📋</span><span class="app-nav-item__label">审批待办</span></a>
+              <a class="app-nav-item" style="display:flex;"><span class="app-nav-item__icon">📄</span><span class="app-nav-item__label">文档更新</span></a>
+              <a class="app-nav-item" style="display:flex;"><span class="app-nav-item__icon">📊</span><span class="app-nav-item__label">周报提醒</span></a>
+              <button class="btn btn-ghost btn-sm" style="width:100%; margin-top:6px;">+ 新建模板</button>
+            </div>
+          </aside>
+
+          <!-- 右侧编辑区 -->
+          <div>
+            <!-- 基本信息 -->
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-header"><div class="card-title">基本信息</div></div>
+              <div class="card-body">
+                <div class="grid grid-cols-3" style="gap: 12px;">
+                  <div>
+                    <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">模板名</label>
+                    <input class="input" value="任务完成通知" style="width:100%;" />
+                  </div>
+                  <div>
+                    <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">触发场景</label>
+                    <select class="select" style="width:100%;"><option>任务完成</option><option>会议开始</option><option>审批待办</option><option>文档更新</option></select>
+                  </div>
+                  <div>
+                    <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">适用渠道(多选)</label>
+                    <div class="flex gap-3" style="padding-top:6px;">
+                      <label class="checkbox"><input type="checkbox" checked> 飞书</label>
+                      <label class="checkbox"><input type="checkbox" checked> 企微</label>
+                      <label class="checkbox"><input type="checkbox"> 钉钉</label>
+                      <label class="checkbox"><input type="checkbox" checked> 站内信</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 标题与正文模板 -->
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-header"><div class="card-title">模板内容</div><span class="badge badge-secondary">变量用 {{}} 包裹</span></div>
+              <div class="card-body">
+                <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">标题模板</label>
+                <input class="input" value="{{task_name}} 已完成" style="width:100%; font-family: var(--font-mono); margin-bottom: 12px;" />
+                <label class="text-xs text-tertiary" style="display:block; margin-bottom:4px;">正文模板</label>
+                <textarea class="textarea" style="width:100%; font-family: var(--font-mono); min-height: 100px;">您好 {{user_name}},您于 {{created_at}} 提交的任务「{{task_name}}」已完成,耗时 {{duration}},消耗 {{tokens}} tokens。点击查看完整结果:{{report_url}}</textarea>
+              </div>
+            </div>
+
+            <!-- 变量列表 -->
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-header"><div class="card-title">变量列表</div></div>
+              <div class="card-body" style="padding: 0;">
+                <table class="table">
+                  <thead><tr><th>变量名</th><th>说明</th><th>示例值</th></tr></thead>
+                  <tbody>
+                    <tr><td><code class="text-sm">{{task_name}}</code></td><td class="text-sm">任务名称</td><td class="text-sm text-tertiary">ABC新能源尽调报告</td></tr>
+                    <tr><td><code class="text-sm">{{user_name}}</code></td><td class="text-sm">提交人姓名</td><td class="text-sm text-tertiary">张三</td></tr>
+                    <tr><td><code class="text-sm">{{created_at}}</code></td><td class="text-sm">任务提交时间</td><td class="text-sm text-tertiary">2026-07-15 09:32</td></tr>
+                    <tr><td><code class="text-sm">{{duration}}</code></td><td class="text-sm">任务耗时</td><td class="text-sm text-tertiary">12 分 30 秒</td></tr>
+                    <tr><td><code class="text-sm">{{tokens}}</code></td><td class="text-sm">消耗 token 数</td><td class="text-sm text-tertiary">8,432</td></tr>
+                    <tr><td><code class="text-sm">{{report_url}}</code></td><td class="text-sm">报告访问链接</td><td class="text-sm text-tertiary">https://automy.cn/r/abc123</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 渠道预览 -->
+            <div class="grid grid-cols-3" style="gap: 16px; margin-bottom: 16px;">
+              <!-- 飞书卡片预览 -->
+              <div class="card">
+                <div class="card-header"><div class="card-title text-sm">💬 飞书卡片预览</div></div>
+                <div class="card-body">
+                  <div style="border:1px solid var(--color-border); border-radius:8px; overflow:hidden;">
+                    <div style="background: var(--color-primary); color:white; padding:10px 12px; font-weight:600; font-size:13px;">ABC新能源尽调报告 已完成</div>
+                    <div style="padding:12px; font-size:12px; line-height:1.6; color: var(--color-text-secondary);">
+                      您好 张三,您于 2026-07-15 09:32 提交的任务「ABC新能源尽调报告」已完成,耗时 12 分 30 秒,消耗 8,432 tokens。
+                    </div>
+                    <div style="padding:0 12px 12px;">
+                      <button style="background: var(--color-primary); color:white; border:none; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer;">📄 查看报告</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 企微卡片预览 -->
+              <div class="card">
+                <div class="card-header"><div class="card-title text-sm">📱 企微卡片预览</div></div>
+                <div class="card-body">
+                  <div style="border:1px solid var(--color-border); border-radius:8px; overflow:hidden;">
+                    <div style="background: linear-gradient(135deg, #FFD700, #FF8C00); color:white; padding:10px 12px; font-weight:600; font-size:13px;">✅ ABC新能源尽调报告 已完成</div>
+                    <div style="padding:12px; font-size:12px; line-height:1.6; color: var(--color-text-secondary);">
+                      您好 张三,任务「ABC新能源尽调报告」已完成,耗时 12 分 30 秒,消耗 8,432 tokens。
+                    </div>
+                    <div style="padding:0 12px 12px;">
+                      <button style="background: var(--color-success); color:white; border:none; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer;">查看报告 →</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 站内信预览 -->
+              <div class="card">
+                <div class="card-header"><div class="card-title text-sm">✉ 站内信预览</div></div>
+                <div class="card-body">
+                  <div style="border:1px solid var(--color-border); border-radius:8px; padding:12px;">
+                    <div class="font-medium" style="font-size:13px; margin-bottom:6px;">ABC新能源尽调报告 已完成</div>
+                    <div style="font-size:12px; line-height:1.6; color: var(--color-text-secondary);">
+                      您好 张三,您于 2026-07-15 09:32 提交的任务「ABC新能源尽调报告」已完成,耗时 12 分 30 秒,消耗 8,432 tokens。点击查看完整结果。
+                    </div>
+                    <div class="text-xs text-tertiary" style="margin-top:8px; border-top:1px solid var(--color-border-light); padding-top:6px;">2 分钟前 · 站内信</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 试发与保存 -->
+            <div class="card">
+              <div class="card-header"><div class="card-title">试发 & 发布</div></div>
+              <div class="card-body">
+                <div class="flex gap-2 items-center" style="margin-bottom: 12px;">
+                  <select class="select" style="min-width: 220px;"><option>张三 · 投研部 (zhangsan@automy.cn)</option><option>李四 · 法务部</option><option>王五 · 合规部</option></select>
+                  <select class="select"><option>飞书</option><option>企业微信</option><option>站内信</option></select>
+                  <button class="btn btn-outline btn-sm">📤 试发</button>
+                  <span class="text-xs text-tertiary">最近试发:09:40 · 成功</span>
+                </div>
+                <div class="flex gap-2" style="border-top:1px solid var(--color-border-light); padding-top:12px;">
+                  <button class="btn btn-primary btn-sm">💾 保存并发布</button>
+                  <button class="btn btn-ghost btn-sm">↩ 回滚至 v1.2</button>
+                  <span class="text-xs text-tertiary" style="align-self:center;">版本历史:v1.3(当前) · v1.2 · v1.1 · v1.0</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

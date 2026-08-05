@@ -1,0 +1,372 @@
+"""工作台任务路由 · 项目 × 文件 × 智能体 × 技能 组合执行 (SSE)"""
+import json
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models.agent import Agent, AgentMemory, AgentMessage, AgentSession
+from app.models.task_run import TaskRun
+from app.schemas.task_run import TaskRunContinue, TaskRunCreate, TaskRunOut
+from app.utils import get_active_project_id
+
+router = APIRouter(prefix="/task-runs", tags=["工作台任务"])
+
+# 任务附件存储目录: pro-cowork/data/task_files/<project_id>/<filename>
+UPLOAD_ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "task_files"
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_FILE_CONTENT_CHARS = 20000   # 注入提示词的文件内容上限
+
+
+def _safe_filename(name: str) -> str:
+    """去除路径分隔符, 防目录穿越"""
+    return Path(name).name
+
+
+def _project_upload_dir(project_id: Optional[int]) -> Path:
+    d = UPLOAD_ROOT / str(project_id or 0)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _read_file(project_id: Optional[int], filename: str) -> str:
+    path = _project_upload_dir(project_id) / _safe_filename(filename)
+    if not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")[:MAX_FILE_CONTENT_CHARS]
+    except Exception:
+        return ""
+
+
+# ---------- 任务附件 ----------
+
+@router.post("/files/upload")
+async def upload_file(
+    project_id: Optional[int] = None,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传任务附件 (按项目分目录存储)"""
+    pid = project_id or await get_active_project_id(db)
+    name = _safe_filename(file.filename or "unnamed")
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="文件过大 (限制 5MB)")
+    path = _project_upload_dir(pid) / name
+    path.write_bytes(content)
+    return {"ok": True, "name": name, "size": len(content)}
+
+
+@router.get("/files/list")
+async def list_files(
+    project_id: Optional[int] = None, db: AsyncSession = Depends(get_db)
+):
+    """列出项目已上传的任务附件"""
+    pid = project_id or await get_active_project_id(db)
+    d = _project_upload_dir(pid)
+    return [
+        {"name": f.name, "size": f.stat().st_size}
+        for f in sorted(d.iterdir())
+        if f.is_file()
+    ]
+
+
+@router.delete("/files/{filename}")
+async def delete_file(
+    filename: str,
+    project_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    pid = project_id or await get_active_project_id(db)
+    path = _project_upload_dir(pid) / _safe_filename(filename)
+    if path.exists():
+        path.unlink()
+    return {"ok": True}
+
+
+# ---------- 任务 CRUD ----------
+
+@router.get("/", response_model=list[TaskRunOut])
+async def list_task_runs(
+    project_id: Optional[int] = None,
+    status: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[TaskRunOut]:
+    q = select(TaskRun)
+    if project_id is not None:
+        q = q.where(TaskRun.project_id == project_id)
+    if status:
+        q = q.where(TaskRun.status == status)
+    q = q.order_by(TaskRun.updated_at.desc()).limit(100)
+    result = await db.execute(q)
+    return [TaskRunOut.model_validate(t) for t in result.scalars().all()]
+
+
+@router.post("/", response_model=TaskRunOut)
+async def create_task_run(
+    payload: TaskRunCreate, db: AsyncSession = Depends(get_db)
+) -> TaskRunOut:
+    agent = await db.get(Agent, payload.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="智能体不存在")
+    pid = payload.project_id or await get_active_project_id(db)
+    run = TaskRun(
+        project_id=pid,
+        agent_id=payload.agent_id,
+        title=payload.title or (payload.input_text[:40] or f"任务 - {agent.name}"),
+        input_text=payload.input_text,
+        skill_ids=payload.skill_ids,
+        file_names=[_safe_filename(f) for f in payload.file_names],
+        status="draft",
+    )
+    db.add(run)
+    await db.flush()
+    await db.refresh(run)
+    return TaskRunOut.model_validate(run)
+
+
+@router.get("/{run_id}", response_model=TaskRunOut)
+async def get_task_run(run_id: int, db: AsyncSession = Depends(get_db)) -> TaskRunOut:
+    run = await db.get(TaskRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return TaskRunOut.model_validate(run)
+
+
+@router.delete("/{run_id}")
+async def delete_task_run(run_id: int, db: AsyncSession = Depends(get_db)):
+    run = await db.get(TaskRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    await db.delete(run)
+    await db.flush()
+    return {"ok": True}
+
+
+# ---------- 任务执行 (SSE 流式) ----------
+
+
+async def _build_prompt(
+    db: AsyncSession,
+    project_id: Optional[int],
+    input_text: str,
+    file_names: list[str],
+    skill_ids: list[int],
+) -> str:
+    """组装任务提示词: 任务描述 + 附件内容 + 指定技能"""
+    from app.models.skill import Skill
+
+    prompt_parts: list[str] = []
+    if input_text:
+        prompt_parts.append(input_text)
+    for fname in file_names or []:
+        content = _read_file(project_id, fname)
+        if content:
+            prompt_parts.append(f"【附件 {fname}】\n{content}")
+    if skill_ids:
+        skill_result = await db.execute(select(Skill).where(Skill.id.in_(skill_ids)))
+        skills = skill_result.scalars().all()
+        if skills:
+            names = "、".join(s.name for s in skills)
+            prompt_parts.append(
+                f"【指定技能】完成本任务时, 请通过 run_skill 工具按需调用以下技能: {names}"
+            )
+    return "\n\n".join(prompt_parts)
+
+
+async def _load_memories(db: AsyncSession, agent_id: int, project_id: Optional[int]) -> list:
+    """加载记忆: 任务关联项目 + 通用记忆"""
+    mem_result = await db.execute(
+        select(AgentMemory)
+        .where(
+            AgentMemory.agent_id == agent_id,
+            or_(
+                AgentMemory.project_id == project_id,
+                AgentMemory.project_id.is_(None),
+            ),
+        )
+        .order_by(AgentMemory.created_at.desc())
+        .limit(20)
+    )
+    return mem_result.scalars().all()
+
+
+@router.get("/{run_id}/messages")
+async def list_task_messages(run_id: int, db: AsyncSession = Depends(get_db)):
+    """任务会话消息列表 (按时间正序), 用于前端对话回放"""
+    run = await db.get(TaskRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not run.session_id:
+        return []
+    result = await db.execute(
+        select(AgentMessage)
+        .where(AgentMessage.session_id == run.session_id)
+        .order_by(AgentMessage.id)
+    )
+    return [
+        {"role": m.role, "content": m.content, "created_at": m.created_at}
+        for m in result.scalars().all()
+    ]
+
+
+@router.post("/{run_id}/run")
+async def run_task(run_id: int, db: AsyncSession = Depends(get_db)):
+    """执行任务: 组装 输入+附件+指定技能 提示词, 通过 Agent 引擎流式执行
+
+    SSE 事件与 /agents/{id}/chat 一致: content / tool_call / tool_result / done / error
+    """
+    from app.services.agent_engine import AgentEngine
+
+    run = await db.get(TaskRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    agent = await db.get(Agent, run.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="智能体不存在")
+
+    message = await _build_prompt(
+        db, run.project_id, run.input_text, run.file_names, run.skill_ids
+    )
+    if not message:
+        raise HTTPException(status_code=400, detail="任务内容为空, 请填写任务描述或选择文件")
+
+    # ---- 创建执行会话 ----
+    session = AgentSession(agent_id=agent.id, title=run.title[:50])
+    db.add(session)
+    await db.flush()
+    await db.refresh(session)
+    run.session_id = session.id
+    run.status = "running"
+    await db.flush()
+
+    db.add(AgentMessage(session_id=session.id, role="user", content=message))
+    await db.flush()
+    await db.commit()
+
+    memories = await _load_memories(db, agent.id, run.project_id)
+
+    engine = AgentEngine(db)
+
+    async def event_stream():
+        reply_parts: list[str] = []
+        failed = False
+        try:
+            async for event in engine.chat(agent, session, [], memories, message):
+                etype = event.get("type")
+                if etype == "content":
+                    reply_parts.append(event["content"])
+                    yield f"data: {json.dumps({'type': 'content', 'content': event['content'], 'session_id': session.id}, ensure_ascii=False)}\n\n"
+                elif etype == "tool_call":
+                    yield f"data: {json.dumps({'type': 'tool_call', 'name': event['name'], 'arguments': event['arguments']}, ensure_ascii=False, default=str)}\n\n"
+                elif etype == "tool_result":
+                    yield f"data: {json.dumps({'type': 'tool_result', 'name': event['name'], 'result': event['result'], 'duration_ms': event['duration_ms']}, ensure_ascii=False, default=str)}\n\n"
+        except Exception as e:
+            failed = True
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            result_text = "".join(reply_parts)
+            # 回复以降级提示开头视为失败
+            if result_text.lstrip().startswith("⚠️"):
+                failed = True
+            db.add(AgentMessage(
+                session_id=session.id, role="assistant", content=result_text
+            ))
+            run.result_text = result_text
+            run.status = "failed" if failed else "done"
+            await db.flush()
+            await db.commit()
+            yield f"data: {json.dumps({'type': 'done', 'session_id': session.id, 'run_id': run.id, 'status': run.status})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/{run_id}/continue")
+async def continue_task(
+    run_id: int, payload: TaskRunContinue, db: AsyncSession = Depends(get_db)
+):
+    """任务继续对话: 在原任务会话中补充内容, 可追加文件/技能
+
+    SSE 事件与 /run 一致; 执行结果追加到 run.result_text
+    """
+    from app.services.agent_engine import AgentEngine
+
+    run = await db.get(TaskRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not run.session_id:
+        raise HTTPException(status_code=400, detail="任务尚未执行, 无法继续对话")
+    agent = await db.get(Agent, run.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="智能体不存在")
+    session = await db.get(AgentSession, run.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="任务会话不存在")
+
+    # 新附件/技能并入任务记录 (去重)
+    new_files = [_safe_filename(f) for f in payload.file_names]
+    new_skill_ids = list(payload.skill_ids or [])
+
+    message = await _build_prompt(
+        db, run.project_id, payload.input_text, new_files, new_skill_ids
+    )
+    if not message:
+        raise HTTPException(status_code=400, detail="补充内容为空, 请填写内容或添加文件/技能")
+
+    # ---- 加载会话历史 (不含本条新消息) ----
+    history_result = await db.execute(
+        select(AgentMessage)
+        .where(AgentMessage.session_id == session.id)
+        .order_by(AgentMessage.id)
+    )
+    history = history_result.scalars().all()
+
+    db.add(AgentMessage(session_id=session.id, role="user", content=message))
+    merged_files = list(dict.fromkeys((run.file_names or []) + new_files))
+    merged_skills = list(dict.fromkeys((run.skill_ids or []) + new_skill_ids))
+    run.file_names = merged_files
+    run.skill_ids = merged_skills
+    run.status = "running"
+    await db.flush()
+    await db.commit()
+
+    memories = await _load_memories(db, agent.id, run.project_id)
+
+    engine = AgentEngine(db)
+
+    async def event_stream():
+        reply_parts: list[str] = []
+        failed = False
+        try:
+            async for event in engine.chat(agent, session, history, memories, message):
+                etype = event.get("type")
+                if etype == "content":
+                    reply_parts.append(event["content"])
+                    yield f"data: {json.dumps({'type': 'content', 'content': event['content'], 'session_id': session.id}, ensure_ascii=False)}\n\n"
+                elif etype == "tool_call":
+                    yield f"data: {json.dumps({'type': 'tool_call', 'name': event['name'], 'arguments': event['arguments']}, ensure_ascii=False, default=str)}\n\n"
+                elif etype == "tool_result":
+                    yield f"data: {json.dumps({'type': 'tool_result', 'name': event['name'], 'result': event['result'], 'duration_ms': event['duration_ms']}, ensure_ascii=False, default=str)}\n\n"
+        except Exception as e:
+            failed = True
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            result_text = "".join(reply_parts)
+            if result_text.lstrip().startswith("⚠️"):
+                failed = True
+            db.add(AgentMessage(
+                session_id=session.id, role="assistant", content=result_text
+            ))
+            # 追加到任务结果 (保留前轮输出)
+            run.result_text = (run.result_text or "") + "\n\n" + result_text
+            run.status = "failed" if failed else "done"
+            await db.flush()
+            await db.commit()
+            yield f"data: {json.dumps({'type': 'done', 'session_id': session.id, 'run_id': run.id, 'status': run.status})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")

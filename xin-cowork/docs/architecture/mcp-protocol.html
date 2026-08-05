@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>MCP 协议与接入 · 技术架构 · XIN</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/architecture/overview">技术架构</a></li>
+  <li>MCP 协议与接入</li>
+</nav>
+
+<h1>MCP 协议与接入</h1>
+
+<p class="text-secondary">
+  Model Context Protocol(MCP)是 Anthropic 主导的开放标准,定义 LLM 应用与外部系统的交互方式。
+  XIN 全面采用 MCP 作为 Agent 接入企业系统(CRM、ERP、Wind、法规库、邮件等)的统一协议,
+  避免为每个系统定制适配代码,实现「一次接入、全网可用」。本章节介绍 MCP 协议、XIN 接入架构、
+  Adapter 框架、服务目录、调用流程、限流配额与安全治理。
+</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">🔌</div>
+  <div class="alert__body">
+    <div class="alert__title">为什么选 MCP</div>
+    <div class="alert__desc">标准协议替代定制集成 · 工具/资源/提示三态模型 · 跨厂商中立 · 生态可复用 · 已成行业事实标准</div>
+  </div>
+</div>
+
+<h2>一、MCP 协议概览</h2>
+
+<p>MCP 协议基于 <strong>JSON-RPC 2.0</strong>,采用 Client-Server 架构,定义三种核心能力原语:</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">MCP 三种能力原语</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+graph TB
+    subgraph CLIENT["MCP Client(在 Agent 内)"]
+        CL["Client Manager<br/>连接池 / 路由 / 限流"]
+    end
+    subgraph SERVER["MCP Server(企业系统适配)"]
+        S1["Resource 资源<br/>URI 寻址的数据<br/>例: customer://123"]
+        S2["Tool 工具<br/>可执行函数<br/>例: crm.opportunity.list"]
+        S3["Prompt 提示模板<br/>预置提示词<br/>例: 投资摘要模板"]
+        S1 --- S2 --- S3
+    end
+    CL -->|"JSON-RPC 2.0<br/>stdio / SSE / WebSocket"| SERVER
+    style CLIENT fill:#FFE8E0,stroke:#FF5D00
+    style SERVER fill:#FEF3C7,stroke:#D97706
+    </div>
+  </div>
+</div>
+
+<table class="table">
+  <thead><tr><th>原语</th><th>语义</th><th>典型示例</th><th>是否改变状态</th></tr></thead>
+  <tbody>
+    <tr><td>Resource(资源)</td><td>URI 寻址的只读数据</td><td>customer://123、wind://quote/600519</td><td>否(幂等读取)</td></tr>
+    <tr><td>Tool(工具)</td><td>可执行函数,有副作用</td><td>crm.opportunity.list、mail.send</td><td>是(写操作)</td></tr>
+    <tr><td>Prompt(提示)</td><td>预置提示模板,带变量</td><td>invest-summary-template</td><td>否(返回文本)</td></tr>
+  </tbody>
+</table>
+
+<h2>二、XIN MCP 接入架构</h2>
+
+<p>XIN 在 Agent Runtime(Eino ADK)与外部 MCP Server 之间,增设 <strong>MCP Gateway</strong> 中间层,
+统一处理连接池、鉴权、限流、审计、脱敏、服务发现,使 Agent 侧无需关心后端实现细节。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">XIN MCP 接入架构(四层)</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+graph TB
+    subgraph L1["1. Agent Runtime 层"]
+        A1["Eino ADK Agent"]
+        A2["Tool Calls<br/>(由 LLM 决策)"]
+    end
+    subgraph L2["2. MCP Gateway 层"]
+        G1["服务发现<br/>Service Registry"]
+        G2["鉴权<br/>Auth(Z-token)"]
+        G3["限流配额<br/>RateLimit + Quota"]
+        G4["审计日志<br/>Audit Log"]
+        G5["脱敏过滤<br/>Masking"]
+    end
+    subgraph L3["3. MCP Client 层"]
+        C1["连接池<br/>Connection Pool"]
+        C2["协议适配<br/>stdio/SSE/WS"]
+        C3["重试 + 熔断<br/>Retry + CircuitBreaker"]
+    end
+    subgraph L4["4. MCP Server 层"]
+        S1["CRM MCP"]
+        S2["Wind MCP"]
+        S3["Mail MCP"]
+        S4["Law MCP"]
+        S5["Custom MCP"]
+    end
+    A1 --> A2 --> L2
+    L2 --> L3 --> L4
+    style L2 fill:#FEF3C7,stroke:#D97706
+    style L4 fill:#FFF8DC,stroke:#FFD700
+    </div>
+  </div>
+</div>
+
+<h2>三、MCP Gateway 职责详解</h2>
+
+<table class="table">
+  <thead><tr><th>职责</th><th>说明</th><th>关键设计</th></tr></thead>
+  <tbody>
+    <tr><td>服务发现</td><td>从 Service Registry 获取可用 MCP Server 列表与 schema</td><td>etcd 存储 + 心跳健康检查</td></tr>
+    <tr><td>鉴权</td><td>校验 Agent 调用凭证与用户授权</td><td>JWT(Z-token)+ OAuth2 用户令牌透传</td></tr>
+    <tr><td>限流配额</td><td>防止单个 Agent/用户耗尽后端资源</td><td>令牌桶 + 按用户/服务/Tool 三维配额</td></tr>
+    <tr><td>审计日志</td><td>记录每次调用,满足金融合规</td><td>异步写入 + 签名链防篡改</td></tr>
+    <tr><td>脱敏过滤</td><td>对返回结果中的敏感字段脱敏</td><td>基于规则的字段级脱敏</td></tr>
+    <tr><td>熔断降级</td><td>后端异常时快速失败,保护系统</td><td>滑动窗口错误率 &gt; 阈值触发熔断</td></tr>
+    <tr><td>缓存</td><td>幂等 Resource 读取缓存</td><td>Redis 缓存 + TTL</td></tr>
+  </tbody>
+</table>
+
+<h2>四、工具调用端到端流程</h2>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Agent 调用 MCP 工具完整时序</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant A as Agent(Eino ADK)
+    participant G as MCP Gateway
+    participant R as Service Registry
+    participant S as MCP Server(CRM)
+    participant AU as Audit Log
+    U->>A: "查询本月金额>500万的商机"
+    A->>A: LLM 决策调用 crm.opportunity.list
+    A->>G: tool_call(name, args, user_token)
+    G->>R: 查询 CRM Server 地址
+    R-->>G: 返回 endpoint
+    G->>G: 鉴权 + 限流检查
+    G->>S: JSON-RPC: tools/call
+    S-->>G: 返回商机列表(脱敏前)
+    G->>G: 敏感字段脱敏(手机/金额)
+    G->>AU: 异步写审计日志
+    G-->>A: 返回脱敏后结果
+    A->>A: LLM 生成自然语言回复
+    A-->>U: "本月共 8 个商机超过 500 万..."
+    </div>
+  </div>
+</div>
+
+<h2>五、Adapter 框架(快速接入新系统)</h2>
+
+<p>XIN 提供 <strong>MCP Adapter SDK</strong>,开发者只需实现少量接口即可把企业系统接入 MCP 协议。
+SDK 已封装协议层、连接管理、schema 生成、错误处理。</p>
+
+<div class="card">
+  <div class="card-body">
+    <div class="code-block">
+      <div class="code-block__header">
+        <span>Python - CRM MCP Server(完整示例)</span>
+        <button class="code-block__copy">复制</button>
+      </div>
+<pre><code><span class="token-keyword">from</span> mcp <span class="token-keyword">import</span> MCPServer, tool, resource
+<span class="token-keyword">from</span> automy.mcp.adapter <span class="token-keyword">import</span> XINAdapter
+
+<span class="token-comment"># 1. 创建 Server,继承 XINAdapter 自动获得鉴权/审计/限流</span>
+server = <span class="token-function">MCPServer</span>(<span class="token-string">"crm-system"</span>, adapter=<span class="token-function">XINAdapter</span>())
+
+<span class="token-comment"># 2. 暴露 Resource:客户详情(只读)</span>
+@server.<span class="token-function">resource</span>(<span class="token-string">"customer://{customer_id}"</span>)
+<span class="token-keyword">async def</span> <span class="token-function">get_customer</span>(customer_id: <span class="token-property">str</span>):
+    <span class="token-string">"""获取客户详情"""</span>
+    customer = <span class="token-keyword">await</span> crm.<span class="token-function">get_customer</span>(customer_id)
+    <span class="token-keyword">return</span> {
+        <span class="token-property">"id"</span>: customer.id,
+        <span class="token-property">"name"</span>: customer.name,
+        <span class="token-property">"size"</span>: customer.size,
+        <span class="token-property">"contracts"</span>: customer.contracts
+    }
+
+<span class="token-comment"># 3. 暴露 Tool:查询商机(带副作用,需审计)</span>
+@server.<span class="token-function">tool</span>(
+    <span class="token-property">name</span>=<span class="token-string">"crm.opportunity.list"</span>,
+    <span class="token-property">description</span>=<span class="token-string">"列出商机,支持金额/日期过滤"</span>,
+    <span class="token-property">audit</span>=<span class="token-keyword">True</span>,
+    <span class="token-property">rate_limit</span>={<span class="token-property">"qps"</span>: <span class="token-number">10</span>, <span class="token-property">"daily"</span>: <span class="token-number">1000</span>}
+)
+<span class="token-keyword">async def</span> <span class="token-function">list_opportunities</span>(
+    <span class="token-property">min_amount</span>: <span class="token-property">float</span> = <span class="token-number">0</span>,
+    <span class="token-property">date_from</span>: <span class="token-property">str</span> = <span class="token-keyword">None</span>,
+    <span class="token-property">date_to</span>: <span class="token-property">str</span> = <span class="token-keyword">None</span>
+):
+    <span class="token-string">"""列出商机
+
+    Args:
+        min_amount: 最小金额(万元)
+        date_from: 开始日期 YYYY-MM-DD
+        date_to: 结束日期 YYYY-MM-DD
+    """</span>
+    opportunities = <span class="token-keyword">await</span> crm.<span class="token-function">query_opportunities</span>(
+        <span class="token-property">min_amount</span>=min_amount * <span class="token-number">10000</span>,
+        <span class="token-property">date_from</span>=date_from,
+        <span class="token-property">date_to</span>=date_to
+    )
+    <span class="token-keyword">return</span> [<span class="token-function">to_dict</span>(o) <span class="token-keyword">for</span> o <span class="token-keyword">in</span> opportunities]
+
+<span class="token-keyword">if</span> __name__ == <span class="token-string">"__main__"</span>:
+    server.<span class="token-function">run</span>(<span class="token-property">transport</span>=<span class="token-string">"sse"</span>, <span class="token-property">host</span>=<span class="token-string">"0.0.0.0"</span>, <span class="token-property">port</span>=<span class="token-number">8080</span>)</code></pre>
+    </div>
+  </div>
+</div>
+
+<h2>六、MCP 服务目录</h2>
+
+<p>XIN 内置 8 个官方 MCP 服务,覆盖投资公司主流业务系统。所有服务在 Service Registry 注册,Agent 启动时自动发现可用工具。</p>
+
+<table class="table">
+  <thead><tr><th>服务 ID</th><th>名称</th><th>分类</th><th>认证方式</th><th>典型工具</th></tr></thead>
+  <tbody>
+    <tr><td>mcp-crm-system</td><td>CRM 客户关系管理</td><td><span class="badge badge-info">销售</span></td><td>OAuth2</td><td>crm.query / crm.customer.get / crm.opportunity.list</td></tr>
+    <tr><td>mcp-erp-system</td><td>ERP 企业资源计划</td><td><span class="badge badge-info">运营</span></td><td>API Key</td><td>erp.finance.query / erp.inventory.get</td></tr>
+    <tr><td>mcp-wind-data</td><td>Wind 金融数据</td><td><span class="badge badge-info">数据</span></td><td>API Key</td><td>wind.quote.realtime / wind.finance.history</td></tr>
+    <tr><td>mcp-internal-research</td><td>内部研究库</td><td><span class="badge badge-info">知识</span></td><td>SSO Token</td><td>research.search / research.document.get</td></tr>
+    <tr><td>mcp-email-system</td><td>企业邮箱</td><td><span class="badge badge-info">通信</span></td><td>OAuth2</td><td>mail.read / mail.send / mail.search</td></tr>
+    <tr><td>mcp-law-database</td><td>法律法规数据库</td><td><span class="badge badge-info">法务</span></td><td>API Key</td><td>law.regulation.search / law.case.search</td></tr>
+    <tr><td>mcp-regulation-database</td><td>监管动态数据库</td><td><span class="badge badge-info">合规</span></td><td>无</td><td>regulation.fetch / regulation.subscribe</td></tr>
+    <tr><td>mcp-document-storage</td><td>企业文档存储</td><td><span class="badge badge-info">存储</span></td><td>OAuth2</td><td>doc.upload / doc.download / doc.search</td></tr>
+  </tbody>
+</table>
+
+<h2>七、限流配额设计</h2>
+
+<p>投资公司场景下,不同后端系统对调用频率的承受力差异巨大(如 Wind 接口按调用计费,CRM 限并发)。
+XIN 设计<strong>三维限流配额</strong>模型。</p>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">三维限流配额模型</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+graph TB
+    CALL["工具调用请求"] --> CHK{"三维配额检查"}
+    CHK -->|维度1: 用户| Q1["用户级 QPS<br/>默认 20/s"]
+    CHK -->|维度2: 服务| Q2["服务级并发<br/>例: Wind 5 并发"]
+    CHK -->|维度3: 工具| Q3["工具级日配额<br/>例: mail.send 100/日"]
+    Q1 -->|通过| ALLOW["放行"]
+    Q2 -->|通过| ALLOW
+    Q3 -->|通过| ALLOW
+    Q1 -->|超限| DENY["拒绝 + 告警"]
+    Q2 -->|超限| QUEUE["排队等待"]
+    Q3 -->|超限| DENY
+    style ALLOW fill:#FFF8DC,stroke:#FFD700
+    style DENY fill:#FEE2E2,stroke:#DC2626
+    style QUEUE fill:#FEF3C7,stroke:#D97706
+    </div>
+  </div>
+</div>
+
+<table class="table">
+  <thead><tr><th>服务</th><th>QPS 限制</th><th>并发限制</th><th>日配额</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Wind 金融数据</td><td>5/s</td><td>3</td><td>10000</td><td>按次计费,需控成本</td></tr>
+    <tr><td>CRM 系统</td><td>20/s</td><td>10</td><td>无</td><td>内部系统,无配额</td></tr>
+    <tr><td>邮件发送</td><td>2/s</td><td>1</td><td>100</td><td>防滥用,需审计</td></tr>
+    <tr><td>法规库</td><td>10/s</td><td>5</td><td>5000</td><td>第三方 API 限制</td></tr>
+    <tr><td>内部研究库</td><td>50/s</td><td>20</td><td>无</td><td>内网高速访问</td></tr>
+  </tbody>
+</table>
+
+<h2>八、认证与凭证管理</h2>
+
+<table class="table">
+  <thead><tr><th>认证方式</th><th>典型场景</th><th>凭证存储</th><th>刷新机制</th></tr></thead>
+  <tbody>
+    <tr><td>OAuth 2.0</td><td>CRM、邮件、文档库</td><td>refresh_token 加密存 KMS</td><td>access_token 过期前 5 分钟自动刷新</td></tr>
+    <tr><td>API Key</td><td>Wind、法规库</td><td>KMS 加密 + Vault 注入</td><td>人工轮换,90 天周期</td></tr>
+    <tr><td>SSO Token</td><td>内部系统</td><td>Keycloak 颁发,会话级</td><td>用户重新登录刷新</td></tr>
+    <tr><td>无认证</td><td>公开数据</td><td>无</td><td>无</td></tr>
+    <tr><td>mTLS</td><td>服务间内部调用</td><td>cert-manager 签发</td><td>自动续期</td></tr>
+  </tbody>
+</table>
+
+<h2>九、安全治理</h2>
+
+<div class="grid grid-cols-2">
+  <div class="card">
+    <div class="card-body">
+      <h4>🛡 调用安全</h4>
+      <ul>
+        <li><strong>Token 透传</strong>:用户 OAuth token 透传到 MCP Server,以用户身份执行</li>
+        <li><strong>权限校验</strong>:每次 tool_call 校验用户是否有该工具权限</li>
+        <li><strong>敏感操作确认</strong>:写操作(mail.send、doc.share)需用户二次确认</li>
+        <li><strong>结果脱敏</strong>:手机/身份证/银行卡字段自动脱敏</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <h4>📋 审计合规</h4>
+      <ul>
+        <li><strong>全量审计</strong>:每次 tool_call 记录用户/时间/参数/结果</li>
+        <li><strong>独立存储</strong>:审计日志写入独立 PG,签名链防篡改</li>
+        <li><strong>5 年留存</strong>:满足金融监管审计要求</li>
+        <li><strong>合规导出</strong>:支持导出标准格式供监管检查</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2>十、可靠性设计</h2>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">MCP 调用可靠性策略</span>
+    <span class="badge badge-primary">Mermaid</span>
+  </div>
+  <div class="card-body">
+    <div class="mermaid">
+flowchart LR
+    CALL["调用"] --> ERR{异常类型}
+    ERR -->|网络抖动| RETRY["指数退避重试<br/>最多 3 次"]
+    ERR -->|服务过载| CB["熔断 30s<br/>快速失败"]
+    ERR -->|超时| TIMEOUT["5s 超时<br/>降级返回缓存"]
+    ERR -->|认证失效| REFRESH["刷新 token<br/>重试一次"]
+    RETRY --> OK{成功?}
+    OK -->|是| SUCC["返回结果"]
+    OK -->|否| FALLBACK["降级方案<br/>提示用户重试"]
+    CB --> FALLBACK
+    TIMEOUT --> FALLBACK
+    style SUCC fill:#FFF8DC,stroke:#FFD700
+    style FALLBACK fill:#FEE2E2,stroke:#DC2626
+    </div>
+  </div>
+</div>
+
+<h2>十一、业务场景示例</h2>
+
+<details class="collapse" open>
+  <summary><span>💼 场景:销售分析师查询客户商机</span></summary>
+  <div class="collapse__body">
+    <ol>
+      <li>销售分析师提问:「本月金额超过 500 万的商机有哪些?客户行业分布?」</li>
+      <li>Agent(LLM)决策:调用 <code>crm.opportunity.list</code>(min_amount=500, date_from=本月)</li>
+      <li>MCP Gateway 鉴权 → 限流检查 → 调用 CRM MCP Server</li>
+      <li>CRM 返回 8 个商机,含客户 ID、金额、阶段</li>
+      <li>Gateway 脱敏:隐藏联系人手机号中间 4 位</li>
+      <li>Agent 再次调用 <code>crm.customer.get</code> 批量获取客户行业</li>
+      <li>LLM 综合生成回答 + 表格,引用 CRM 数据来源</li>
+      <li>全程审计日志记录,可在管理后台查询调用链</li>
+    </ol>
+  </div>
+</details>
+
+<h2>下一章</h2>
+<p><a href="#/docs/architecture/knowledge-base" class="card-link">知识库与 RAG →</a></p>
+
+<script>
+  (function() {
+    function initMermaid() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+      try { window.mermaid.run({ querySelector: '.mermaid' }); } catch(e) { console.error('mermaid render error:', e); }
+    }
+    if (window.mermaid) { initMermaid(); }
+    else {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+      s.onload = initMermaid;
+      document.head.appendChild(s);
+    }
+  })();
+</script>
+</body>
+</html>

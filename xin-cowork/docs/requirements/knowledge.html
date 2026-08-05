@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>知识库与 RAG · 需求文档 · XIN</title>
+</head>
+<body>
+<nav class="breadcrumb">
+  <li><a href="#/">首页</a></li>
+  <li><a href="#/docs/requirements/overview">需求文档</a></li>
+  <li>知识库与 RAG</li>
+</nav>
+
+<h1>知识库与 RAG</h1>
+
+<p class="text-secondary">企业内部知识沉淀、检索与复用。基于 RAG 检索增强生成,让 Agent 能精准引用企业知识库中的具体文档与数据,所有回答附带文件名与页码,可跳转原文验证,告别 AI 幻觉。</p>
+
+<div class="alert alert-info">
+  <div class="alert__icon">📚</div>
+  <div class="alert__body">
+    <div class="alert__title">模块定位</div>
+    <div class="alert__desc">本模块定义文档接入(多源)、文档处理流水线(解析/分块/向量化/元数据)、混合检索(语义+关键词+元数据)、来源引用(文件名+页码)、未命中兜底五大能力,让企业知识资产可被 Agent 精准引用。</div>
+  </div>
+</div>
+
+<h2>模块概述</h2>
+<p>
+  投资公司积累了大量研究报告、行业研究、尽调材料、内部备忘录、法规案例等知识资产。这些资产分散在各系统(文档库、邮件、研究系统、网页),格式多样(PDF、Word、Excel、PPT、HTML),难以检索与复用。
+</p>
+<p>
+  XIN 知识库通过 RAG(Retrieval-Augmented Generation)技术,让 Agent 能精准引用企业内部知识:支持多源接入(本地 / 文档系统 / 邮件 / 网页),自动完成解析、分块、向量化、元数据提取的文档处理流水线,基于语义+关键词+元数据的混合检索提升召回率,所有回答附带文件名与页码,可跳转原文验证,确保 AI 回答可追溯、可信。
+</p>
+
+<h2>知识库分类</h2>
+<table class="table">
+  <thead><tr><th>分类</th><th>典型内容</th><th>访问范围</th></tr></thead>
+  <tbody>
+    <tr><td>公司知识库</td><td>研究报告、行业研究、宏观分析</td><td>全公司</td></tr>
+    <tr><td>部门知识库</td><td>部门内部资料、流程文档</td><td>部门内</td></tr>
+    <tr><td>项目知识库</td><td>尽调材料、访谈记录、纪要</td><td>项目成员</td></tr>
+    <tr><td>个人知识库</td><td>个人笔记、收藏、草稿</td><td>个人</td></tr>
+  </tbody>
+</table>
+
+<h2>需求条目</h2>
+
+<!-- REQ-7.1 文档接入 -->
+<div class="card" id="REQ-7.1">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.1</span>
+        <strong>文档接入</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 支持多源文档接入,包括本地文件上传、文档系统对接(SharePoint / 飞书文档 / 腾讯文档)、邮件接入、网页爬取;SHALL 支持多格式文件(PDF、Word、Excel、PPT、Markdown、HTML)。</p>
+    <ul>
+      <li>本地上传:支持单文件与批量上传,单文件 ≤ 100MB,批量 ≤ 50 文件</li>
+      <li>文档系统:对接 SharePoint / 飞书文档 / 腾讯文档,定时增量同步</li>
+      <li>邮件接入:从邮箱自动提取附件与正文,按规则归档到知识库</li>
+      <li>网页爬取:配置 URL 与爬取规则,定时抓取公开网页(如监管公告)</li>
+      <li>格式支持:PDF / Word / Excel / PPT / Markdown / HTML / TXT</li>
+      <li>权限继承:文档接入时继承源系统的权限,如 SharePoint 文档的部门权限</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 投研团队把 SharePoint 上的 "2025 年度研究报告" 文件夹接入 XIN 知识库<br>
+      <strong>THEN</strong> 系统定时增量同步该文件夹,所有 PDF / Word 报告自动入库,继承 SharePoint 的部门权限(仅投研部可访问),新文档发布后 1 小时内同步到 XIN 可检索。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/knowledge">查看知识库原型</a></li>
+      <li><a href="#/docs/architecture/knowledge-base">关联架构:知识库</a></li>
+      <li><a href="#/docs/requirements/auth-rbac">关联需求:REQ-1.2 组织架构同步(权限继承)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-7.2 文档处理流水线 -->
+<div class="card" id="REQ-7.2">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.2</span>
+        <strong>文档处理流水线</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 对接入的文档自动执行解析、分块、向量化、元数据提取的处理流水线;SHALL 支持表格、图片、公式等多模态内容提取;处理状态与进度对用户可见。</p>
+    <table class="table table-bordered">
+      <thead><tr><th>环节</th><th>说明</th><th>示例</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge">解析</span></td><td>从源文件提取文本、表格、图片、公式</td><td>PDF 解析提取正文 + 表格 + 图表说明</td></tr>
+        <tr><td><span class="badge badge-info">分块</span></td><td>按语义与结构切分为可检索的块</td><td>按段落分块,每块 500-1000 字,保留上下文</td></tr>
+        <tr><td><span class="badge badge-success">向量化</span></td><td>生成嵌入向量,存入向量库</td><td>使用 BGE / text-embedding-3 生成向量</td></tr>
+        <tr><td><span class="badge badge-warning">元数据</span></td><td>提取文档元数据(标题、作者、时间、分类)</td><td>标题:ABC 新能源 2024 年报,作者:投研部,时间:2025-03-15</td></tr>
+        <tr><td><span class="badge badge-danger">索引</span></td><td>建立全文索引与向量索引</td><td>Elasticsearch 全文 + Milvus 向量</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>多模态提取:支持表格(转为结构化数据)、图片(OCR + 描述)、公式(LaTeX)</li>
+      <li>分块策略:按段落、按章节、按页码分块,保留上下文与位置信息</li>
+      <li>增量更新:文档更新时增量重建索引,不全量重建</li>
+      <li>处理状态:展示处理进度(待处理 / 处理中 / 已完成 / 失败),失败可重试</li>
+      <li>处理日志:记录每步处理结果,便于排查问题</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三上传一份 50 页的 ABC 新能源年报 PDF<br>
+      <strong>THEN</strong> 系统自动执行:解析(提取正文 + 12 个表格 + 8 张图表)→ 分块(按章节切为 80 个块)→ 向量化(生成 80 个向量)→ 元数据(标题:ABC 新能源 2024 年报,作者:ABC 公司,时间:2025-03-15);处理状态从 "处理中" 变为 "已完成",全程耗时约 30 秒。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/knowledge">查看知识库原型</a></li>
+      <li><a href="#/docs/architecture/knowledge-base">关联架构:知识库</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-7.3 混合检索 -->
+<div class="card" id="REQ-7.3">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.3</span>
+        <strong>混合检索</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 提供混合检索能力,综合语义检索(向量相似度)、关键词检索(BM25)、元数据过滤(部门、时间、分类)三种策略;SHALL 对召回结果进行重排序,提升精度;检索时延 SHALL ≤ 2 秒。</p>
+    <ul>
+      <li>语义检索:基于向量相似度,理解语义而非字面匹配,如 "新能源车" 命中 "电动汽车"</li>
+      <li>关键词检索:基于 BM25 算法,精确匹配专业术语、人名、公司名</li>
+      <li>元数据过滤:按部门、时间范围、分类、密级过滤,如 "仅投研部 2025 年的研究报告"</li>
+      <li>重排序:使用交叉编码器对召回结果重排序,提升 Top-K 精度</li>
+      <li>检索时延:P95 ≤ 2 秒,Top-10 召回</li>
+      <li>权限过滤:检索时自动过滤用户无权访问的文档</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三提问 "ABC 新能源动力电池业务 2024 年表现如何"<br>
+      <strong>THEN</strong> 系统执行混合检索:(1) 语义检索召回 20 条相关块;(2) 关键词检索补充命中 "ABC 新能源" 与 "动力电池" 的块;(3) 元数据过滤(投研部 / 2024-2025 年);(4) 重排序后返回 Top-5 块,时延 1.3 秒。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/knowledge">查看知识库原型</a></li>
+      <li><a href="#/docs/architecture/knowledge-base">关联架构:知识库</a></li>
+      <li><a href="#/docs/requirements/expert-market">关联需求:REQ-5.1 专家 Agent 模型(知识库挂载)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-7.4 来源引用 -->
+<div class="card" id="REQ-7.4">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.4</span>
+        <strong>来源引用</strong>
+      </div>
+      <div>
+        <span class="badge badge-success">P0</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 在 Agent 回答中标注引用的源文档文件名与页码,SHALL 支持点击跳转原文位置;SHALL 在引用来源区展示所有引用的文档清单,便于用户验证。</p>
+    <ul>
+      <li>行内引用:回答中关键信息后标注 [1] [2] 等引用编号</li>
+      <li>引用来源区:消息底部展示引用清单,每条引用显示文件名、页码、片段预览</li>
+      <li>跳转原文:点击引用编号可跳转到原文档的具体页码与位置</li>
+      <li>片段预览:鼠标悬停引用编号展示原文片段(上下文)</li>
+      <li>引用可信度:展示每条引用的相关度评分</li>
+      <li>无引用标注:Agent 回答若未基于知识库,SHALL 明确提示 "此回答未基于知识库,仅供参考"</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-info">
+      <strong>WHEN</strong> 张三问 "ABC 新能源 2024 年动力电池业务收入是多少"<br>
+      <strong>THEN</strong> 专家回答:"ABC 新能源 2024 年动力电池业务收入 ¥32.5 亿,同比增长 45% [1]。其中磷酸铁锂电池占比 70%,三元锂电池占比 30% [2]。";引用来源区展示:[1] ABC 新能源 2024 年年报.pdf 第 23 页;[2] ABC 新能源 2024 年年报.pdf 第 24 页;张三点击 [1] 跳转到 PDF 第 23 页对应位置。
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/knowledge">查看知识库原型</a></li>
+      <li><a href="#/docs/requirements/workspace">关联需求:REQ-3.2 流式输出(引用分段展示)</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- REQ-7.5 未命中兜底 -->
+<div class="card" id="REQ-7.5">
+  <div class="card-header">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="badge badge-primary">REQ-7.5</span>
+        <strong>未命中兜底</strong>
+      </div>
+      <div>
+        <span class="badge badge-warning">P1</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <p>系统 SHALL 在知识库未命中或命中相关度低时,提供兜底策略,包括:明确告知用户未命中、降级使用模型通用知识(明确标注)、推荐相关文档供用户参考、提供 "提交问题到知识库管理员" 入口。</p>
+    <ul>
+      <li>未命中提示:检索 Top-K 结果相关度均低于阈值(默认 0.6)时,明确告知 "知识库中未找到高度相关内容"</li>
+      <li>降级回答:可配置降级为模型通用知识回答,但 SHALL 明确标注 "以下回答未基于知识库,仅供参考"</li>
+      <li>相关推荐:展示 Top-3 相关度较低的文档,供用户参考</li>
+      <li>问题提交:提供 "提交此问题到知识库管理员" 入口,管理员可补充文档</li>
+      <li>未命中统计:统计未命中率,辅助管理员发现知识库覆盖盲区</li>
+    </ul>
+
+    <h4>场景</h4>
+    <div class="alert alert-warning">
+      <strong>WHEN</strong> 张三问 "DEF 公司 2024 年海外业务占比" 但知识库中没有 DEF 公司相关文档<br>
+      <strong>THEN</strong> 专家回答:"知识库中未找到 DEF 公司相关内容。以下基于通用知识回答:DEF 公司是一家... (此回答未基于知识库,仅供参考)。推荐查看相关文档:[1] 行业龙头海外业务对比.pdf(相关度 0.42)。如需更准确回答,可提交此问题到知识库管理员。"
+    </div>
+
+    <h4>关联</h4>
+    <ul>
+      <li><a href="#/prototype/knowledge">查看知识库原型</a></li>
+      <li><a href="#/docs/requirements/admin">关联需求:REQ-10.1 用户与组织管理(知识库管理员)</a></li>
+    </ul>
+  </div>
+</div>
+
+<h2>验收标准</h2>
+<div class="card">
+  <div class="card-body">
+    <ul>
+      <li>✅ 多源文档接入正常,支持主流格式</li>
+      <li>✅ 文档处理流水线自动化,多模态内容正确提取</li>
+      <li>✅ 混合检索召回率与精度达标,时延 ≤ 2 秒</li>
+      <li>✅ 来源引用准确,可跳转原文</li>
+      <li>✅ 未命中兜底机制清晰,不产生幻觉</li>
+      <li>✅ 权限过滤有效,无越权访问</li>
+    </ul>
+  </div>
+</div>
+
+<h2>原型参考</h2>
+<p><a href="#/prototype/knowledge" class="card-link">查看知识库原型</a></p>
+</body>
+</html>

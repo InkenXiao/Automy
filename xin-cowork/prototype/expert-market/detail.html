@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>投研分析师 · 专家详情 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item active"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">专家市场</div>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🏪</span><span class="app-nav-item__label">市场首页</span></a>
+        <a href="#/prototype/expert-market/customize" class="app-nav-item"><span class="app-nav-item__icon">🎨</span><span class="app-nav-item__label">个性化定制</span></a>
+        <a href="#/prototype/profile" class="app-nav-item"><span class="app-nav-item__icon">📦</span><span class="app-nav-item__label">我的订阅</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div class="app-topbar__title">专家详情</div>
+        <div class="app-topbar__actions">
+          <a href="#/prototype/expert-market/customize" class="btn btn-outline btn-sm">🎨 个性化微调</a>
+          <button class="btn btn-primary btn-sm install-btn" data-installed="false">订阅 ¥199/月</button>
+        </div>
+      </div>
+      <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/expert-market">专家市场</a></li>
+          <li>专家详情</li>
+        </ul>
+
+        <!-- 专家卡片头部 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-body">
+            <div class="flex items-center gap-3" style="margin-bottom: 16px;">
+              <div style="width: 64px; height: 64px; border-radius: 16px; background: #FF8C00; color: white; display: flex; align-items: center; justify-content: center; font-size: 32px;">📈</div>
+              <div style="flex: 1;">
+                <div class="flex items-center gap-2">
+                  <h2 style="margin: 0;">投研分析师</h2>
+                  <span class="badge badge-success">官方</span>
+                  <span class="badge badge-primary">v2.1.0</span>
+                </div>
+                <div class="text-sm text-secondary">Investment Analyst · XIN 官方 · 投研类别</div>
+                <div class="flex flex-wrap gap-1" style="margin-top: 6px;">
+                  <span class="chip">行业分析</span><span class="chip">企业估值</span><span class="chip">财务建模</span><span class="chip">尽调报告</span><span class="chip">风险识别</span>
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div class="font-bold" style="color: var(--color-warning);">★ 4.8</div>
+                <div class="text-xs text-tertiary">186 评价</div>
+                <div class="text-xs text-tertiary" style="margin-top: 4px;">👥 248 订阅</div>
+              </div>
+            </div>
+            <p class="text-sm text-secondary" style="padding-top: 12px; border-top: 1px solid var(--color-border-light); margin: 0;">专注于投资研究的领域专家,擅长行业分析、企业估值、财务建模、风险识别。可处理尽调材料、行业报告、财务报表,主动关联项目记忆并追踪历史决策。</p>
+          </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 1fr 300px; gap: 16px;">
+          <div>
+            <!-- Persona 设定 -->
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-header"><div class="card-title">Persona 设定</div></div>
+              <div class="card-body">
+                <div class="grid grid-cols-2" style="gap: 12px;">
+                  <div><div class="text-xs text-tertiary">身份</div><div class="text-sm">资深投研分析师(8 年经验)</div></div>
+                  <div><div class="text-xs text-tertiary">语气</div><div class="text-sm">专业、严谨、数据驱动</div></div>
+                  <div><div class="text-xs text-tertiary">目标</div><div class="text-sm">辅助投资决策,识别风险与机会</div></div>
+                  <div><div class="text-xs text-tertiary">边界</div><div class="text-sm">不提供直接投资建议</div></div>
+                </div>
+                <div class="text-xs text-tertiary uppercase" style="margin: 12px 0 6px;">系统提示词(节选)</div>
+                <pre class="code-block" style="font-size: 11px;"><code>你是一名服务于投资公司的资深投研分析师。
+在分析企业时,必须:1) 引用 Wind 数据;2) 对比同业;
+3) 标注风险等级(低/中/高);4) 关联项目历史记忆。
+回答采用结构化要点,关键数据用 <b>加粗</b>。</code></pre>
+              </div>
+            </div>
+
+            <!-- 绑定能力 -->
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-header"><div class="card-title">绑定能力</div></div>
+              <div class="card-body">
+                <div class="text-xs text-tertiary uppercase" style="margin-bottom: 6px;">技能 (3)</div>
+                <div class="flex flex-wrap gap-1" style="margin-bottom: 12px;">
+                  <a href="#/prototype/skill-market/detail" class="chip chip-hover">📊 财务报表解析</a>
+                  <a href="#/prototype/skill-market/detail" class="chip chip-hover">📈 IPO 项目风险分析</a>
+                  <a href="#/prototype/skill-market/detail" class="chip chip-hover">📋 尽职调查报告</a>
+                </div>
+                <div class="text-xs text-tertiary uppercase" style="margin-bottom: 6px;">MCP 服务 (2)</div>
+                <div class="flex flex-wrap gap-1" style="margin-bottom: 12px;">
+                  <a href="#/prototype/mcp/service-detail" class="chip chip-hover">💹 Wind 金融数据</a>
+                  <a href="#/prototype/mcp/service-detail" class="chip chip-hover">📚 内部研究库</a>
+                </div>
+                <div class="text-xs text-tertiary uppercase" style="margin-bottom: 6px;">知识库 (3)</div>
+                <div class="flex flex-wrap gap-1">
+                  <span class="chip chip-hover">📊 财报库 (236)</span>
+                  <span class="chip chip-hover">📈 研报库 (489)</span>
+                  <span class="chip chip-hover">📝 纪要库 (78)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 用户评论 -->
+            <div class="card">
+              <div class="card-header"><div class="card-title">用户评价 (186)</div></div>
+              <div class="card-body">
+                <div style="padding-bottom: 12px; border-bottom: 1px solid var(--color-border-light); margin-bottom: 12px;">
+                  <div class="flex items-center gap-2" style="margin-bottom: 4px;">
+                    <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #C96500, #FFD700);">李</div>
+                    <span class="font-medium text-sm">李四 · 法务部</span>
+                    <span class="text-xs text-tertiary">★ 5 · 2026-07-13</span>
+                  </div>
+                  <div class="text-sm text-secondary">ABC 项目尽调中,关联交易异常直接被标红,还自动关联了上次投决会决议,记忆能力惊艳。</div>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2" style="margin-bottom: 4px;">
+                    <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FFD700, #FF8C00);">王</div>
+                    <span class="font-medium text-sm">王五 · 合规部</span>
+                    <span class="text-xs text-tertiary">★ 4 · 2026-07-08</span>
+                  </div>
+                  <div class="text-sm text-secondary">分析框架完整,但半导体行业的产业链梳理可以更深入。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧:记忆策略 -->
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-header"><div class="card-title">记忆策略</div></div>
+              <div class="card-body">
+                <div class="text-xs text-tertiary" style="margin-bottom: 4px;">策略类型</div>
+                <div class="text-sm font-medium" style="margin-bottom: 12px;">项目级长期记忆 + 摘要压缩</div>
+                <div class="text-xs text-tertiary" style="margin-bottom: 4px;">保留期限</div>
+                <div class="text-sm font-medium" style="margin-bottom: 12px;">项目存续期 + 90 天</div>
+                <div class="text-xs text-tertiary" style="margin-bottom: 4px;">容量上限</div>
+                <div class="text-sm font-medium" style="margin-bottom: 4px;">单项目 50 条</div>
+                <div class="progress progress-sm"><div class="progress__bar" style="width: 42%;"></div></div>
+                <div class="text-xs text-tertiary" style="margin-top: 4px;">ABC 项目已用 21/50</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div class="card-title">订阅信息</div></div>
+              <div class="card-body">
+                <div class="text-xs text-tertiary" style="margin-bottom: 4px;">价格</div>
+                <div class="font-bold" style="color: var(--color-primary); margin-bottom: 12px;">¥199 / 月</div>
+                <div class="text-xs text-tertiary" style="margin-bottom: 4px;">包含</div>
+                <ul class="text-sm" style="margin: 0 0 12px; padding-left: 18px;">
+                  <li>无限次对话</li>
+                  <li>项目记忆容量 50 条</li>
+                  <li>个性化微调</li>
+                </ul>
+                <button class="btn btn-primary btn-sm btn-block install-btn" data-installed="false">立即订阅</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

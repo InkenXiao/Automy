@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>管理后台 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div style="padding: 24px; overflow-y: auto; height: 100%;">
+
+    <!-- 顶部 -->
+    <div class="flex justify-between items-center" style="margin-bottom: 20px;">
+      <div>
+        <h2 style="margin-bottom: 4px;">管理后台</h2>
+        <p class="text-sm text-secondary">系统总览 · 用户管理 · 模型配置 · 审计追踪</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm">📊 导出报表</button>
+        <button class="btn btn-primary btn-sm">⚙ 系统设置</button>
+      </div>
+    </div>
+
+    <!-- 核心指标 -->
+    <div class="stat-grid" style="margin-bottom: 24px;">
+      <div class="stat-card">
+        <div class="stat-card__label">活跃用户 (近 7 日)</div>
+        <div class="stat-card__value">326</div>
+        <div class="stat-card__trend stat-card__trend--up">▲ +24%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">会话总数 (今日)</div>
+        <div class="stat-card__value">1,842</div>
+        <div class="stat-card__trend stat-card__trend--up">▲ +8%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">Token 消耗 (本月)</div>
+        <div class="stat-card__value">28.6<span class="text-sm text-tertiary"> M</span></div>
+        <div class="stat-card__trend stat-card__trend--down">▼ -3%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">系统健康度</div>
+        <div class="stat-card__value" style="color: var(--color-success);">99.98<span class="text-sm text-tertiary">%</span></div>
+        <div class="stat-card__trend stat-card__trend--up">▲ +0.02%</div>
+      </div>
+    </div>
+
+    <!-- 主体: 左侧导航 + 右侧内容 -->
+    <div class="grid" style="grid-template-columns: 200px 1fr; gap: 20px;">
+
+      <!-- 左侧导航 -->
+      <aside class="card" style="height: fit-content;">
+        <div class="card-body" style="padding: 8px;">
+          <a href="#/prototype/admin" class="app-nav-item active" style="display: block;">📊 仪表盘</a>
+          <a href="#/prototype/admin/users" class="app-nav-item" style="display: block;">👥 用户管理</a>
+          <a href="#/prototype/admin/roles" class="app-nav-item" style="display: block;">🔑 角色权限</a>
+          <a href="#/prototype/admin/models" class="app-nav-item" style="display: block;">🤖 模型网关</a>
+          <a href="#/prototype/admin/mcp-services" class="app-nav-item" style="display: block;">🔌 MCP 服务</a>
+          <a href="#/prototype/admin/skills-experts" class="app-nav-item" style="display: block;">📦 技能与专家</a>
+          <a href="#/prototype/admin/audit" class="app-nav-item" style="display: block;">📜 审计日志</a>
+          <a href="#/prototype/admin/billing" class="app-nav-item" style="display: block;">💰 计费账单</a>
+          <a href="#/prototype/admin/security" class="app-nav-item" style="display: block;">🔐 安全策略</a>
+          <a href="#/prototype/admin/market-review" class="app-nav-item" style="display: block;">🛡 市场审核</a>
+          <a href="#/prototype/admin/settings" class="app-nav-item" style="display: block;">⚙ 系统配置</a>
+        </div>
+      </aside>
+
+      <!-- 右侧内容 -->
+      <div>
+
+        <!-- 用户管理 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">用户管理</div>
+            <div class="flex gap-2">
+              <input type="text" class="form-input" placeholder="搜索用户..." style="font-size: 13px; height: 32px; min-width: 220px;" />
+              <button class="btn btn-ghost btn-sm">导出</button>
+              <button class="btn btn-primary btn-sm">+ 邀请用户</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>用户</th>
+                  <th>部门</th>
+                  <th>角色</th>
+                  <th>套餐</th>
+                  <th>最近活跃</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <div class="avatar avatar-sm" style="background: var(--gradient-primary);">张</div>
+                      <div>
+                        <div class="font-medium">张三</div>
+                        <div class="text-xs text-tertiary">zhangsan@automy.cn</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-sm">投研部</td>
+                  <td><span class="badge badge-primary">分析师</span></td>
+                  <td class="text-sm">Pro</td>
+                  <td class="text-sm">3 分钟前</td>
+                  <td><span class="badge badge-success">在线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">管理</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #C96500, #FFD700);">李</div>
+                      <div>
+                        <div class="font-medium">李四</div>
+                        <div class="text-xs text-tertiary">lisi@automy.cn</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-sm">法务部</td>
+                  <td><span class="badge badge-primary">法务顾问</span></td>
+                  <td class="text-sm">Pro</td>
+                  <td class="text-sm">12 分钟前</td>
+                  <td><span class="badge badge-success">在线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">管理</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FFD700, #FF8C00);">王</div>
+                      <div>
+                        <div class="font-medium">王五</div>
+                        <div class="text-xs text-tertiary">wangwu@automy.cn</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-sm">合规部</td>
+                  <td><span class="badge badge-secondary">合规官</span></td>
+                  <td class="text-sm">Enterprise</td>
+                  <td class="text-sm">1 小时前</td>
+                  <td><span class="badge badge-secondary">离线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">管理</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #F97316, #EF4444);">赵</div>
+                      <div>
+                        <div class="font-medium">赵六</div>
+                        <div class="text-xs text-tertiary">zhaoliu@automy.cn</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-sm">销售部</td>
+                  <td><span class="badge badge-primary">销售</span></td>
+                  <td class="text-sm">Basic</td>
+                  <td class="text-sm">2 小时前</td>
+                  <td><span class="badge badge-secondary">离线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">管理</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #FF8C00, #FF5D00);">钱</div>
+                      <div>
+                        <div class="font-medium">钱七</div>
+                        <div class="text-xs text-tertiary">qianqi@automy.cn</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-sm">IT 部</td>
+                  <td><span class="badge badge-warning">管理员</span></td>
+                  <td class="text-sm">Enterprise</td>
+                  <td class="text-sm">5 分钟前</td>
+                  <td><span class="badge badge-success">在线</span></td>
+                  <td><button class="btn btn-ghost btn-sm">管理</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 模型配置 -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">模型配置</div>
+            <button class="btn btn-primary btn-sm">+ 添加模型</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>模型</th>
+                  <th>供应商</th>
+                  <th>上下文窗口</th>
+                  <th>输入价格</th>
+                  <th>输出价格</th>
+                  <th>调用次数 (今日)</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="font-medium">Claude Sonnet 4.5</div>
+                    <div class="text-xs text-tertiary">claude-sonnet-4-5</div>
+                  </td>
+                  <td class="text-sm">Anthropic</td>
+                  <td class="text-sm">200K</td>
+                  <td class="text-sm">$3 / 1M</td>
+                  <td class="text-sm">$15 / 1M</td>
+                  <td class="text-sm">8,432</td>
+                  <td><span class="badge badge-success">已启用</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="font-medium">GPT-4o</div>
+                    <div class="text-xs text-tertiary">gpt-4o-2024-08</div>
+                  </td>
+                  <td class="text-sm">OpenAI</td>
+                  <td class="text-sm">128K</td>
+                  <td class="text-sm">$2.5 / 1M</td>
+                  <td class="text-sm">$10 / 1M</td>
+                  <td class="text-sm">5,128</td>
+                  <td><span class="badge badge-success">已启用</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="font-medium">DeepSeek-V3</div>
+                    <div class="text-xs text-tertiary">deepseek-v3-chat</div>
+                  </td>
+                  <td class="text-sm">DeepSeek</td>
+                  <td class="text-sm">128K</td>
+                  <td class="text-sm">¥1 / 1M</td>
+                  <td class="text-sm">¥2 / 1M</td>
+                  <td class="text-sm">12,856</td>
+                  <td><span class="badge badge-success">已启用</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="font-medium">Qwen2.5-72B</div>
+                    <div class="text-xs text-tertiary">qwen2.5-72b-instruct</div>
+                  </td>
+                  <td class="text-sm">阿里云</td>
+                  <td class="text-sm">131K</td>
+                  <td class="text-sm">¥4 / 1M</td>
+                  <td class="text-sm">¥12 / 1M</td>
+                  <td class="text-sm">3,248</td>
+                  <td><span class="badge badge-secondary">已停用</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="font-medium">GLM-4-Plus</div>
+                    <div class="text-xs text-tertiary">glm-4-plus</div>
+                  </td>
+                  <td class="text-sm">智谱 AI</td>
+                  <td class="text-sm">128K</td>
+                  <td class="text-sm">¥50 / 1M</td>
+                  <td class="text-sm">¥50 / 1M</td>
+                  <td class="text-sm">1,856</td>
+                  <td><span class="badge badge-warning">限流</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 审计日志 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">最近审计日志</div>
+            <a href="#/docs/requirements/security-audit" class="text-sm" style="color: var(--color-primary);">查看全部 →</a>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>用户</th>
+                  <th>操作类型</th>
+                  <th>资源</th>
+                  <th>结果</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 09:45:23</td>
+                  <td class="text-sm">张三</td>
+                  <td><span class="badge badge-primary">工具调用</span></td>
+                  <td class="text-sm">mcp.wind-data / wind.finance.history</td>
+                  <td><span class="badge badge-success">成功</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.34</td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 09:33:01</td>
+                  <td class="text-sm">张三</td>
+                  <td><span class="badge badge-primary">会话</span></td>
+                  <td class="text-sm">会话 #chat_abc123 (新建)</td>
+                  <td><span class="badge badge-success">成功</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.34</td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 09:18:47</td>
+                  <td class="text-sm">李四</td>
+                  <td><span class="badge badge-warning">权限变更</span></td>
+                  <td class="text-sm">授予用户 赵六 "法务阅读"权限</td>
+                  <td><span class="badge badge-success">成功</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.56</td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 08:50:12</td>
+                  <td class="text-sm">赵六</td>
+                  <td><span class="badge badge-primary">工具调用</span></td>
+                  <td class="text-sm">mcp.crm-system / crm.opportunity.list</td>
+                  <td><span class="badge badge-warning">超时</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.78</td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 08:12:39</td>
+                  <td class="text-sm">钱七</td>
+                  <td><span class="badge badge-danger">登录失败</span></td>
+                  <td class="text-sm">SSO 登录(密码错误 3 次)</td>
+                  <td><span class="badge badge-danger">失败</span></td>
+                  <td class="text-xs text-tertiary">192.168.1.45</td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-15 07:55:21</td>
+                  <td class="text-sm">王五</td>
+                  <td><span class="badge badge-primary">文档上传</span></td>
+                  <td class="text-sm">ABC新能源_法律意见书_最终版.pdf</td>
+                  <td><span class="badge badge-success">成功</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.45</td>
+                </tr>
+                <tr>
+                  <td class="text-sm text-tertiary">2026-07-14 22:01:08</td>
+                  <td class="text-sm">张三</td>
+                  <td><span class="badge badge-secondary">技能安装</span></td>
+                  <td class="text-sm">金融文档翻译 v1.1.0</td>
+                  <td><span class="badge badge-success">成功</span></td>
+                  <td class="text-xs text-tertiary">10.0.12.34</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

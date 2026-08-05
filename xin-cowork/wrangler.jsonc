@@ -1,0 +1,27 @@
+{
+  // Automy 静态站点 · Cloudflare Workers Static Assets 部署配置
+  // 部署命令: npx wrangler deploy   (在 automy-site 目录下执行,无需 npm install)
+  // 说明: 本项目为纯静态站点(HTML5 + CSS3 + 原生 JS + hash 路由),
+  //       源码目录即可直接作为静态资源部署,无需 Vite 构建产物。
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "automy-site",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    // 以当前目录(automy-site)作为静态资源根目录
+    "directory": ".",
+    // 未命中静态文件时返回 404.html
+    "not_found_handling": "404-page",
+    // 排除非静态文件:构建配置、依赖、文档等不发布到 CDN
+    "exclude": [
+      "wrangler.jsonc",
+      "wrangler.toml",
+      "vite.config.js",
+      "package.json",
+      "package-lock.json",
+      "README.md",
+      ".gitignore",
+      "node_modules/**",
+      "dist/**"
+    ]
+  }
+}

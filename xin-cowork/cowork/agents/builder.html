@@ -1,0 +1,223 @@
+<!-- ============================================================
+     XIN 信 · CoWork Agent 构建器(新建 / 编辑)
+     通过 Hash 路由懒加载,仅包含 body 内容
+     编辑模式: #/cowork/agents/builder?id=<agentId>
+     ============================================================ -->
+<link rel="stylesheet" href="../../assets/css/cowork.css" />
+
+<div class="cowork-main__scroll">
+  <!-- 页面标题 -->
+  <div class="cowork-page-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;">
+    <div>
+      <h2 style="margin:0;font-size:20px;" id="builder-title">Agent 构建器</h2>
+      <p class="text-muted" style="margin:4px 0 0;font-size:13px;">配置 Agent 的类型、提示词、可用工具与高级参数。</p>
+    </div>
+    <a href="#/cowork/agents" class="btn btn-ghost">返回列表</a>
+  </div>
+
+  <!-- 构建器表单 -->
+  <form id="agent-builder-form" class="builder-form">
+    <div class="builder-form__group">
+      <label class="builder-form__label" for="agent-name">名称<span class="required">*</span></label>
+      <input class="builder-form__input" id="agent-name" name="name" required placeholder="例如:投研分析助手" />
+    </div>
+
+    <div class="builder-form__group">
+      <label class="builder-form__label" for="agent-type">类型</label>
+      <select class="builder-form__select" id="agent-type" name="type">
+        <option value="progress">进度跟踪 (progress)</option>
+        <option value="meeting">会议纪要 (meeting)</option>
+        <option value="weekly_report">周报 (weekly_report)</option>
+        <option value="work_plan">工作计划 (work_plan)</option>
+        <option value="custom" selected>自定义 (custom)</option>
+      </select>
+    </div>
+
+    <div class="builder-form__group">
+      <label class="builder-form__label" for="agent-description">描述</label>
+      <textarea class="builder-form__textarea" id="agent-description" name="description" rows="3" placeholder="简要说明 Agent 的职责与适用场景"></textarea>
+    </div>
+
+    <div class="builder-form__group">
+      <label class="builder-form__label" for="agent-system-prompt">系统提示词</label>
+      <textarea class="builder-form__textarea" id="agent-system-prompt" name="system_prompt" rows="6" placeholder="定义 Agent 的角色、能力与输出要求"></textarea>
+    </div>
+
+    <div class="builder-form__group">
+      <span class="builder-form__label">工具选择</span>
+      <div id="agent-tools" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_project_info" /> 查询项目信息</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_phases" /> 查询阶段</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_modules" /> 查询模块</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_progress_tasks" /> 查询进度任务</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="create_progress_task" /> 创建进度任务</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="update_progress_task" /> 更新进度任务</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_weekly_reports" /> 查询周报列表</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_weekly_report_detail" /> 查询周报详情</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_meetings" /> 查询会议</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="create_meeting" /> 创建会议</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="get_work_tasks" /> 查询工作任务</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" name="tools" value="create_work_task" /> 创建工作任务</label>
+      </div>
+      <div class="builder-form__hint">勾选该 Agent 在对话中可调用的工具。</div>
+    </div>
+
+    <div class="builder-form__group">
+      <label class="builder-form__label" for="agent-config">配置 (JSON)</label>
+      <textarea class="builder-form__textarea" id="agent-config" name="config" rows="5" style="font-family:var(--font-mono);" placeholder='{"model": "...", "temperature": 0.7}'></textarea>
+      <div class="builder-form__hint">高级配置,需为合法 JSON;留空则使用默认配置。</div>
+    </div>
+
+    <div class="builder-form__actions">
+      <button type="button" class="btn btn-ghost" id="agent-test-btn">测试</button>
+      <button type="submit" class="btn btn-primary" id="agent-save-btn">保存</button>
+    </div>
+  </form>
+
+  <!-- 测试结果区 -->
+  <div id="agent-test-result" style="margin-top:16px;max-width:640px;"></div>
+</div>
+
+<script type="module">
+  import { agentApi } from '../../assets/js/agent-api.js';
+
+  /** 编辑模式下的 Agent ID(从 hash 查询参数解析) */
+  let agentId = null;
+
+  const form = document.getElementById('agent-builder-form');
+  const resultEl = document.getElementById('agent-test-result');
+
+  /** HTML 转义 */
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** 从 hash 中解析查询参数 */
+  function getHashParam(name) {
+    const match = location.hash.match(new RegExp('[?&]' + name + '=([^&]+)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  /** 编辑模式: 加载已有 Agent 数据并填充表单 */
+  async function loadAgent() {
+    agentId = getHashParam('id');
+    if (!agentId) return;
+    document.getElementById('builder-title').textContent = '编辑 Agent';
+    try {
+      const agent = await agentApi.getAgent(agentId);
+      form.elements.name.value = agent.name || '';
+      form.elements.type.value = agent.type || 'custom';
+      form.elements.description.value = agent.description || '';
+      form.elements.system_prompt.value = agent.system_prompt || '';
+      form.elements.config.value = agent.config && Object.keys(agent.config).length
+        ? JSON.stringify(agent.config, null, 2)
+        : '';
+      const tools = Array.isArray(agent.tools) ? agent.tools : [];
+      form.querySelectorAll('input[name="tools"]').forEach((cb) => {
+        cb.checked = tools.includes(cb.value);
+      });
+    } catch (err) {
+      console.error('[CoWork] 加载 Agent 失败:', err);
+      resultEl.innerHTML = `<div class="alert alert-danger">加载 Agent 失败: ${esc(err.message)}</div>`;
+    }
+  }
+
+  /** 收集表单数据 */
+  function collectForm() {
+    const configText = form.elements.config.value.trim();
+    let config = {};
+    if (configText) {
+      try {
+        config = JSON.parse(configText);
+      } catch (e) {
+        alert('配置不是合法的 JSON,请检查后重试。');
+        return null;
+      }
+    }
+    return {
+      name: form.elements.name.value.trim(),
+      type: form.elements.type.value,
+      description: form.elements.description.value.trim(),
+      system_prompt: form.elements.system_prompt.value,
+      tools: Array.from(form.querySelectorAll('input[name="tools"]:checked')).map((cb) => cb.value),
+      config
+    };
+  }
+
+  /** 保存(新建或更新) */
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = collectForm();
+    if (!data) return;
+    const saveBtn = document.getElementById('agent-save-btn');
+    saveBtn.disabled = true;
+    try {
+      if (agentId) {
+        await agentApi.updateAgent(agentId, data);
+      } else {
+        const created = await agentApi.createAgent(data);
+        agentId = created?.id || agentId;
+      }
+      window.location.hash = '#/cowork/agents';
+    } catch (err) {
+      console.error('[CoWork] 保存 Agent 失败:', err);
+      alert('保存失败: ' + err.message);
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  /** 测试: 向已保存的 Agent 发送一条消息,解析 SSE 流式回复 */
+  document.getElementById('agent-test-btn').addEventListener('click', async () => {
+    if (!agentId) {
+      resultEl.innerHTML = '<div class="alert alert-warning">请先保存 Agent,再进行测试。</div>';
+      return;
+    }
+    resultEl.innerHTML = `
+      <div class="cowork-loading"><span class="cowork-loading__spinner"></span><span>测试对话中...</span></div>`;
+    try {
+      const stream = await agentApi.chat(agentId, '你好,请用一句话介绍你自己。', null);
+      const reader = stream.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let content = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop();
+        for (const block of events) {
+          const line = block.trim();
+          if (!line.startsWith('data:')) continue;
+          let data;
+          try {
+            data = JSON.parse(line.slice(5).trim());
+          } catch (e) {
+            continue; // 忽略无法解析的数据块
+          }
+          if (data.type === 'content') {
+            content += data.content || '';
+          } else if (data.type === 'error') {
+            throw new Error(data.content || '未知错误');
+          }
+        }
+      }
+      resultEl.innerHTML = `
+        <div class="card"><div class="card-body">
+          <span class="badge badge-success" style="margin-bottom:8px;">测试成功</span>
+          <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;">${esc(content) || '(无回复内容)'}</div>
+        </div></div>`;
+    } catch (err) {
+      console.error('[CoWork] 测试 Agent 失败:', err);
+      resultEl.innerHTML = `<div class="alert alert-danger">测试失败: ${esc(err.message)}</div>`;
+    }
+  });
+
+  loadAgent();
+  document.title = 'Agent 构建器 · CoWork · XIN';
+</script>

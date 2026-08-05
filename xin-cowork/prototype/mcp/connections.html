@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>MCP 连接管理 · XIN</title>
+</head>
+<body>
+<div class="prototype-frame">
+  <div class="app-frame">
+    <!-- 应用侧边栏 -->
+    <aside class="app-frame__sidebar">
+      <div class="app-sidebar__header">
+        <span class="app-sidebar__brand">XIN</span>
+        <button class="app-sidebar__new" title="新建会话">+</button>
+      </div>
+      <nav class="app-sidebar__nav">
+        <div class="app-sidebar__section-label">主导航</div>
+        <a href="#/prototype/workspace" class="app-nav-item"><span class="app-nav-item__icon">💼</span><span class="app-nav-item__label">工作台</span></a>
+        <a href="#/prototype/skill-market" class="app-nav-item"><span class="app-nav-item__icon">⚡</span><span class="app-nav-item__label">技能市场</span></a>
+        <a href="#/prototype/expert-market" class="app-nav-item"><span class="app-nav-item__icon">🤖</span><span class="app-nav-item__label">专家市场</span></a>
+        <a href="#/prototype/mcp" class="app-nav-item active"><span class="app-nav-item__icon">🔌</span><span class="app-nav-item__label">MCP 集成</span></a>
+        <a href="#/prototype/knowledge" class="app-nav-item"><span class="app-nav-item__icon">📚</span><span class="app-nav-item__label">知识库</span></a>
+        <a href="#/prototype/admin" class="app-nav-item"><span class="app-nav-item__icon">⚙</span><span class="app-nav-item__label">管理后台</span></a>
+        <a href="#/prototype/workbuddy-demo" class="app-nav-item"><span class="app-nav-item__icon">🖼</span><span class="app-nav-item__label">WorkBuddy 交互界面</span></a>
+
+        <div class="app-sidebar__section-label" style="margin-top: 20px;">MCP</div>
+        <a href="#/prototype/mcp" class="app-nav-item"><span class="app-nav-item__icon">🏪</span><span class="app-nav-item__label">服务市场</span></a>
+        <a href="#/prototype/mcp/connections" class="app-nav-item active"><span class="app-nav-item__icon">🔗</span><span class="app-nav-item__label">连接管理</span></a>
+        <a href="#/prototype/admin/audit" class="app-nav-item"><span class="app-nav-item__icon">📜</span><span class="app-nav-item__label">调用日志</span></a>
+      </nav>
+      <div class="app-sidebar__footer">
+        <a href="#/prototype/profile" class="app-nav-item">
+          <div class="avatar avatar-sm">张</div>
+          <span class="app-nav-item__label">张三 · 投研部</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="app-frame__main">
+      <div class="app-topbar">
+        <div class="app-topbar__title">MCP 连接管理</div>
+        <div class="app-topbar__actions">
+          <button class="btn btn-ghost btn-sm">🔄 刷新</button>
+          <button class="btn btn-primary btn-sm">+ 添加连接</button>
+        </div>
+      </div>
+      <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        <ul class="breadcrumb">
+          <li><a href="#/">首页</a></li>
+          <li><a href="#/prototype/workspace">产品原型</a></li>
+          <li><a href="#/prototype/mcp">MCP 集成</a></li>
+          <li>连接管理</li>
+        </ul>
+
+        <!-- 已连接服务卡片 -->
+        <div class="text-xs text-tertiary uppercase" style="margin-bottom: 8px;">已连接服务 (6)</div>
+        <div class="grid grid-cols-2" style="gap: 12px; margin-bottom: 24px;">
+          <div class="card">
+            <div class="card-body">
+              <div class="flex items-center gap-2" style="margin-bottom: 8px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--color-info-light); display: flex; align-items: center; justify-content: center;">💹</div>
+                <div style="flex: 1;">
+                  <div class="font-medium text-sm">Wind 金融数据</div>
+                  <div class="text-xs text-tertiary">Wind 资讯 · v3.1.0</div>
+                </div>
+                <span class="badge badge-success"><span class="status-dot success"></span>已连接</span>
+              </div>
+              <div class="grid grid-cols-2 text-xs" style="gap: 4px; margin-bottom: 8px;">
+                <div><span class="text-tertiary">授权范围:</span> <span class="badge badge-primary">只读</span></div>
+                <div><span class="text-tertiary">调用次数:</span> 8,432</div>
+                <div><span class="text-tertiary">数据标签:</span> 行情/财务</div>
+                <div><span class="text-tertiary">连接时间:</span> 2026-06-15</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">调用记录</button>
+                <button class="btn btn-danger btn-sm">撤销连接</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-body">
+              <div class="flex items-center gap-2" style="margin-bottom: 8px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: #FF5D00; color: white; display: flex; align-items: center; justify-content: center;">🎯</div>
+                <div style="flex: 1;">
+                  <div class="font-medium text-sm">CRM 客户关系管理</div>
+                  <div class="text-xs text-tertiary">Salesforce · v2.0.0</div>
+                </div>
+                <span class="badge badge-success"><span class="status-dot success"></span>已连接</span>
+              </div>
+              <div class="grid grid-cols-2 text-xs" style="gap: 4px; margin-bottom: 8px;">
+                <div><span class="text-tertiary">授权范围:</span> <span class="badge badge-warning">读写</span></div>
+                <div><span class="text-tertiary">调用次数:</span> 5,128</div>
+                <div><span class="text-tertiary">数据标签:</span> 客户/商机</div>
+                <div><span class="text-tertiary">连接时间:</span> 2026-05-20</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">调用记录</button>
+                <button class="btn btn-danger btn-sm">撤销连接</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-body">
+              <div class="flex items-center gap-2" style="margin-bottom: 8px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: #FF5D00; color: white; display: flex; align-items: center; justify-content: center;">💬</div>
+                <div style="flex: 1;">
+                  <div class="font-medium text-sm">飞书协作套件</div>
+                  <div class="text-xs text-tertiary">Lark Suite · v2.3.0</div>
+                </div>
+                <span class="badge badge-success"><span class="status-dot success"></span>已连接</span>
+              </div>
+              <div class="grid grid-cols-2 text-xs" style="gap: 4px; margin-bottom: 8px;">
+                <div><span class="text-tertiary">授权范围:</span> <span class="badge badge-warning">读写</span></div>
+                <div><span class="text-tertiary">调用次数:</span> 3,248</div>
+                <div><span class="text-tertiary">数据标签:</span> 文档/日历</div>
+                <div><span class="text-tertiary">连接时间:</span> 2026-04-10</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">调用记录</button>
+                <button class="btn btn-danger btn-sm">撤销连接</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-body">
+              <div class="flex items-center gap-2" style="margin-bottom: 8px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: #FFD700; color: white; display: flex; align-items: center; justify-content: center;">📚</div>
+                <div style="flex: 1;">
+                  <div class="font-medium text-sm">内部研究库</div>
+                  <div class="text-xs text-tertiary">自研 / Confluence · v1.2.0</div>
+                </div>
+                <span class="badge badge-success"><span class="status-dot success"></span>已连接</span>
+              </div>
+              <div class="grid grid-cols-2 text-xs" style="gap: 4px; margin-bottom: 8px;">
+                <div><span class="text-tertiary">授权范围:</span> <span class="badge badge-primary">只读</span></div>
+                <div><span class="text-tertiary">调用次数:</span> 1,856</div>
+                <div><span class="text-tertiary">数据标签:</span> 研报/备忘</div>
+                <div><span class="text-tertiary">连接时间:</span> 2026-06-01</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">调用记录</button>
+                <button class="btn btn-danger btn-sm">撤销连接</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 调用记录表 -->
+        <div class="flex justify-between items-center" style="margin-bottom: 12px;">
+          <h3>调用记录</h3>
+          <div class="flex gap-2">
+            <select class="select input-sm" style="width: auto;"><option>全部服务</option><option>Wind 金融</option><option>CRM</option></select>
+            <select class="select input-sm" style="width: auto;"><option>全部状态</option><option>成功</option><option>超时</option></select>
+            <button class="btn btn-outline btn-sm">导出 CSV</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding: 0;">
+            <table class="table">
+              <thead>
+                <tr><th>时间</th><th>服务</th><th>工具</th><th>参数摘要</th><th>状态</th><th>耗时</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="text-sm text-tertiary">2026-07-15 09:45:23</td><td><span class="chip">💹 Wind</span></td><td><code class="text-sm">wind.finance.history</code></td><td class="text-sm">{"code":"600519","years":5}</td><td><span class="badge badge-success">成功</span></td><td class="text-sm">186 ms</td></tr>
+                <tr><td class="text-sm text-tertiary">2026-07-15 09:33:01</td><td><span class="chip">💹 Wind</span></td><td><code class="text-sm">wind.quote.realtime</code></td><td class="text-sm">{"codes":["600519","000858"]}</td><td><span class="badge badge-success">成功</span></td><td class="text-sm">94 ms</td></tr>
+                <tr><td class="text-sm text-tertiary">2026-07-15 09:18:47</td><td><span class="chip">💬 飞书</span></td><td><code class="text-sm">lark.doc.read</code></td><td class="text-sm">{"doc_id":"abc123"}</td><td><span class="badge badge-success">成功</span></td><td class="text-sm">312 ms</td></tr>
+                <tr><td class="text-sm text-tertiary">2026-07-15 08:50:12</td><td><span class="chip">🎯 CRM</span></td><td><code class="text-sm">crm.opportunity.list</code></td><td class="text-sm">{"owner":"zhangsan"}</td><td><span class="badge badge-warning">超时</span></td><td class="text-sm">5,024 ms</td></tr>
+                <tr><td class="text-sm text-tertiary">2026-07-15 08:12:39</td><td><span class="chip">📚 研究库</span></td><td><code class="text-sm">research.search</code></td><td class="text-sm">{"q":"新能源产业链"}</td><td><span class="badge badge-success">成功</span></td><td class="text-sm">268 ms</td></tr>
+                <tr><td class="text-sm text-tertiary">2026-07-14 22:01:08</td><td><span class="chip">🎯 CRM</span></td><td><code class="text-sm">crm.customer.get</code></td><td class="text-sm">{"id":"C20251"}</td><td><span class="badge badge-danger">失败</span></td><td class="text-sm">-</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

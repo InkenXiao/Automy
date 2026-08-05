@@ -1,0 +1,182 @@
+[
+  {
+    "id": "mcp-crm-system",
+    "name": "CRM 客户关系管理",
+    "nameEn": "CRM System",
+    "category": "销售",
+    "icon": "🎯",
+    "description": "连接企业 CRM 系统,查询客户、商机、合同数据,支持自然语言转结构化查询。",
+    "vendor": "Salesforce / 自研",
+    "version": "2.0.0",
+    "status": "connected",
+    "tools": [
+      { "name": "crm.query", "description": "查询商机/客户/合同" },
+      { "name": "crm.customer.get", "description": "获取客户详情" },
+      { "name": "crm.opportunity.list", "description": "列出商机" },
+      { "name": "crm.contract.search", "description": "搜索合同" }
+    ],
+    "authType": "oauth2",
+    "permissions": ["read:customers", "read:opportunities", "read:contracts"],
+    "connectionCount": 156,
+    "isOfficial": true,
+    "lastUsed": "2026-07-14 18:23",
+    "configRequired": ["endpoint", "clientId", "clientSecret"]
+  },
+  {
+    "id": "mcp-erp-system",
+    "name": "ERP 企业资源计划",
+    "nameEn": "ERP System",
+    "category": "运营",
+    "icon": "🏢",
+    "description": "连接 ERP 系统查询财务、库存、采购、人力资源等数据,实现跨系统数据整合分析。",
+    "vendor": "SAP / 用友 / 金蝶",
+    "version": "1.5.0",
+    "status": "disconnected",
+    "tools": [
+      { "name": "erp.finance.query", "description": "查询财务数据" },
+      { "name": "erp.inventory.get", "description": "获取库存信息" },
+      { "name": "erp.hr.employee", "description": "查询员工信息" }
+    ],
+    "authType": "api_key",
+    "permissions": ["read:finance", "read:inventory", "read:hr"],
+    "connectionCount": 78,
+    "isOfficial": true,
+    "lastUsed": "2026-07-12 14:08",
+    "configRequired": ["endpoint", "apiKey"]
+  },
+  {
+    "id": "mcp-wind-data",
+    "name": "Wind 金融数据",
+    "nameEn": "Wind Financial Data",
+    "category": "数据",
+    "icon": "💹",
+    "description": "接入 Wind 资讯金融数据接口,获取股票行情、财务数据、宏观数据、行业研究等。",
+    "vendor": "Wind 资讯",
+    "version": "3.1.0",
+    "status": "connected",
+    "tools": [
+      { "name": "wind.quote.realtime", "description": "实时行情" },
+      { "name": "wind.finance.history", "description": "历史财务数据" },
+      { "name": "wind.macro.indicator", "description": "宏观经济指标" },
+      { "name": "wind.research.report", "description": "行业研究报告" }
+    ],
+    "authType": "api_key",
+    "permissions": ["read:quotes", "read:finance", "read:macro", "read:research"],
+    "connectionCount": 234,
+    "isOfficial": true,
+    "lastUsed": "2026-07-15 09:45",
+    "configRequired": ["apiKey", "apiSecret"]
+  },
+  {
+    "id": "mcp-internal-research",
+    "name": "内部研究库",
+    "nameEn": "Internal Research Library",
+    "category": "知识",
+    "icon": "📚",
+    "description": "连接企业内部研究文档库,检索历史研究报告、行业研究、内部备忘录等。",
+    "vendor": "自研 / Confluence",
+    "version": "1.2.0",
+    "status": "connected",
+    "tools": [
+      { "name": "research.search", "description": "全文检索研究文档" },
+      { "name": "research.document.get", "description": "获取文档详情" },
+      { "name": "research.tag.list", "description": "列出文档标签" }
+    ],
+    "authType": "sso",
+    "permissions": ["read:documents", "read:tags"],
+    "connectionCount": 312,
+    "isOfficial": true,
+    "lastUsed": "2026-07-15 10:12",
+    "configRequired": ["endpoint", "ssoToken"]
+  },
+  {
+    "id": "mcp-email-system",
+    "name": "企业邮箱",
+    "nameEn": "Corporate Email",
+    "category": "通信",
+    "icon": "✉",
+    "description": "连接企业邮箱(Exchange/Outlook/Gmail),读取邮件、起草邮件、查询历史通信。",
+    "vendor": "Microsoft / Google",
+    "version": "1.0.5",
+    "status": "disconnected",
+    "tools": [
+      { "name": "mail.read", "description": "读取邮件" },
+      { "name": "mail.send", "description": "发送邮件" },
+      { "name": "mail.search", "description": "搜索邮件" },
+      { "name": "mail.draft", "description": "起草邮件" }
+    ],
+    "authType": "oauth2",
+    "permissions": ["read:mail", "write:mail"],
+    "connectionCount": 89,
+    "isOfficial": false,
+    "lastUsed": "2026-07-13 16:30",
+    "configRequired": ["provider", "clientId", "clientSecret"]
+  },
+  {
+    "id": "mcp-law-database",
+    "name": "法律法规数据库",
+    "nameEn": "Legal Database",
+    "category": "法务",
+    "icon": "⚖",
+    "description": "接入法律法规数据库,查询最新法规、司法解释、典型案例,支持合同条款合规性比对。",
+    "vendor": "北大法宝 / 威科先行",
+    "version": "1.3.2",
+    "status": "connected",
+    "tools": [
+      { "name": "law.regulation.search", "description": "搜索法规" },
+      { "name": "law.case.search", "description": "搜索案例" },
+      { "name": "law.clause.compare", "description": "条款比对" }
+    ],
+    "authType": "api_key",
+    "permissions": ["read:regulations", "read:cases"],
+    "connectionCount": 145,
+    "isOfficial": false,
+    "lastUsed": "2026-07-11 11:25",
+    "configRequired": ["endpoint", "apiKey"]
+  },
+  {
+    "id": "mcp-regulation-database",
+    "name": "监管动态数据库",
+    "nameEn": "Regulation Update",
+    "category": "合规",
+    "icon": "📋",
+    "description": "实时跟踪证监会、银保监会等监管机构动态,推送最新政策与监管要求。",
+    "vendor": "自研聚合",
+    "version": "1.1.0",
+    "status": "connected",
+    "tools": [
+      { "name": "regulation.fetch", "description": "获取最新法规" },
+      { "name": "regulation.subscribe", "description": "订阅监管动态" },
+      { "name": "regulation.compare", "description": "对比法规变化" }
+    ],
+    "authType": "none",
+    "permissions": ["read:regulations"],
+    "connectionCount": 67,
+    "isOfficial": false,
+    "lastUsed": "2026-07-15 08:00",
+    "configRequired": []
+  },
+  {
+    "id": "mcp-document-storage",
+    "name": "企业文档存储",
+    "nameEn": "Document Storage",
+    "category": "存储",
+    "icon": "📁",
+    "description": "连接企业文档存储系统(SharePoint/OneDrive/自研),上传、下载、检索文档。",
+    "vendor": "Microsoft / 自研",
+    "version": "2.1.0",
+    "status": "connected",
+    "tools": [
+      { "name": "doc.upload", "description": "上传文档" },
+      { "name": "doc.download", "description": "下载文档" },
+      { "name": "doc.search", "description": "检索文档" },
+      { "name": "doc.share", "description": "共享文档" }
+    ],
+    "authType": "oauth2",
+    "permissions": ["read:documents", "write:documents", "share:documents"],
+    "connectionCount": 423,
+    "isOfficial": true,
+    "lastUsed": "2026-07-15 09:30",
+    "configRequired": ["provider", "clientId", "clientSecret"]
+  }
+]
