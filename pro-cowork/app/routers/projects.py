@@ -145,5 +145,5 @@ async def delete_project(project_id: int, db=Depends(get_db)) -> dict:
     if not proj or proj.is_delete:
         raise HTTPException(status_code=404, detail="项目不存在")
     proj.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": project_id}

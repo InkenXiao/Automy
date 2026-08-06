@@ -112,7 +112,7 @@ async def list_task_runs(
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[TaskRunOut]:
-    q = select(TaskRun)
+    q = select(TaskRun).where(TaskRun.is_delete.is_(False))
     if project_id is not None:
         q = q.where(TaskRun.project_id == project_id)
     if status:
@@ -127,7 +127,7 @@ async def create_task_run(
     payload: TaskRunCreate, db: AsyncSession = Depends(get_db)
 ) -> TaskRunOut:
     agent = await db.get(Agent, payload.agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="智能体不存在")
     pid = payload.project_id or await get_active_project_id(db)
     run = TaskRun(
@@ -148,7 +148,7 @@ async def create_task_run(
 @router.get("/{run_id}", response_model=TaskRunOut)
 async def get_task_run(run_id: int, db: AsyncSession = Depends(get_db)) -> TaskRunOut:
     run = await db.get(TaskRun, run_id)
-    if not run:
+    if not run or run.is_delete:
         raise HTTPException(status_code=404, detail="任务不存在")
     return TaskRunOut.model_validate(run)
 
@@ -156,10 +156,10 @@ async def get_task_run(run_id: int, db: AsyncSession = Depends(get_db)) -> TaskR
 @router.delete("/{run_id}")
 async def delete_task_run(run_id: int, db: AsyncSession = Depends(get_db)):
     run = await db.get(TaskRun, run_id)
-    if not run:
+    if not run or run.is_delete:
         raise HTTPException(status_code=404, detail="任务不存在")
-    await db.delete(run)
-    await db.flush()
+    run.is_delete = True
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True}
 
 
@@ -167,13 +167,13 @@ async def delete_task_run(run_id: int, db: AsyncSession = Depends(get_db)):
 async def list_task_messages(run_id: int, db: AsyncSession = Depends(get_db)):
     """任务会话消息列表 (按时间正序), 用于前端对话回放"""
     run = await db.get(TaskRun, run_id)
-    if not run:
+    if not run or run.is_delete:
         raise HTTPException(status_code=404, detail="任务不存在")
     if not run.session_id:
         return []
     result = await db.execute(
         select(AgentMessage)
-        .where(AgentMessage.session_id == run.session_id)
+        .where(AgentMessage.session_id == run.session_id, AgentMessage.is_delete.is_(False))
         .order_by(AgentMessage.id)
     )
     return [
@@ -223,7 +223,9 @@ async def _build_prompt(
 async def _next_seq(db: AsyncSession, run_id: int) -> int:
     from sqlalchemy import func
     result = await db.execute(
-        select(func.max(TaskRunEvent.seq)).where(TaskRunEvent.run_id == run_id)
+        select(func.max(TaskRunEvent.seq)).where(
+            TaskRunEvent.run_id == run_id, TaskRunEvent.is_delete.is_(False)
+        )
     )
     return (result.scalar() or 0) + 1
 
@@ -235,12 +237,12 @@ async def run_task(run_id: int, db: AsyncSession = Depends(get_db)):
     执行过程通过 GET /{run_id}/events (SSE) 订阅。
     """
     run = await db.get(TaskRun, run_id)
-    if not run:
+    if not run or run.is_delete:
         raise HTTPException(status_code=404, detail="任务不存在")
     if run.status == "running" or task_runner.is_running(run_id):
         raise HTTPException(status_code=409, detail="任务正在执行中")
     agent = await db.get(Agent, run.agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="智能体不存在")
 
     message = await _build_prompt(
@@ -258,12 +260,14 @@ async def run_task(run_id: int, db: AsyncSession = Depends(get_db)):
     run.status = "running"
     db.add(AgentMessage(session_id=session.id, role="user", content=message))
 
-    # 清理旧事件 (重新执行时) 并写入 user 事件
+    # 清理旧事件 (重新执行时, 逻辑删除) 并写入 user 事件
     old_events = await db.execute(
-        select(TaskRunEvent).where(TaskRunEvent.run_id == run_id)
+        select(TaskRunEvent).where(
+            TaskRunEvent.run_id == run_id, TaskRunEvent.is_delete.is_(False)
+        )
     )
     for ev in old_events.scalars().all():
-        await db.delete(ev)
+        ev.is_delete = True
     db.add(TaskRunEvent(run_id=run_id, seq=1, type="user", name="", payload={"content": message}))
     await db.commit()
 
@@ -277,17 +281,17 @@ async def continue_task(
 ):
     """任务继续对话 (后台): 在原任务会话中补充内容, 可追加文件/技能"""
     run = await db.get(TaskRun, run_id)
-    if not run:
+    if not run or run.is_delete:
         raise HTTPException(status_code=404, detail="任务不存在")
     if not run.session_id:
         raise HTTPException(status_code=400, detail="任务尚未执行, 无法继续对话")
     if run.status == "running" or task_runner.is_running(run_id):
         raise HTTPException(status_code=409, detail="任务正在执行中")
     agent = await db.get(Agent, run.agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="智能体不存在")
     session = await db.get(AgentSession, run.session_id)
-    if not session:
+    if not session or session.is_delete:
         raise HTTPException(status_code=404, detail="任务会话不存在")
 
     # 新附件/技能并入任务记录 (去重)
@@ -323,7 +327,7 @@ async def stream_task_events(
     收到 done 事件后流结束; 断线后可用最后收到的 seq 重连 (after_seq)。
     """
     run = await db.get(TaskRun, run_id)
-    if not run:
+    if not run or run.is_delete:
         raise HTTPException(status_code=404, detail="任务不存在")
 
     # 先注册订阅再查历史, 避免间隙丢事件
@@ -331,7 +335,11 @@ async def stream_task_events(
 
     result = await db.execute(
         select(TaskRunEvent)
-        .where(TaskRunEvent.run_id == run_id, TaskRunEvent.seq > after_seq)
+        .where(
+            TaskRunEvent.run_id == run_id,
+            TaskRunEvent.seq > after_seq,
+            TaskRunEvent.is_delete.is_(False),
+        )
         .order_by(TaskRunEvent.seq)
     )
     backlog = result.scalars().all()

@@ -25,7 +25,7 @@ async def list_skills(
     category: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[SkillOut]:
-    q = select(Skill).where(Skill.is_active.is_(True))
+    q = select(Skill).where(Skill.is_active.is_(True), Skill.is_delete.is_(False))
     if category:
         q = q.where(Skill.category == category)
     q = q.order_by(Skill.id)
@@ -36,7 +36,7 @@ async def list_skills(
 @router.get("/{skill_id}", response_model=SkillOut)
 async def get_skill(skill_id: int, db: AsyncSession = Depends(get_db)) -> SkillOut:
     skill = await db.get(Skill, skill_id)
-    if not skill:
+    if not skill or skill.is_delete:
         raise HTTPException(status_code=404, detail="Skill 不存在")
     return SkillOut.model_validate(skill)
 
@@ -55,7 +55,7 @@ async def update_skill(
     skill_id: int, payload: SkillUpdate, db: AsyncSession = Depends(get_db)
 ) -> SkillOut:
     skill = await db.get(Skill, skill_id)
-    if not skill:
+    if not skill or skill.is_delete:
         raise HTTPException(status_code=404, detail="Skill 不存在")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(skill, key, value)
@@ -67,10 +67,11 @@ async def update_skill(
 @router.delete("/{skill_id}")
 async def delete_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
     skill = await db.get(Skill, skill_id)
-    if not skill:
+    if not skill or skill.is_delete:
         raise HTTPException(status_code=404, detail="Skill 不存在")
+    skill.is_delete = True
     skill.is_active = False
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True}
 
 
@@ -79,7 +80,7 @@ async def execute_skill(
     skill_id: int, payload: SkillExecuteRequest, db: AsyncSession = Depends(get_db)
 ) -> SkillExecutionOut:
     skill = await db.get(Skill, skill_id)
-    if not skill:
+    if not skill or skill.is_delete:
         raise HTTPException(status_code=404, detail="Skill 不存在")
 
     import time
@@ -118,7 +119,7 @@ async def test_skill(skill_id: int, payload: SkillTestRequest, db: AsyncSession 
     返回: {status, steps(每步入参/出参/耗时), results(完整 results 数组, 供下轮传入), duration_ms, error}
     """
     skill = await db.get(Skill, skill_id)
-    if not skill:
+    if not skill or skill.is_delete:
         raise HTTPException(status_code=404, detail="Skill 不存在")
 
     from app.services.skill_engine import SkillEngine
@@ -150,7 +151,10 @@ async def test_skill(skill_id: int, payload: SkillTestRequest, db: AsyncSession 
 async def list_executions(skill_id: int, db: AsyncSession = Depends(get_db)) -> list[SkillExecutionOut]:
     result = await db.execute(
         select(SkillExecution)
-        .where(SkillExecution.skill_id == skill_id)
+        .where(
+            SkillExecution.skill_id == skill_id,
+            SkillExecution.is_delete.is_(False),
+        )
         .order_by(SkillExecution.created_at.desc())
         .limit(50)
     )

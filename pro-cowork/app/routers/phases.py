@@ -76,5 +76,5 @@ async def delete_phase(item_id: int, db: AsyncSession = Depends(get_db)) -> dict
     if not item or item.is_delete:
         raise HTTPException(status_code=404, detail="阶段不存在")
     item.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True}

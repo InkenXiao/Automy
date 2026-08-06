@@ -10,10 +10,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class TaskRun(Base, TimestampMixin):
+class TaskRun(Base, TimestampMixin, SoftDeleteMixin):
     """工作台任务: 选择项目/文件/智能体/技能后的一次执行记录"""
 
     __tablename__ = "task_runs"
@@ -38,7 +38,7 @@ class TaskRun(Base, TimestampMixin):
     )
 
 
-class TaskRunEvent(Base, TimestampMixin):
+class TaskRunEvent(Base, TimestampMixin, SoftDeleteMixin):
     """任务执行过程事件 (后台执行持久化, 供过程回放/断线续看)
 
     type: user / content / tool_call / tool_result / error / done

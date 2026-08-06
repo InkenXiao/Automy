@@ -14,10 +14,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class Skill(Base, TimestampMixin):
+class Skill(Base, TimestampMixin, SoftDeleteMixin):
     """技能定义"""
 
     __tablename__ = "skills"
@@ -36,7 +36,7 @@ class Skill(Base, TimestampMixin):
     )
 
 
-class SkillExecution(Base):
+class SkillExecution(Base, SoftDeleteMixin):
     """技能执行记录"""
 
     __tablename__ = "skill_executions"

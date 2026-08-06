@@ -121,7 +121,7 @@ async def delete_meeting(
     if not meeting or meeting.is_delete:
         raise HTTPException(status_code=404, detail="会议不存在")
     meeting.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": meeting_id}
 
 
@@ -170,5 +170,5 @@ async def delete_meeting_item(
     if not item or item.is_delete or item.meeting_id != meeting_id:
         raise HTTPException(status_code=404, detail="议程项不存在")
     item.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": item_id}

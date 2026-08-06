@@ -77,13 +77,19 @@ class TaskRunner:
             failed = False
             try:
                 run = await db.get(TaskRun, run_id)
+                if run.is_delete:
+                    # 任务在启动间隙被删除: 静默退出, 不产生任何事件/状态变更
+                    return
                 agent = await db.get(Agent, run.agent_id)
                 session = await db.get(AgentSession, run.session_id)
 
                 # 会话历史: 最后一条 user 为本轮输入, 其余为上下文
                 msg_result = await db.execute(
                     select(AgentMessage)
-                    .where(AgentMessage.session_id == session.id)
+                    .where(
+                        AgentMessage.session_id == session.id,
+                        AgentMessage.is_delete.is_(False),
+                    )
                     .order_by(AgentMessage.id)
                 )
                 all_msgs = msg_result.scalars().all()
@@ -95,6 +101,7 @@ class TaskRunner:
                     select(AgentMemory)
                     .where(
                         AgentMemory.agent_id == agent.id,
+                        AgentMemory.is_delete.is_(False),
                         or_(
                             AgentMemory.project_id == run.project_id,
                             AgentMemory.project_id.is_(None),
@@ -105,9 +112,11 @@ class TaskRunner:
                 )
                 memories = mem_result.scalars().all()
 
-                # 事件序号起点
+                # 事件序号起点 (忽略已逻辑删除的旧事件)
                 seq_result = await db.execute(
-                    select(func.max(TaskRunEvent.seq)).where(TaskRunEvent.run_id == run_id)
+                    select(func.max(TaskRunEvent.seq)).where(
+                        TaskRunEvent.run_id == run_id, TaskRunEvent.is_delete.is_(False)
+                    )
                 )
                 seq = (seq_result.scalar() or 0) + 1
 
@@ -154,7 +163,9 @@ class TaskRunner:
                 logger.exception("任务 %s 后台执行异常", run_id)
                 try:
                     seq_result = await db.execute(
-                        select(func.max(TaskRunEvent.seq)).where(TaskRunEvent.run_id == run_id)
+                        select(func.max(TaskRunEvent.seq)).where(
+                            TaskRunEvent.run_id == run_id, TaskRunEvent.is_delete.is_(False)
+                        )
                     )
                     seq = (seq_result.scalar() or 0) + 1
                     await self._emit(db, run_id, seq, "error", "", {"content": str(e)})
@@ -166,6 +177,9 @@ class TaskRunner:
                     if result_text.lstrip().startswith("⚠️"):
                         failed = True
                     run = await db.get(TaskRun, run_id)
+                    if run.is_delete:
+                        # 执行期间被删除: 不回写结果/状态, 仅广播结束
+                        return
                     session = await db.get(AgentSession, run.session_id)
                     if session and result_text:
                         db.add(AgentMessage(
@@ -179,7 +193,9 @@ class TaskRunner:
                     await db.commit()
 
                     seq_result = await db.execute(
-                        select(func.max(TaskRunEvent.seq)).where(TaskRunEvent.run_id == run_id)
+                        select(func.max(TaskRunEvent.seq)).where(
+                            TaskRunEvent.run_id == run_id, TaskRunEvent.is_delete.is_(False)
+                        )
                     )
                     seq = (seq_result.scalar() or 0) + 1
                     await self._emit(db, run_id, seq, "done", "", {
@@ -198,12 +214,16 @@ task_runner = TaskRunner()
 async def recover_interrupted_runs() -> None:
     """服务启动巡检: 上次进程退出时仍在 running 的任务标记为失败"""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(TaskRun).where(TaskRun.status == "running"))
+        result = await db.execute(
+            select(TaskRun).where(TaskRun.status == "running", TaskRun.is_delete.is_(False))
+        )
         runs = result.scalars().all()
         for run in runs:
             run.status = "failed"
             seq_result = await db.execute(
-                select(func.max(TaskRunEvent.seq)).where(TaskRunEvent.run_id == run.id)
+                select(func.max(TaskRunEvent.seq)).where(
+                    TaskRunEvent.run_id == run.id, TaskRunEvent.is_delete.is_(False)
+                )
             )
             seq = (seq_result.scalar() or 0) + 1
             db.add(TaskRunEvent(

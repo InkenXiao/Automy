@@ -295,7 +295,7 @@ async def delete_weekly_report(
     if not report or report.is_delete:
         raise HTTPException(status_code=404, detail="周报不存在")
     report.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": report_id}
 
 
@@ -344,7 +344,7 @@ async def delete_plan_task(
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="下周任务不存在")
     item.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": task_id}
 
 
@@ -441,7 +441,7 @@ async def delete_kpi(
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="KPI 不存在")
     item.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": kpi_id}
 
 
@@ -516,7 +516,7 @@ async def delete_progress_item(
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="进展事项不存在")
     item.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": item_id}
 
 
@@ -565,5 +565,5 @@ async def delete_risk(
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="风险不存在")
     item.is_delete = True
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": risk_id}

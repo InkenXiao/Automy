@@ -1315,6 +1315,8 @@ const AgentChat = {
         }
       };
     });
+    // 列表重渲染后恢复当前会话高亮 (删除/发消息等触发的刷新会重置 DOM)
+    this.markActiveSession();
   },
 
   async newSession(focus = true) {

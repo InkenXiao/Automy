@@ -37,7 +37,7 @@ async def list_agents(
     type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[AgentOut]:
-    q = select(Agent).where(Agent.is_active.is_(True))
+    q = select(Agent).where(Agent.is_active.is_(True), Agent.is_delete.is_(False))
     if type:
         q = q.where(Agent.type == type)
     q = q.order_by(Agent.id)
@@ -48,7 +48,7 @@ async def list_agents(
 @router.get("/{agent_id}", response_model=AgentOut)
 async def get_agent(agent_id: int, db: AsyncSession = Depends(get_db)) -> AgentOut:
     agent = await db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="Agent 不存在")
     return AgentOut.model_validate(agent)
 
@@ -67,7 +67,7 @@ async def update_agent(
     agent_id: int, payload: AgentUpdate, db: AsyncSession = Depends(get_db)
 ) -> AgentOut:
     agent = await db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="Agent 不存在")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(agent, key, value)
@@ -79,10 +79,11 @@ async def update_agent(
 @router.delete("/{agent_id}")
 async def delete_agent(agent_id: int, db: AsyncSession = Depends(get_db)):
     agent = await db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="Agent 不存在")
+    agent.is_delete = True
     agent.is_active = False
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True}
 
 
@@ -93,11 +94,11 @@ async def create_session(
     agent_id: int, payload: SessionCreate, db: AsyncSession = Depends(get_db)
 ) -> SessionOut:
     agent = await db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="Agent 不存在")
     session = AgentSession(agent_id=agent_id, title=payload.title or f"会话 {agent.name}")
     db.add(session)
-    await db.flush()
+    await db.commit()  # 显式提交: 保证紧随的列表刷新能读到新会话
     await db.refresh(session)
     return SessionOut.model_validate(session)
 
@@ -106,7 +107,11 @@ async def create_session(
 async def list_sessions(agent_id: int, db: AsyncSession = Depends(get_db)) -> list[SessionOut]:
     result = await db.execute(
         select(AgentSession)
-        .where(AgentSession.agent_id == agent_id, AgentSession.status == "active")
+        .where(
+            AgentSession.agent_id == agent_id,
+            AgentSession.status == "active",
+            AgentSession.is_delete.is_(False),
+        )
         .order_by(AgentSession.updated_at.desc())
     )
     return [SessionOut.model_validate(s) for s in result.scalars().all()]
@@ -118,7 +123,7 @@ async def update_session(
 ) -> SessionOut:
     """会话改名 / 状态变更"""
     session = await db.get(AgentSession, session_id)
-    if not session:
+    if not session or session.is_delete:
         raise HTTPException(status_code=404, detail="会话不存在")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(session, key, value)
@@ -129,20 +134,24 @@ async def update_session(
 
 @router.delete("/sessions/{session_id}")
 async def archive_session(session_id: int, db: AsyncSession = Depends(get_db)):
-    """归档会话 (软删除, 消息保留)"""
+    """删除会话 (逻辑删除, 消息保留)"""
     session = await db.get(AgentSession, session_id)
-    if not session:
+    if not session or session.is_delete:
         raise HTTPException(status_code=404, detail="会话不存在")
+    session.is_delete = True
     session.status = "archived"
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True}
 
 
 @router.get("/sessions/{session_id}/messages", response_model=list[MessageOut])
 async def get_messages(session_id: int, db: AsyncSession = Depends(get_db)) -> list[MessageOut]:
+    session = await db.get(AgentSession, session_id)
+    if not session or session.is_delete:
+        raise HTTPException(status_code=404, detail="会话不存在")
     result = await db.execute(
         select(AgentMessage)
-        .where(AgentMessage.session_id == session_id)
+        .where(AgentMessage.session_id == session_id, AgentMessage.is_delete.is_(False))
         .order_by(AgentMessage.id)
     )
     return [MessageOut.model_validate(m) for m in result.scalars().all()]
@@ -163,13 +172,13 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
     from app.services.agent_engine import AgentEngine
 
     agent = await db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="Agent 不存在")
 
     # 获取或创建会话
     if payload.session_id:
         session = await db.get(AgentSession, payload.session_id)
-        if not session or session.agent_id != agent_id:
+        if not session or session.agent_id != agent_id or session.is_delete:
             raise HTTPException(status_code=404, detail="会话不存在")
     else:
         session = AgentSession(agent_id=agent_id, title=payload.message[:50])
@@ -200,7 +209,7 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
     # 加载历史消息
     result = await db.execute(
         select(AgentMessage)
-        .where(AgentMessage.session_id == session.id)
+        .where(AgentMessage.session_id == session.id, AgentMessage.is_delete.is_(False))
         .order_by(AgentMessage.id)
     )
     history = result.scalars().all()
@@ -210,6 +219,7 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
         select(AgentMemory)
         .where(
             AgentMemory.agent_id == agent_id,
+            AgentMemory.is_delete.is_(False),
             or_(
                 AgentMemory.project_id == active_pid,
                 AgentMemory.project_id.is_(None),
@@ -265,13 +275,13 @@ async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = De
     from app.services.agent_engine import AgentEngine
 
     agent = await db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.is_delete:
         raise HTTPException(status_code=404, detail="Agent 不存在")
 
     # 调试会话: 复用或新建 (status=debug 与正式会话隔离)
     if payload.session_id:
         session = await db.get(AgentSession, payload.session_id)
-        if not session or session.agent_id != agent_id:
+        if not session or session.agent_id != agent_id or session.is_delete:
             raise HTTPException(status_code=404, detail="调试会话不存在")
     else:
         session = AgentSession(
@@ -287,6 +297,7 @@ async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = De
         select(AgentMemory)
         .where(
             AgentMemory.agent_id == agent_id,
+            AgentMemory.is_delete.is_(False),
             or_(
                 AgentMemory.project_id == active_pid,
                 AgentMemory.project_id.is_(None),
@@ -300,7 +311,7 @@ async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = De
     # 调试会话历史 (上下文记忆)
     msg_result = await db.execute(
         select(AgentMessage)
-        .where(AgentMessage.session_id == session.id)
+        .where(AgentMessage.session_id == session.id, AgentMessage.is_delete.is_(False))
         .order_by(AgentMessage.id)
     )
     history = msg_result.scalars().all()
@@ -337,7 +348,9 @@ async def list_memories(
     project_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[MemoryOut]:
-    q = select(AgentMemory).where(AgentMemory.agent_id == agent_id)
+    q = select(AgentMemory).where(
+        AgentMemory.agent_id == agent_id, AgentMemory.is_delete.is_(False)
+    )
     if memory_type:
         q = q.where(AgentMemory.memory_type == memory_type)
     if project_id is not None:
@@ -363,8 +376,8 @@ async def delete_memory(
     agent_id: int, memory_id: int, db: AsyncSession = Depends(get_db)
 ):
     memory = await db.get(AgentMemory, memory_id)
-    if not memory or memory.agent_id != agent_id:
+    if not memory or memory.agent_id != agent_id or memory.is_delete:
         raise HTTPException(status_code=404, detail="记忆不存在")
-    await db.delete(memory)
-    await db.flush()
+    memory.is_delete = True
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True}

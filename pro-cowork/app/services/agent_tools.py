@@ -775,10 +775,16 @@ class ToolExecutor:
         skill: Optional[Skill] = None
         if skill_id:
             skill = await self.db.get(Skill, skill_id)
+            if skill and skill.is_delete:
+                skill = None
         elif skill_name:
             result = await self.db.execute(
                 select(Skill)
-                .where(Skill.is_active.is_(True), Skill.name.contains(skill_name))
+                .where(
+                    Skill.is_active.is_(True),
+                    Skill.is_delete.is_(False),
+                    Skill.name.contains(skill_name),
+                )
                 .order_by(Skill.id)
                 .limit(1)
             )

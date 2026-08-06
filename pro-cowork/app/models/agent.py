@@ -14,10 +14,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class Agent(Base, TimestampMixin):
+class Agent(Base, TimestampMixin, SoftDeleteMixin):
     """智能体定义"""
 
     __tablename__ = "agents"
@@ -41,7 +41,7 @@ class Agent(Base, TimestampMixin):
     )
 
 
-class AgentSession(Base, TimestampMixin):
+class AgentSession(Base, TimestampMixin, SoftDeleteMixin):
     """Agent 会话"""
 
     __tablename__ = "agent_sessions"
@@ -60,7 +60,7 @@ class AgentSession(Base, TimestampMixin):
     )
 
 
-class AgentMessage(Base):
+class AgentMessage(Base, SoftDeleteMixin):
     """Agent 消息"""
 
     __tablename__ = "agent_messages"
@@ -81,7 +81,7 @@ class AgentMessage(Base):
     session: Mapped["AgentSession"] = relationship("AgentSession", back_populates="messages")
 
 
-class AgentMemory(Base):
+class AgentMemory(Base, SoftDeleteMixin):
     """Agent 记忆"""
 
     __tablename__ = "agent_memories"
