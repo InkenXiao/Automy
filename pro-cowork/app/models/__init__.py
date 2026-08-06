@@ -6,7 +6,7 @@ from app.models.module import Module
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
 from app.models.skill import Skill, SkillExecution
-from app.models.task_run import TaskRun
+from app.models.task_run import TaskRun, TaskRunEvent
 from app.models.weekly_report import (
     WeeklyReport,
     WeeklyKpi,
@@ -33,6 +33,7 @@ __all__ = [
     "Skill",
     "SkillExecution",
     "TaskRun",
+    "TaskRunEvent",
     "WeeklyReport",
     "WeeklyKpi",
     "WeeklyProgressItem",

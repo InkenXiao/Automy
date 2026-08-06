@@ -1,4 +1,5 @@
-"""Skill 路由 · CRUD + 执行"""
+"""Skill 路由 · CRUD + 执行 + 调试"""
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,7 @@ from app.schemas.skill import (
     SkillExecuteRequest,
     SkillExecutionOut,
     SkillOut,
+    SkillTestRequest,
     SkillUpdate,
 )
 
@@ -105,6 +107,43 @@ async def execute_skill(
         await db.refresh(execution)
 
     return SkillExecutionOut.model_validate(execution)
+
+
+@router.post("/{skill_id}/test")
+async def test_skill(skill_id: int, payload: SkillTestRequest, db: AsyncSession = Depends(get_db)):
+    """技能调试执行 (不落执行记录)
+
+    上下文记忆: prior_results 携带前几轮测试返回的 steps, 置于 results 头部,
+    本轮步骤可通过 {{results.N.result.xxx}} 引用前几轮产物 (如上一轮创建的会议 id)。
+    返回: {status, steps(每步入参/出参/耗时), results(完整 results 数组, 供下轮传入), duration_ms, error}
+    """
+    skill = await db.get(Skill, skill_id)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill 不存在")
+
+    from app.services.skill_engine import SkillEngine
+
+    start = time.time()
+    try:
+        engine = SkillEngine(db)
+        output = await engine.execute(skill, payload.input_data, payload.prior_results)
+        # 本轮新增的 steps (prior_results 之后)
+        steps = output.get("results", [])[len(payload.prior_results or []):]
+        return {
+            "status": "success",
+            "steps": steps,
+            "results": output.get("results", []),
+            "duration_ms": int((time.time() - start) * 1000),
+            "error": "",
+        }
+    except Exception as e:  # noqa: BLE001
+        return {
+            "status": "failed",
+            "steps": [],
+            "results": list(payload.prior_results or []),
+            "duration_ms": int((time.time() - start) * 1000),
+            "error": str(e),
+        }
 
 
 @router.get("/{skill_id}/executions", response_model=list[SkillExecutionOut])

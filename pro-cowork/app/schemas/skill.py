@@ -43,6 +43,13 @@ class SkillExecuteRequest(BaseModel):
     input_data: dict = {}
 
 
+class SkillTestRequest(BaseModel):
+    """技能调试请求: prior_results 为前几轮测试的 steps 结果, 供 {{results.N}} 上下文引用"""
+
+    input_data: dict = {}
+    prior_results: list = []
+
+
 class SkillExecutionOut(BaseModel):
     id: int
     skill_id: int

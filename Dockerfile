@@ -27,7 +27,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 # ---------- 系统依赖 ----------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl ca-certificates xz-utils \
+        curl ca-certificates xz-utils ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------- Node.js 20 LTS ----------

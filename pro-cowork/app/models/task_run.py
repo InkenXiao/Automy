@@ -36,3 +36,22 @@ class TaskRun(Base, TimestampMixin):
     session_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("agent_sessions.id", ondelete="SET NULL"), nullable=True
     )
+
+
+class TaskRunEvent(Base, TimestampMixin):
+    """任务执行过程事件 (后台执行持久化, 供过程回放/断线续看)
+
+    type: user / content / tool_call / tool_result / error / done
+    payload: content→{"content"}; tool_call→{"arguments"}; tool_result→{"result","duration_ms"}
+    """
+
+    __tablename__ = "task_run_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("task_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)  # 事件序号 (run 内单调递增)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(64), default="")  # 工具名 (tool_* 事件)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")

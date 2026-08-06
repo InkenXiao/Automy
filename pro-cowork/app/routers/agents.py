@@ -250,16 +250,36 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-# ---------- 调试 (非流式 Trace) ----------
+# ---------- 调试 (非流式 Trace + 上下文会话) ----------
 
 @router.post("/{agent_id}/debug")
 async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(get_db)):
-    """调试模式: 非流式执行一轮对话, 返回结构化执行轨迹 (不落库)"""
+    """调试模式: 非流式执行一轮对话, 返回结构化执行轨迹
+
+    上下文记忆:
+    - 传入 session_id 时复用该调试会话的历史消息 (上一轮创建会议后, 本轮"保存会议纪要"
+      可定位到同一会议); 不传则新建调试会话 (status=debug, 不出现在正式会话列表)
+    - 调试消息落库到调试会话, 供多轮上下文引用
+    返回: {reply, trace(每轮入参/出参/耗时), memories(本次注入的记忆), session_id, model}
+    """
     from app.services.agent_engine import AgentEngine
 
     agent = await db.get(Agent, agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent 不存在")
+
+    # 调试会话: 复用或新建 (status=debug 与正式会话隔离)
+    if payload.session_id:
+        session = await db.get(AgentSession, payload.session_id)
+        if not session or session.agent_id != agent_id:
+            raise HTTPException(status_code=404, detail="调试会话不存在")
+    else:
+        session = AgentSession(
+            agent_id=agent_id, title=f"[调试] {payload.message[:40]}", status="debug"
+        )
+        db.add(session)
+        await db.flush()
+        await db.refresh(session)
 
     # 加载记忆 (与正式对话一致): 当前激活项目 + 通用记忆
     active_pid = await get_active_project_id(db)
@@ -277,8 +297,35 @@ async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = De
     )
     memories = mem_result.scalars().all()
 
+    # 调试会话历史 (上下文记忆)
+    msg_result = await db.execute(
+        select(AgentMessage)
+        .where(AgentMessage.session_id == session.id)
+        .order_by(AgentMessage.id)
+    )
+    history = msg_result.scalars().all()
+
+    # 用户消息落库
+    db.add(AgentMessage(session_id=session.id, role="user", content=payload.message))
+    await db.flush()
+
     engine = AgentEngine(db)
-    return await engine.chat_with_trace(agent, [], memories, payload.message)
+    result = await engine.chat_with_trace(agent, history, memories, payload.message)
+
+    # 助手回复落库 (供下轮上下文)
+    if result.get("reply"):
+        db.add(AgentMessage(
+            session_id=session.id, role="assistant", content=result["reply"]
+        ))
+        await db.flush()
+
+    result["session_id"] = session.id
+    result["memories"] = [
+        {"id": m.id, "memory_type": m.memory_type, "key": m.key,
+         "content": m.content, "project_id": m.project_id}
+        for m in memories
+    ]
+    return result
 
 
 # ---------- 记忆管理 ----------

@@ -32,17 +32,34 @@ class NoCacheStaticFiles(StaticFiles):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期: 启动时初始化数据库 + 预置 Agent/Skill"""
+    """应用生命周期: 启动时初始化数据库 + 预置 Agent/Skill + 项目记忆 + 中断任务巡检"""
     await init_db()
     # 预置四大智能体与示例技能 (幂等)
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
-    from app.services.agent_presets import seed_preset_agents, seed_preset_memories
+    from app.models.project import Project
+    from app.services.agent_presets import (
+        seed_preset_agents,
+        seed_preset_memories,
+        seed_project_memories,
+    )
     from app.services.skill_presets import seed_preset_skills
+    from app.services.task_runner import recover_interrupted_runs
+
     async with AsyncSessionLocal() as session:
         await seed_preset_agents(session)
         await seed_preset_memories(session)
         await seed_preset_skills(session)
+        # 存量项目: 为四个预置智能体播种项目关联的默认记忆 (幂等)
+        result = await session.execute(
+            select(Project.id).where(Project.is_delete.is_(False))
+        )
+        for (pid,) in result.all():
+            await seed_project_memories(session, pid)
         await session.commit()
+    # 上次进程退出时仍在 running 的任务标记为失败
+    await recover_interrupted_runs()
     yield
 
 

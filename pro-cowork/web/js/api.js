@@ -368,9 +368,9 @@ const API = {
     return this.get(`/agents/sessions/${sessionId}/messages`);
   },
 
-  /** Agent 调试 (非流式, 返回 {reply, trace}) */
-  debugAgent(agentId, message) {
-    return this.post(`/agents/${agentId}/debug`, { message });
+  /** Agent 调试 (非流式, 返回 {reply, trace, memories, session_id}; session_id 用于上下文记忆) */
+  debugAgent(agentId, message, sessionId) {
+    return this.post(`/agents/${agentId}/debug`, { message, session_id: sessionId || null });
   },
 
   /* 智能体记忆 */
@@ -417,6 +417,11 @@ const API = {
     return this.post(`/skills/${id}/execute`, { input_data: inputData });
   },
 
+  /** 技能调试执行 (不落记录; priorResults 为前几轮 steps, 支持上下文记忆) */
+  testSkill(id, inputData = {}, priorResults = []) {
+    return this.post(`/skills/${id}/test`, { input_data: inputData, prior_results: priorResults });
+  },
+
   getSkillExecutions(id) {
     return this.get(`/skills/${id}/executions`);
   },
@@ -447,6 +452,16 @@ const API = {
   /** 任务会话消息列表 */
   getTaskRunMessages(id) {
     return this.get(`/task-runs/${id}/messages`);
+  },
+
+  /** 启动任务后台执行 (立即返回; 执行过程经 events SSE 订阅) */
+  runTaskRun(id) {
+    return this.post(`/task-runs/${id}/run`, {});
+  },
+
+  /** 任务继续对话 (后台执行) */
+  continueTaskRun(id, payload) {
+    return this.post(`/task-runs/${id}/continue`, payload);
   },
 
   /** 上传任务附件 (multipart) */
@@ -495,6 +510,30 @@ const API = {
     if (!response.ok) {
       throw new Error(`请求失败 (${response.status})`);
     }
+    await this._readSse(response, onEvent);
+  },
+
+  /**
+   * GET 方式订阅 SSE 事件流 (任务执行过程回放/实时 tail)
+   * @param {string} path - 路径 (不含 baseUrl)
+   * @param {(event: object) => void} onEvent - 每个 SSE data JSON 事件回调
+   * @param {AbortSignal} [signal] - 可选中止信号 (切换任务时断开旧流)
+   * @returns {Promise<void>}
+   */
+  async streamGet(path, onEvent, signal) {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: 'GET',
+      headers: { 'Accept': 'text/event-stream' },
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`请求失败 (${response.status})`);
+    }
+    await this._readSse(response, onEvent);
+  },
+
+  /** 读取 SSE 响应流并按事件回调 */
+  async _readSse(response, onEvent) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';

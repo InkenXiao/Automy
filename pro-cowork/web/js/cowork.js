@@ -17,8 +17,10 @@ const TaskCenter = {
   runs: [],
   running: false,
   currentRunId: null,     // 当前输出窗口对应的任务 id
-  fcFiles: new Set(),     // 补充对话区已附加文件
-  fcSkills: new Set(),    // 补充对话区已附加技能
+  currentRun: null,       // 当前任务对象 (项目 id 供 / 引用)
+  _eventsAbort: null,     // 事件流中止控制器 (切换任务时断开旧流)
+  _lastMinutes: '',       // 最近一次工具产出的会议纪要 (优先保存对象)
+  _lastReply: '',         // 最近一条助手完整回复 (纪要保存兜底)
 
   init() {},
 
@@ -33,23 +35,23 @@ const TaskCenter = {
       <div class="task-layout">
         <div class="task-left">
           <div class="task-card">
-            <div class="task-card__title">📋 新建任务</div>
+            <div class="task-card__title">📋 新建长任务</div>
             <div class="form-row">
               <div class="form-field">
-                <label>项目</label>
+                <label>选择项目</label>
                 <select id="tc-project"></select>
               </div>
               <div class="form-field">
-                <label>智能体</label>
+                <label>选择数字分身</label>
                 <select id="tc-agent"></select>
               </div>
             </div>
             <div class="form-field">
-              <label>技能 (可多选, 智能体将按需调用)</label>
+              <label>选择技能 (可多选, 分身将按需调用)</label>
               <div class="chip-box" id="tc-skills"></div>
             </div>
             <div class="form-field">
-              <label>文件 (点击选中作为任务上下文)</label>
+              <label>选择文件 (点击选中作为任务上下文, 支持录音文件生成会议纪要)</label>
               <div class="chip-box" id="tc-files"></div>
               <div style="margin-top:6px">
                 <button class="cw-btn cw-btn--sm" id="tc-upload">📎 上传文件</button>
@@ -60,7 +62,7 @@ const TaskCenter = {
               <label>任务描述</label>
               <textarea id="tc-input" rows="4" placeholder="描述要让智能体完成的任务, 如: 汇总本周进度并识别风险; 输入 / 引用会议/周报/里程碑/周任务记录, # 选择智能体/技能/工具"></textarea>
             </div>
-            <button class="cw-btn cw-btn--primary" id="tc-run" style="width:100%">▶ 创建并执行</button>
+            <button class="cw-btn cw-btn--primary" id="tc-run" style="width:100%">▶ 创建并执行长任务</button>
           </div>
           <div class="task-card">
             <div class="task-card__title">🕘 历史任务</div>
@@ -69,20 +71,18 @@ const TaskCenter = {
         </div>
         <div class="task-right">
           <div class="task-card task-output-card">
-            <div class="task-card__title" id="tc-output-title">执行输出</div>
+            <div class="task-card__title task-output-head">
+              <span id="tc-output-title">执行输出</span>
+              <button class="cw-btn cw-btn--sm" id="tc-save-minutes" style="display:none"
+                title="将生成的会议纪要保存到当前任务的会议记录 (支持覆盖/追加)">📥 保存到会议记录</button>
+            </div>
             <div class="task-output" id="tc-output">
               <div class="empty-state">选择项目 / 文件 / 智能体 / 技能, 创建并执行任务</div>
             </div>
           </div>
           <div class="task-card task-followup-card" id="tc-followup-card">
-            <div class="fc-attachments" id="fc-attachments"></div>
-            <div class="fc-picker" id="fc-picker" style="display:none"></div>
-            <div class="fc-toolbar">
-              <button class="cw-btn cw-btn--sm" id="fc-add-file" title="添加文件到本轮对话">📎 文件</button>
-              <button class="cw-btn cw-btn--sm" id="fc-add-skill" title="添加技能到本轮对话">⚡ 技能</button>
-            </div>
             <div class="fc-input-row">
-              <textarea id="fc-input" rows="2" placeholder="补充任务内容, 继续让 AI 执行当前任务… (Enter 发送, Shift+Enter 换行)"></textarea>
+              <textarea id="fc-input" rows="2" placeholder="补充任务内容, 继续让 AI 执行当前任务… 支持 @ 项目 / 记录 # 资源 (Enter 发送, Shift+Enter 换行)"></textarea>
               <button class="cw-btn cw-btn--primary" id="fc-send">发送</button>
             </div>
           </div>
@@ -111,17 +111,19 @@ const TaskCenter = {
       getProjectId: () => this.currentProjectId(),
     });
 
-    // 补充对话区事件
+    // 补充对话区: Enter 发送; 支持 @ / # 引用 (项目上下文取当前任务项目)
     document.getElementById('fc-send').onclick = () => this.sendFollowup();
-    document.getElementById('fc-add-file').onclick = () => this.togglePicker('file');
-    document.getElementById('fc-add-skill').onclick = () => this.togglePicker('skill');
-    document.getElementById('fc-input').addEventListener('keydown', (e) => {
+    document.getElementById('tc-save-minutes').onclick = () => this.openSaveMinutes();
+    const fcInput = document.getElementById('fc-input');
+    fcInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         this.sendFollowup();
       }
     });
-    this.renderFollowupChips();
+    MentionBox.attach(fcInput, {
+      getProjectId: () => (this.currentRun && this.currentRun.project_id) || this.currentProjectId(),
+    });
     this.updateFollowupState();
 
     await this.loadFiles();
@@ -297,35 +299,229 @@ const TaskCenter = {
     return div;
   },
 
-  /** 点击历史任务: 加载会话消息回放, 并设为当前对话任务 */
+  /** 点击历史任务: 回放执行过程事件 (含实时 tail), 并设为当前对话任务 */
   async showRunResult(run) {
     this.currentRunId = run.id;
-    this.fcFiles.clear();
-    this.fcSkills.clear();
-    this.renderFollowupChips();
-    this.updateFollowupState();
+    this.currentRun = run;
+    this.renderRunEvents(run);
+  },
 
-    document.getElementById('tc-output-title').textContent = `执行结果 · ${run.title || ''}`;
-    const out = document.getElementById('tc-output');
-    out.innerHTML = '<div class="empty-state">加载对话记录…</div>';
-    let messages = [];
-    try {
-      messages = await API.getTaskRunMessages(run.id);
-    } catch (err) {
-      App.showToast(`加载对话失败: ${err.message}`, 'error');
+  /** 停止当前事件流订阅 (切换任务/补充对话重渲染前调用) */
+  stopEvents() {
+    if (this._eventsAbort) {
+      this._eventsAbort.abort();
+      this._eventsAbort = null;
     }
-    out.innerHTML = '';
-    if (!messages.length) {
-      out.innerHTML = '<div class="empty-state">该任务暂无对话记录</div>';
+  },
+
+  /**
+   * 渲染任务执行事件流: 先重放持久化事件, 任务执行中则实时 tail
+   * 页面切换/关闭不影响后台执行; 重进点击历史任务即可看到完整过程
+   * (含录音转写文字与生成的会议纪要), 并可继续对话 (如保存纪要到指定会议)
+   */
+  async renderRunEvents(run) {
+    this.stopEvents();
+    this.currentRunId = run.id;
+    this.currentRun = run;
+    this.running = run.status === 'running';
+    this._lastMinutes = '';
+    this._lastReply = '';
+    this.updateFollowupState();
+    this.updateSaveBtn();
+
+    document.getElementById('tc-output-title').textContent =
+      `执行输出 · ${run.title || ''}${this.running ? ' (执行中…)' : ''}`;
+    const out = document.getElementById('tc-output');
+    out.innerHTML = '<div class="empty-state">加载执行过程…</div>';
+
+    const ctrl = new AbortController();
+    this._eventsAbort = ctrl;
+
+    // 渲染状态: 连续 content 事件聚合到同一个回复气泡
+    let started = false;
+    let replyBody = null;
+    let replyText = '';
+    let lastTrace = null;
+
+    const ensureReply = () => {
+      if (!replyBody) {
+        const div = this.appendChatMsg(out, 'assistant', '');
+        replyBody = div.querySelector('.chat-msg__body');
+      }
+      return replyBody;
+    };
+
+    try {
+      await API.streamGet(`/task-runs/${run.id}/events`, (event) => {
+        if (!started) { out.innerHTML = ''; started = true; }
+        if (event.type === 'user') {
+          if (replyText) this._lastReply = replyText; // 新一轮开始前冻结上一条完整回复
+          replyBody = null; replyText = ''; lastTrace = null;
+          this.appendChatMsg(out, 'user',
+            App.escapeHtml(this.displayUserText(event.payload.content)).replace(/\n/g, '<br>'));
+        } else if (event.type === 'content') {
+          replyText += event.payload.content || '';
+          ensureReply().innerHTML = App.renderMarkdown(replyText);
+          out.scrollTop = out.scrollHeight;
+        } else if (event.type === 'tool_call') {
+          replyBody = null; replyText = '';
+          lastTrace = this.appendTrace(out, event.name, '执行中');
+          if (lastTrace) {
+            lastTrace.querySelector('.chat-trace__body').innerHTML =
+              `<pre>入参: ${App.escapeHtml(JSON.stringify(event.payload.arguments, null, 2))}</pre>`;
+          }
+        } else if (event.type === 'tool_result') {
+          // 会议纪要技能产物: 录音文字 / 会议纪要 分区块展示
+          let resObj = event.payload.result;
+          if (typeof resObj === 'string') { try { resObj = JSON.parse(resObj); } catch (e) { /* 非 JSON */ } }
+          const hasMinutes = resObj && typeof resObj === 'object' && (resObj.transcript || resObj.minutes);
+          if (lastTrace) {
+            const badge = lastTrace.querySelector('.chat-trace__badge');
+            badge.textContent = `完成 ${event.payload.duration_ms}ms`;
+            badge.classList.add('chat-trace__badge--ok');
+            lastTrace.querySelector('.chat-trace__body').innerHTML +=
+              `<pre>结果: ${App.escapeHtml(JSON.stringify(event.payload.result, null, 2).slice(0, 4000))}</pre>`;
+          } else {
+            // 历史回放时 tool_call 可能缺失 (异常中断), 保底展示结果
+            lastTrace = this.appendTrace(out, event.name || 'tool', `完成 ${event.payload.duration_ms}ms`);
+            lastTrace.querySelector('.chat-trace__body').innerHTML =
+              `<pre>结果: ${App.escapeHtml(JSON.stringify(event.payload.result, null, 2).slice(0, 4000))}</pre>`;
+          }
+          if (hasMinutes) {
+            if (resObj.transcript) this.appendOutputBlock(out, '🗣', '录音转写文字', resObj.transcript);
+            if (resObj.minutes) {
+              this.appendOutputBlock(out, '📑', '会议纪要', resObj.minutes);
+              this._lastMinutes = resObj.minutes;
+            }
+          }
+          out.scrollTop = out.scrollHeight;
+        } else if (event.type === 'error') {
+          replyText += `\n\n⚠️ ${event.payload.content}`;
+          ensureReply().innerHTML = App.renderMarkdown(replyText);
+        } else if (event.type === 'done') {
+          if (replyText) this._lastReply = replyText;
+          this.running = false;
+          this.updateFollowupState();
+          this.updateSaveBtn();
+          document.getElementById('tc-output-title').textContent = `执行输出 · ${run.title || ''}`;
+        }
+      }, ctrl.signal);
+    } catch (err) {
+      if (err.name === 'AbortError') return; // 主动切换任务
+      if (!started) out.innerHTML = '';
+      this.appendChatMsg(out, 'assistant', `⚠️ 加载执行过程失败: ${App.escapeHtml(err.message)}`);
+    } finally {
+      // 已被新事件流取代 (abort) 时不干预新流的状态
+      if (this._eventsAbort === ctrl) {
+        this._eventsAbort = null;
+        if (!started) {
+          out.innerHTML = '<div class="empty-state">该任务暂无执行记录</div>';
+        }
+        // 流结束 (done 或历史任务回放完毕): 刷新任务列表状态
+        this.running = false;
+        this.updateFollowupState();
+        this.updateSaveBtn();
+        this.loadRuns();
+      }
+    }
+  },
+
+  /** 会议纪要/录音文字折叠区块 (默认展开, 点击标题折叠) */
+  appendOutputBlock(out, icon, title, text) {
+    const div = document.createElement('div');
+    div.className = 'chat-trace output-block open';
+    div.innerHTML = `
+      <div class="chat-trace__head">
+        <span>${icon}</span><span>${App.escapeHtml(title)}</span>
+        <span class="chat-trace__badge chat-trace__badge--ok">${(text || '').length} 字</span>
+      </div>
+      <div class="chat-trace__body"><pre>${App.escapeHtml(text || '')}</pre></div>`;
+    div.querySelector('.chat-trace__head').onclick = () => div.classList.toggle('open');
+    out.appendChild(div);
+    out.scrollTop = out.scrollHeight;
+    return div;
+  },
+
+  /** 保存按钮可见性: 任务已结束且有纪要/回复内容 */
+  updateSaveBtn() {
+    const btn = document.getElementById('tc-save-minutes');
+    if (!btn) return;
+    const hasContent = !!(this._lastMinutes || this._lastReply);
+    btn.style.display = (this.currentRun && !this.running && hasContent) ? '' : 'none';
+  },
+
+  /** 保存纪要到会议记录: 选会议 → 覆盖 / 追加 */
+  async openSaveMinutes() {
+    if (!this.currentRun) return;
+    const content = this._lastMinutes || this._lastReply;
+    if (!content) {
+      App.showToast('暂无可保存的纪要内容', 'warning');
       return;
     }
-    messages.forEach(m => {
-      if (m.role === 'user') {
-        this.appendChatMsg(out, 'user', App.escapeHtml(this.displayUserText(m.content)).replace(/\n/g, '<br>'));
-      } else if (m.role === 'assistant' && m.content) {
-        this.appendChatMsg(out, 'assistant', App.renderMarkdown(m.content));
-      }
+    let meetings = [];
+    try {
+      meetings = await API.get(`/meetings/?project_id=${this.currentRun.project_id}`);
+    } catch (err) {
+      App.showToast(`加载会议失败: ${err.message}`, 'error');
+      return;
+    }
+    if (!meetings.length) {
+      App.showToast('当前任务项目暂无会议记录, 请先创建会议', 'warning');
+      return;
+    }
+    const modal = App.openModal({
+      title: '保存纪要到会议记录',
+      size: 'lg',
+      bodyHtml: `
+        <div class="form-field">
+          <label>选择会议</label>
+          <select id="sm-meeting">
+            ${meetings.map(m => `<option value="${m.id}">${App.escapeHtml(m.title)} (${m.meet_date || '未定日期'})</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field">
+          <label>该会议现有纪要</label>
+          <div id="sm-existing" class="sm-existing"></div>
+        </div>
+        <div class="form-field">
+          <label>待保存内容 (保存前可编辑)</label>
+          <textarea id="sm-content" rows="10">${App.escapeHtml(content)}</textarea>
+        </div>`,
+      footerHtml: `
+        <button class="cw-btn" data-modal-close>取消</button>
+        <button class="cw-btn" id="sm-append">追加到纪要</button>
+        <button class="cw-btn cw-btn--primary" id="sm-overwrite">覆盖纪要</button>`,
     });
+    const sel = modal.querySelector('#sm-meeting');
+    const showExisting = () => {
+      const m = meetings.find(x => String(x.id) === sel.value);
+      const desc = (m && m.description) || '';
+      modal.querySelector('#sm-existing').textContent =
+        desc ? desc.slice(0, 600) : '(当前会议暂无纪要内容, 保存将直接写入)';
+    };
+    sel.onchange = showExisting;
+    showExisting();
+
+    const save = async (mode) => {
+      const m = meetings.find(x => String(x.id) === sel.value);
+      const newText = modal.querySelector('#sm-content').value.trim();
+      if (!newText) {
+        App.showToast('保存内容为空', 'warning');
+        return;
+      }
+      // 追加: 接到现有纪要之后; 覆盖或原纪要为空: 直接写入
+      const description = (mode === 'append' && m.description)
+        ? `${m.description}\n\n---\n\n${newText}` : newText;
+      try {
+        await API.updateMeeting(m.id, { description });
+        App.closeModal(modal);
+        App.showToast(`已${mode === 'append' ? '追加到' : '覆盖保存到'}「${m.title}」`, 'success');
+      } catch (err) {
+        App.showToast(`保存失败: ${err.message}`, 'error');
+      }
+    };
+    modal.querySelector('#sm-overwrite').onclick = () => save('overwrite');
+    modal.querySelector('#sm-append').onclick = () => save('append');
   },
 
   /* ---------------- 补充对话区 ---------------- */
@@ -337,143 +533,42 @@ const TaskCenter = {
     const enabled = !!this.currentRunId && !this.running;
     card.classList.toggle('fc-disabled', !enabled);
     document.getElementById('fc-send').disabled = !enabled;
-    document.getElementById('fc-input').disabled = !enabled;
-    document.getElementById('fc-add-file').disabled = !enabled;
-    document.getElementById('fc-add-skill').disabled = !enabled;
     const hint = document.getElementById('fc-input');
+    hint.disabled = !enabled;
     if (hint && !this.currentRunId) {
       hint.placeholder = '请先创建并执行任务, 或在左侧选择历史任务…';
     } else if (hint) {
-      hint.placeholder = '补充任务内容, 继续让 AI 执行当前任务… (Enter 发送, Shift+Enter 换行)';
+      hint.placeholder = '补充任务内容, 继续让 AI 执行当前任务… 支持 @ 项目 / 记录 # 资源 (Enter 发送, Shift+Enter 换行)';
     }
   },
 
-  /** 渲染补充区已附加的文件/技能 chips */
-  renderFollowupChips() {
-    const box = document.getElementById('fc-attachments');
-    if (!box) return;
-    const chips = [];
-    this.fcFiles.forEach(name => {
-      chips.push(`<span class="chip chip--on" data-fc-del-file="${App.escapeHtml(name)}">📄 ${App.escapeHtml(name)} <span class="chip__del">×</span></span>`);
-    });
-    this.fcSkills.forEach(id => {
-      const s = this.skills.find(x => x.id === id);
-      chips.push(`<span class="chip chip--on" data-fc-del-skill="${id}">⚡ ${App.escapeHtml(s ? s.name : `技能#${id}`)} <span class="chip__del">×</span></span>`);
-    });
-    box.innerHTML = chips.join('');
-    box.style.display = chips.length ? '' : 'none';
-    box.querySelectorAll('[data-fc-del-file]').forEach(c => {
-      c.onclick = () => { this.fcFiles.delete(c.dataset.fcDelFile); this.renderFollowupChips(); };
-    });
-    box.querySelectorAll('[data-fc-del-skill]').forEach(c => {
-      c.onclick = () => { this.fcSkills.delete(parseInt(c.dataset.fcDelSkill, 10)); this.renderFollowupChips(); };
-    });
-  },
-
-  /** 展开/收起 文件或技能选择面板 */
-  togglePicker(kind) {
-    const picker = document.getElementById('fc-picker');
-    if (!picker) return;
-    if (picker.style.display !== 'none' && picker.dataset.kind === kind) {
-      picker.style.display = 'none';
-      return;
-    }
-    picker.dataset.kind = kind;
-    if (kind === 'file') {
-      picker.innerHTML = this.files.map(f =>
-        `<span class="chip" data-pick-file="${App.escapeHtml(f.name)}">📄 ${App.escapeHtml(f.name)}</span>`).join('')
-        || '<span style="font-size:12px;color:var(--color-text-tertiary)">当前项目暂无附件, 请先在左侧上传</span>';
-      picker.querySelectorAll('[data-pick-file]').forEach(c => {
-        c.onclick = () => { this.fcFiles.add(c.dataset.pickFile); this.renderFollowupChips(); };
-      });
-    } else {
-      picker.innerHTML = this.skills.map(s =>
-        `<span class="chip" data-pick-skill="${s.id}">${(s.config || {}).icon || '⚡'} ${App.escapeHtml(s.name)}</span>`).join('')
-        || '<span style="font-size:12px;color:var(--color-text-tertiary)">暂无技能</span>';
-      picker.querySelectorAll('[data-pick-skill]').forEach(c => {
-        c.onclick = () => { this.fcSkills.add(parseInt(c.dataset.pickSkill, 10)); this.renderFollowupChips(); };
-      });
-    }
-    picker.style.display = '';
-  },
-
-  /** 发送补充内容: 在当前任务会话中继续执行 */
+  /** 发送补充内容: 在当前任务会话中继续后台执行, 并重放事件流 */
   async sendFollowup() {
     if (this.running || !this.currentRunId) return;
     const inputEl = document.getElementById('fc-input');
     const text = inputEl.value.trim();
-    if (!text && !this.fcFiles.size && !this.fcSkills.size) {
-      App.showToast('请填写补充内容或添加文件/技能', 'warning');
+    if (!text) {
+      App.showToast('请填写补充内容', 'warning');
       return;
     }
 
     this.running = true;
     this.updateFollowupState();
-    const out = document.getElementById('tc-output');
-    const placeholder = out.querySelector('.empty-state');
-    if (placeholder) placeholder.remove();
-
-    // 用户消息回显 (含附件/技能标注)
-    let echo = App.escapeHtml(text || '(补充附件/技能)');
-    const tags = [];
-    this.fcFiles.forEach(n => tags.push(`📄${n}`));
-    this.fcSkills.forEach(id => {
-      const s = this.skills.find(x => x.id === id);
-      tags.push(`⚡${s ? s.name : id}`);
-    });
-    if (tags.length) echo += `<div style="font-size:11px;opacity:0.85;margin-top:4px">${App.escapeHtml(tags.join(' · '))}</div>`;
-    this.appendChatMsg(out, 'user', echo.replace(/\n/g, '<br>'));
-
-    const replyDiv = this.appendChatMsg(out, 'assistant', '');
-    const replyBody = replyDiv.querySelector('.chat-msg__body');
-
-    // 本轮载荷快照, 发送后清空补充区
-    const payload = {
-      input_text: text,
-      file_names: Array.from(this.fcFiles),
-      skill_ids: Array.from(this.fcSkills),
-    };
     inputEl.value = '';
-    this.fcFiles.clear();
-    this.fcSkills.clear();
-    this.renderFollowupChips();
-    const picker = document.getElementById('fc-picker');
-    if (picker) picker.style.display = 'none';
 
-    let replyText = '';
-    let lastTrace = null;
     try {
-      await API.stream(`/task-runs/${this.currentRunId}/continue`, payload, (event) => {
-        if (event.type === 'content') {
-          replyText += event.content;
-          replyBody.innerHTML = App.renderMarkdown(replyText);
-          out.scrollTop = out.scrollHeight;
-        } else if (event.type === 'tool_call') {
-          lastTrace = this.appendTrace(out, event.name, '执行中');
-          if (lastTrace) {
-            lastTrace.querySelector('.chat-trace__body').innerHTML =
-              `<pre>入参: ${App.escapeHtml(JSON.stringify(event.arguments, null, 2))}</pre>`;
-          }
-        } else if (event.type === 'tool_result') {
-          if (lastTrace) {
-            const badge = lastTrace.querySelector('.chat-trace__badge');
-            badge.textContent = `完成 ${event.duration_ms}ms`;
-            badge.classList.add('chat-trace__badge--ok');
-            lastTrace.querySelector('.chat-trace__body').innerHTML +=
-              `<pre>结果: ${App.escapeHtml(JSON.stringify(event.result, null, 2).slice(0, 2000))}</pre>`;
-          }
-          out.scrollTop = out.scrollHeight;
-        } else if (event.type === 'error') {
-          replyText += `\n\n⚠️ ${event.content}`;
-          replyBody.innerHTML = App.renderMarkdown(replyText);
-        }
+      await API.continueTaskRun(this.currentRunId, {
+        input_text: text,
+        file_names: [],
+        skill_ids: [],
       });
+      // 后台已启动: 重放事件流 (含历史轮次与本轮实时事件)
+      const run = await API.getTaskRun(this.currentRunId);
+      this.renderRunEvents(run);
     } catch (err) {
-      this.appendChatMsg(out, 'assistant', `⚠️ 执行失败: ${App.escapeHtml(err.message)}`);
-    } finally {
+      App.showToast(`执行失败: ${err.message}`, 'error');
       this.running = false;
       this.updateFollowupState();
-      this.loadRuns();
     }
   },
 
@@ -498,7 +593,7 @@ const TaskCenter = {
     // 重置输出区
     document.getElementById('tc-output-title').textContent = '执行输出';
     const out = document.getElementById('tc-output');
-    out.innerHTML = '';
+    out.innerHTML = '<div class="empty-state">任务已创建, 正在启动后台执行…</div>';
 
     try {
       const run = await API.createTaskRun({
@@ -509,54 +604,16 @@ const TaskCenter = {
         input_text: inputText,
       });
 
-      // 绑定当前任务, 启用补充对话区
-      this.currentRunId = run.id;
-      this.fcFiles.clear();
-      this.fcSkills.clear();
-      this.renderFollowupChips();
-
-      // 用户消息回显
-      out.innerHTML = `<div class="chat-msg chat-msg--user"><div class="chat-msg__avatar">👤</div><div class="chat-msg__body">${App.escapeHtml(inputText || '(附件任务)')}</div></div>`;
-      const replyDiv = document.createElement('div');
-      replyDiv.className = 'chat-msg chat-msg--assistant';
-      replyDiv.innerHTML = `<div class="chat-msg__avatar">🤖</div><div class="chat-msg__body"></div>`;
-      out.appendChild(replyDiv);
-      const replyBody = replyDiv.querySelector('.chat-msg__body');
-
-      let replyText = '';
-      let lastTrace = null;
-      await API.stream(`/task-runs/${run.id}/run`, {}, (event) => {
-        if (event.type === 'content') {
-          replyText += event.content;
-          replyBody.innerHTML = App.renderMarkdown(replyText);
-          out.scrollTop = out.scrollHeight;
-        } else if (event.type === 'tool_call') {
-          lastTrace = this.appendTrace(out, event.name, '执行中');
-          if (lastTrace) {
-            lastTrace.querySelector('.chat-trace__body').innerHTML =
-              `<pre>入参: ${App.escapeHtml(JSON.stringify(event.arguments, null, 2))}</pre>`;
-          }
-        } else if (event.type === 'tool_result') {
-          if (lastTrace) {
-            const badge = lastTrace.querySelector('.chat-trace__badge');
-            badge.textContent = `完成 ${event.duration_ms}ms`;
-            badge.classList.add('chat-trace__badge--ok');
-            lastTrace.querySelector('.chat-trace__body').innerHTML +=
-              `<pre>结果: ${App.escapeHtml(JSON.stringify(event.result, null, 2).slice(0, 2000))}</pre>`;
-          }
-          out.scrollTop = out.scrollHeight;
-        } else if (event.type === 'error') {
-          replyText += `\n\n⚠️ ${event.content}`;
-          replyBody.innerHTML = App.renderMarkdown(replyText);
-        }
-      });
+      // 启动后台执行 (立即返回), 随后经事件流渲染过程
+      await API.runTaskRun(run.id);
+      this.renderRunEvents({ ...run, status: 'running' });
     } catch (err) {
-      out.innerHTML += `<div class="empty-state">⚠️ 执行失败: ${App.escapeHtml(err.message)}</div>`;
-    } finally {
+      out.innerHTML = `<div class="empty-state">⚠️ 执行失败: ${App.escapeHtml(err.message)}</div>`;
       this.running = false;
-      runBtn.disabled = false;
-      runBtn.textContent = '▶ 创建并执行';
       this.updateFollowupState();
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = '▶ 创建并执行长任务';
       this.loadRuns();
     }
   },
@@ -645,6 +702,7 @@ const CoworkAgents = {
           </div>
           <div class="agent-card__footer">
             <button class="cw-btn cw-btn--primary cw-btn--sm" data-action="chat">💬 对话</button>
+            <button class="cw-btn cw-btn--sm" data-action="copy">📋 复制</button>
             <button class="cw-btn cw-btn--sm" data-action="edit">✏️ 编辑</button>
             <button class="cw-btn cw-btn--sm cw-btn--danger" data-action="delete">🗑</button>
           </div>
@@ -657,6 +715,10 @@ const CoworkAgents = {
       card.querySelector('[data-action="chat"]').onclick = (e) => {
         e.stopPropagation();
         AgentChat.open(agent);
+      };
+      card.querySelector('[data-action="copy"]').onclick = (e) => {
+        e.stopPropagation();
+        CoworkBuilder.openCopy(agent);
       };
       card.querySelector('[data-action="edit"]').onclick = (e) => {
         e.stopPropagation();
@@ -685,15 +747,8 @@ const CoworkAgents = {
               当前所选项目下的对应记录, 选中记录将其关键信息插入输入框
    ------------------------------------------------------------------ */
 const MentionBox = {
-  textarea: null,       // 当前绑定的 textarea
-  popup: null,          // 浮层 DOM
-  getProjectId: null,   // 回调: 获取当前项目 id (未 @ 选择时的默认项目)
-  onPickProject: null,  // 回调: @ 选中项目后通知宿主
-  projects: null,       // 项目缓存
-  stage: null,          // 'project' | 'category' | 'record'
-  triggerStart: -1,     // 触发字符 (@ 或 /) 在文本中的下标
-  items: [],            // 当前浮层条目 [{title, sub, snippet|project|category}]
-  activeIdx: 0,
+  // 实例状态在 attach 中初始化 (以下注释仅为结构说明)
+  // textarea / host / popup / getProjectId / onPickProject / projects / stage / triggerStart / items / activeIdx
 
   CATEGORIES: [
     { key: 'meeting',   label: '会议',   icon: '📅' },
@@ -709,14 +764,30 @@ const MentionBox = {
     { key: 'tool',  label: '工具',   icon: '🔧' },
   ],
 
-  /** 绑定到输入框; opts: { getProjectId, onPickProject } */
+  /** 工厂: 为输入框创建独立联想实例 (支持同页多个输入框) */
   attach(textarea, opts = {}) {
-    this.detach();
+    const inst = Object.create(MentionBox);
+    inst.textarea = null;
+    inst.host = null;
+    inst.popup = null;
+    inst.getProjectId = null;
+    inst.onPickProject = null;
+    inst.projects = null;
+    inst.stage = null;
+    inst.triggerStart = -1;
+    inst.items = [];
+    inst.activeIdx = 0;
+    inst._bind(textarea, opts);
+    return inst;
+  },
+
+  /** 绑定到输入框; opts: { getProjectId, onPickProject } */
+  _bind(textarea, opts = {}) {
     this.textarea = textarea;
     this.getProjectId = opts.getProjectId || null;
     this.onPickProject = opts.onPickProject || null;
     // 输入框容器需要相对定位以承载浮层
-    this.host = textarea.closest('.chat-input, .form-field') || textarea.parentElement;
+    this.host = textarea.closest('.chat-input, .form-field, .fc-input-row, .debug-input-row') || textarea.parentElement;
     if (this.host) this.host.style.position = 'relative';
 
     this._onInput = () => this.handleInput();
@@ -992,6 +1063,100 @@ const MentionBox = {
     this.triggerStart = -1;
   },
 };
+
+/* ------------------------------------------------------------------
+   可视化选择器: Emoji 与主题色 (供智能体/技能构建器共用)
+   - 点击 😀 按钮弹出常用 Emoji 网格, 点选填入输入框
+   - 点击色块按钮弹出 12 预设色板 + 原生取色器, 点选填入输入框
+   ------------------------------------------------------------------ */
+const Pickers = {
+  EMOJIS: [
+    '🤖', '👤', '🧑‍💼', '🧑‍💻', '🎭', '🧠', '📊', '📈', '📋', '📝', '📑', '📅',
+    '🗓️', '⏰', '⚡', '🔧', '⚙️', '🛠️', '🧩', '🔍', '💡', '🚀', '🎯', '🏁',
+    '🚩', '⭐', '🌟', '🔥', '💬', '📢', '🎙️', '📁', '🗂️', '📦', '📌', '📎',
+    '🔔', '🔑', '🧭', '🗒️', '✅', '🤝', '👥', '🧪', '🕸️', '💼', '📞', '🎧',
+  ],
+  COLORS: [
+    '#FF8C00', '#F97316', '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6',
+    '#6366F1', '#3B82F6', '#06B6D4', '#10B981', '#84CC16', '#64748B',
+  ],
+
+  /** 绑定容器内所有 [data-pick-emoji] / [data-pick-color] 按钮 */
+  bind(root) {
+    root.querySelectorAll('[data-pick-emoji]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        const input = root.querySelector(btn.dataset.pickEmoji);
+        if (input) this.toggleEmoji(btn, input);
+      };
+    });
+    root.querySelectorAll('[data-pick-color]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        const input = root.querySelector(btn.dataset.pickColor);
+        if (input) this.toggleColor(btn, input);
+      };
+    });
+  },
+
+  /** 浮层开关: 同一按钮重复点击为关闭; 打开新浮层前清掉旧的 */
+  _mount(btn, pop) {
+    const wasOpen = !!btn.parentElement.querySelector('.pick-pop');
+    this.closeAll();
+    if (wasOpen) return;
+    pop.classList.add('pick-pop');
+    btn.parentElement.appendChild(pop);
+  },
+
+  toggleEmoji(btn, input) {
+    const pop = document.createElement('div');
+    pop.className = 'emoji-pop';
+    pop.innerHTML = this.EMOJIS.map(e =>
+      `<button type="button" class="emoji-pop__item">${e}</button>`).join('');
+    pop.querySelectorAll('.emoji-pop__item').forEach(item => {
+      item.onclick = () => {
+        input.value = item.textContent;
+        this.closeAll();
+        input.focus();
+      };
+    });
+    this._mount(btn, pop);
+  },
+
+  toggleColor(btn, input) {
+    const pop = document.createElement('div');
+    pop.className = 'color-pop';
+    const current = (input.value || '').trim() || '#FF8C00';
+    pop.innerHTML = `
+      <div class="color-pop__grid">
+        ${this.COLORS.map(c => `
+          <button type="button" class="color-pop__swatch${c.toLowerCase() === current.toLowerCase() ? ' active' : ''}"
+            data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}
+      </div>
+      <label class="color-pop__custom">自定义 <input type="color" value="${App.escapeHtml(current)}"></label>`;
+    const apply = (color) => {
+      input.value = color;
+      const dot = btn.querySelector('.pick-color-dot');
+      if (dot) dot.style.background = color;
+      pop.querySelectorAll('.color-pop__swatch').forEach(sw =>
+        sw.classList.toggle('active', sw.dataset.color.toLowerCase() === color.toLowerCase()));
+    };
+    pop.querySelectorAll('.color-pop__swatch').forEach(sw => {
+      sw.onclick = () => { apply(sw.dataset.color); this.closeAll(); input.focus(); };
+    });
+    pop.querySelector('input[type="color"]').oninput = (e) => apply(e.target.value);
+    this._mount(btn, pop);
+  },
+
+  closeAll() {
+    document.querySelectorAll('.pick-pop').forEach(p => p.remove());
+  },
+};
+
+// 点击选择器浮层与触发按钮以外的位置时关闭浮层
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.pick-pop') && !e.target.closest('.pick-btn')) Pickers.closeAll();
+});
 
 /* ------------------------------------------------------------------
    智能体对话视图 (SSE 流式 + 工具轨迹 + 记忆面板)
@@ -1343,7 +1508,9 @@ const AgentChat = {
    智能体构建器 (左表单 + 右调试)
    ------------------------------------------------------------------ */
 const CoworkBuilder = {
-  editing: null,   // 正在编辑的 agent, null=新建
+  editing: null,        // 正在编辑的 agent, null=新建
+  debugSessionId: null, // 调试上下文会话 id (多轮调试共享上下文记忆)
+  debugging: false,
   /* 全部可用工具: [工具名, 中文注释] —— 与后端 TOOL_DEFINITIONS 保持一致 */
   ALL_TOOLS: [
     ['get_today', '获取当前日期与本周起止 (感知时间)'],
@@ -1380,6 +1547,7 @@ const CoworkBuilder = {
 
   openCreate() {
     this.editing = null;
+    this.debugSessionId = null;
     this._dirty = true;
     App.switchView('builder');
     this.renderForm({
@@ -1389,8 +1557,26 @@ const CoworkBuilder = {
     });
   },
 
+  /** 复制已有智能体: 预填配置, 名称加副本后缀, 保存后生成新分身 */
+  openCopy(agent) {
+    this.editing = null;
+    this.debugSessionId = null;
+    this._dirty = true;
+    App.switchView('builder');
+    this.renderForm({
+      name: `${agent.name} 副本`,
+      type: agent.type || 'custom',
+      description: agent.description || '',
+      system_prompt: agent.system_prompt || '',
+      tools: [...(agent.tools || [])],
+      config: { ...(agent.config || { icon: '🤖', color: '#FF8C00' }) },
+    });
+    App.showToast(`已复制「${agent.name}」配置, 保存后生成新分身`, 'success');
+  },
+
   openEdit(agent) {
     this.editing = agent;
+    this.debugSessionId = null;  // 切换编辑对象时重置调试上下文
     this._dirty = true;
     App.switchView('builder');
     this.renderForm(agent);
@@ -1426,11 +1612,19 @@ const CoworkBuilder = {
           <div class="form-row">
             <div class="form-field">
               <label>图标 Emoji</label>
-              <input type="text" id="bf-icon" value="${App.escapeHtml(cfg.icon || '🤖')}">
+              <div class="pick-field">
+                <input type="text" id="bf-icon" value="${App.escapeHtml(cfg.icon || '🤖')}">
+                <button type="button" class="cw-btn cw-btn--sm pick-btn" data-pick-emoji="#bf-icon" title="选择 Emoji">😀</button>
+              </div>
             </div>
             <div class="form-field">
               <label>主题色</label>
-              <input type="text" id="bf-color" value="${App.escapeHtml(cfg.color || '#FF8C00')}" placeholder="#FF8C00">
+              <div class="pick-field">
+                <input type="text" id="bf-color" value="${App.escapeHtml(cfg.color || '#FF8C00')}" placeholder="#FF8C00">
+                <button type="button" class="cw-btn cw-btn--sm pick-btn" data-pick-color="#bf-color" title="选择颜色">
+                  <span class="pick-color-dot" style="background:${App.escapeHtml(cfg.color || '#FF8C00')}"></span>
+                </button>
+              </div>
             </div>
           </div>
           <div class="form-field">
@@ -1454,12 +1648,18 @@ const CoworkBuilder = {
           </div>
         </div>
         <div class="builder-debug">
-          <div class="builder-debug__title">🧪 调试面板 ${this.editing ? '' : '(保存后可用)'}</div>
-          <div id="debug-output"></div>
-          <div class="form-field" style="margin-top:auto">
-            <textarea id="debug-input" rows="3" placeholder="输入测试消息, 如: 本周有哪些逾期任务?"></textarea>
+          <div class="builder-debug__title">
+            🧪 调试面板 ${this.editing ? '' : '(保存后可用)'}
+            <span class="debug-ctx-badge" id="debug-ctx-badge" title="多轮调试共享上下文记忆, 如先创建会议再保存纪要"></span>
           </div>
-          <button class="cw-btn cw-btn--primary" id="debug-run" ${this.editing ? '' : 'disabled'}>▶ 运行调试</button>
+          <div id="debug-output"></div>
+          <div class="form-field debug-input-row" style="margin-top:auto">
+            <textarea id="debug-input" rows="3" placeholder="输入测试消息, 支持 @ 项目 / 记录 # 资源; 多轮调试自动携带上下文"></textarea>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="cw-btn cw-btn--primary" id="debug-run" ${this.editing ? '' : 'disabled'} style="flex:1">▶ 运行调试</button>
+            <button class="cw-btn" id="debug-clear" title="清空调试输出并重置上下文记忆">🔄 重置</button>
+          </div>
         </div>
       </div>`;
 
@@ -1469,6 +1669,35 @@ const CoworkBuilder = {
       App.switchView('agents');
     };
     document.getElementById('debug-run').onclick = () => this.runDebug();
+    document.getElementById('debug-clear').onclick = () => this.clearDebug();
+    const debugInput = document.getElementById('debug-input');
+    debugInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.runDebug();
+      }
+    });
+    // 调试输入框: @ 项目 / 记录 # 资源
+    MentionBox.attach(debugInput, {});
+    // Emoji / 主题色选择器
+    Pickers.bind(el);
+    this.updateCtxBadge();
+  },
+
+  /** 更新调试上下文徽章 */
+  updateCtxBadge() {
+    const badge = document.getElementById('debug-ctx-badge');
+    if (!badge) return;
+    badge.textContent = this.debugSessionId ? `上下文 #${this.debugSessionId}` : '无上下文';
+    badge.classList.toggle('debug-ctx-badge--on', !!this.debugSessionId);
+  },
+
+  /** 清空调试输出并重置上下文记忆 (下轮调试开启新会话) */
+  clearDebug() {
+    this.debugSessionId = null;
+    const output = document.getElementById('debug-output');
+    if (output) output.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary)">已重置, 下轮调试将开启新的上下文</div>';
+    this.updateCtxBadge();
   },
 
   async save() {
@@ -1495,30 +1724,65 @@ const CoworkBuilder = {
         this.editing = await API.createAgent(payload);
         App.showToast('已创建, 现在可以调试了', 'success');
       }
-      // 重新渲染以启用调试按钮
+      // 保存后开启全新调试上下文; 重新渲染以启用调试按钮
+      this.debugSessionId = null;
       this.renderForm(this.editing);
     } catch (err) {
       App.showToast(`保存失败: ${err.message}`, 'error');
     }
   },
 
+  /** 运行调试: 多轮共享上下文会话, 累积展示每轮详情 (入参/出参/注入记忆) */
   async runDebug() {
-    if (!this.editing) return;
+    if (!this.editing || this.debugging) return;
     const input = document.getElementById('debug-input');
     const output = document.getElementById('debug-output');
     const message = (input.value || '').trim();
     if (!message) return;
 
+    this.debugging = true;
     const runBtn = document.getElementById('debug-run');
     runBtn.disabled = true;
-    output.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div>';
+    input.value = '';
+
+    // 清除占位提示, 追加本轮用户输入块
+    const placeholder = output.querySelector('.debug-hint');
+    if (placeholder) placeholder.remove();
+    const roundDiv = document.createElement('div');
+    roundDiv.className = 'debug-round';
+    roundDiv.innerHTML = `
+      <div class="debug-round__user">${App.escapeHtml(message)}</div>
+      <div class="debug-round__body"><div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div></div>`;
+    output.appendChild(roundDiv);
+    output.scrollTop = output.scrollHeight;
+    const body = roundDiv.querySelector('.debug-round__body');
 
     try {
-      const res = await API.debugAgent(this.editing.id, message);
-      let html = `<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:8px">模型: ${App.escapeHtml(res.model || '-')}</div>`;
-      if (res.error) {
-        html += `<div class="debug-reply" style="border-color:var(--color-danger-border);background:var(--color-danger-light)">⚠️ ${App.escapeHtml(res.error)}</div>`;
+      const res = await API.debugAgent(this.editing.id, message, this.debugSessionId);
+      if (res.session_id) {
+        this.debugSessionId = res.session_id;
+        this.updateCtxBadge();
       }
+      let html = `<div class="debug-meta">模型: ${App.escapeHtml(res.model || '-')}</div>`;
+      // 注入记忆 (记忆效果测试: 与正式对话一致的记忆注入)
+      if (res.memories && res.memories.length) {
+        html += `
+          <details class="debug-mem">
+            <summary>🧠 本次注入记忆 ${res.memories.length} 条 (含项目关联与通用记忆)</summary>
+            ${res.memories.map(m => `
+              <div class="debug-mem__item">
+                <span class="memory-item__type">${App.escapeHtml(m.memory_type)}</span>
+                <b>${App.escapeHtml(m.key || '')}</b>${m.project_id ? ` <span class="memory-item__project">项目#${m.project_id}</span>` : ' <span class="memory-item__project">通用</span>'}
+                <div>${App.escapeHtml(m.content)}</div>
+              </div>`).join('')}
+          </details>`;
+      } else {
+        html += '<div class="debug-meta">🧠 本次未注入任何记忆</div>';
+      }
+      if (res.error) {
+        html += `<div class="debug-reply debug-reply--error">⚠️ ${App.escapeHtml(res.error)}</div>`;
+      }
+      // 每轮执行轨迹: 输出 + 工具入参/出参/耗时
       (res.trace || []).forEach(round => {
         html += `
           <div class="debug-trace-round">
@@ -1526,7 +1790,7 @@ const CoworkBuilder = {
             <div class="debug-trace-round__body">
               ${round.content ? `<pre>输出: ${App.escapeHtml(round.content)}</pre>` : ''}
               ${(round.tool_calls || []).map(tc => `
-                <pre>🔧 ${App.escapeHtml(tc.name)}(${App.escapeHtml(JSON.stringify(tc.arguments))})\n→ ${App.escapeHtml(JSON.stringify(tc.result, null, 2).slice(0, 800))} [${tc.duration_ms}ms]</pre>
+                <pre>🔧 ${App.escapeHtml(tc.name)}\n入参: ${App.escapeHtml(JSON.stringify(tc.arguments, null, 2))}\n出参: ${App.escapeHtml(JSON.stringify(tc.result, null, 2).slice(0, 1500))}\n耗时: ${tc.duration_ms}ms</pre>
               `).join('')}
             </div>
           </div>`;
@@ -1534,11 +1798,13 @@ const CoworkBuilder = {
       if (res.reply) {
         html += `<div class="debug-reply">${App.renderMarkdown(res.reply)}</div>`;
       }
-      output.innerHTML = html;
+      body.innerHTML = html;
     } catch (err) {
-      output.innerHTML = `<div class="debug-reply" style="border-color:var(--color-danger-border);background:var(--color-danger-light)">请求失败: ${App.escapeHtml(err.message)}</div>`;
+      body.innerHTML = `<div class="debug-reply debug-reply--error">请求失败: ${App.escapeHtml(err.message)}</div>`;
     } finally {
+      this.debugging = false;
       runBtn.disabled = false;
+      output.scrollTop = output.scrollHeight;
     }
   }
 };
@@ -1606,6 +1872,7 @@ const CoworkSkills = {
           <div class="skill-card__footer">
             <button class="cw-btn cw-btn--primary cw-btn--sm" data-action="run">▶ 执行</button>
             <button class="cw-btn cw-btn--sm" data-action="history">📜 记录</button>
+            <button class="cw-btn cw-btn--sm" data-action="copy">📋 复制</button>
             <button class="cw-btn cw-btn--sm" data-action="edit">✏️</button>
             <button class="cw-btn cw-btn--sm cw-btn--danger" data-action="delete">🗑</button>
           </div>
@@ -1617,6 +1884,7 @@ const CoworkSkills = {
       const skill = this.skills.find(s => s.id === id);
       card.querySelector('[data-action="run"]').onclick = () => this.runSkill(skill);
       card.querySelector('[data-action="history"]').onclick = () => this.showHistory(skill);
+      card.querySelector('[data-action="copy"]').onclick = () => SkillBuilder.openCopy(skill);
       card.querySelector('[data-action="edit"]').onclick = () => SkillBuilder.openEdit(skill);
       card.querySelector('[data-action="delete"]').onclick = async () => {
         if (!confirm(`确定删除技能「${skill.name}」?`)) return;
@@ -1717,6 +1985,8 @@ const CoworkSkills = {
 const SkillBuilder = {
   editing: null,
   _dirty: false,
+  testPriorResults: [],  // 调试上下文: 前几轮测试的 steps 结果 (供 {{results.N}} 引用)
+  testing: false,
   CATEGORIES: [['data', '数据查询'], ['api', 'API 调用'], ['workflow', '工作流'], ['notification', '通知']],
 
   init() {},
@@ -1727,6 +1997,7 @@ const SkillBuilder = {
 
   openCreate() {
     this.editing = null;
+    this.testPriorResults = [];
     this._dirty = true;
     App.switchView('skill-builder');
     this.renderForm({
@@ -1736,8 +2007,28 @@ const SkillBuilder = {
     });
   },
 
+  /** 复制已有技能: 预填配置, 名称加副本后缀, 保存后生成新技能 */
+  openCopy(skill) {
+    this.editing = null;
+    this.testPriorResults = [];
+    this._dirty = true;
+    App.switchView('skill-builder');
+    let code = skill.code || '';
+    try { code = JSON.stringify(JSON.parse(code), null, 2); } catch (e) { /* 保持原样 */ }
+    this.renderForm({
+      name: `${skill.name} 副本`,
+      description: skill.description || '',
+      category: skill.category || 'workflow',
+      trigger_type: skill.trigger_type || 'manual',
+      config: { ...(skill.config || { icon: '⚡', color: '#8B5CF6' }) },
+      code,
+    });
+    App.showToast(`已复制「${skill.name}」配置, 保存后生成新技能`, 'success');
+  },
+
   openEdit(skill) {
     this.editing = skill;
+    this.testPriorResults = [];
     this._dirty = true;
     App.switchView('skill-builder');
     let code = skill.code || '';
@@ -1774,11 +2065,19 @@ const SkillBuilder = {
           <div class="form-row">
             <div class="form-field">
               <label>图标 Emoji</label>
-              <input type="text" id="sf-icon" value="${App.escapeHtml(cfg.icon || '⚡')}">
+              <div class="pick-field">
+                <input type="text" id="sf-icon" value="${App.escapeHtml(cfg.icon || '⚡')}">
+                <button type="button" class="cw-btn cw-btn--sm pick-btn" data-pick-emoji="#sf-icon" title="选择 Emoji">😀</button>
+              </div>
             </div>
             <div class="form-field">
               <label>主题色</label>
-              <input type="text" id="sf-color" value="${App.escapeHtml(cfg.color || '#8B5CF6')}">
+              <div class="pick-field">
+                <input type="text" id="sf-color" value="${App.escapeHtml(cfg.color || '#8B5CF6')}">
+                <button type="button" class="cw-btn cw-btn--sm pick-btn" data-pick-color="#sf-color" title="选择颜色">
+                  <span class="pick-color-dot" style="background:${App.escapeHtml(cfg.color || '#8B5CF6')}"></span>
+                </button>
+              </div>
             </div>
             <div class="form-field">
               <label>触发方式</label>
@@ -1800,12 +2099,18 @@ const SkillBuilder = {
           </div>
         </div>
         <div class="builder-debug">
-          <div class="builder-debug__title">🧪 测试执行 ${this.editing ? '' : '(保存后可用)'}</div>
+          <div class="builder-debug__title">
+            🧪 测试执行 ${this.editing ? '' : '(保存后可用)'}
+            <span class="debug-ctx-badge" id="sf-ctx-badge" title="多轮测试共享上下文: 本轮可用 {{results.N}} 引用前几轮产物"></span>
+          </div>
           <div class="form-field">
             <label>输入参数 (JSON)</label>
             <textarea id="sf-test-input" class="code-editor" rows="4" placeholder='{}'></textarea>
           </div>
-          <button class="cw-btn cw-btn--primary" id="sf-test-run" ${this.editing ? '' : 'disabled'}>▶ 执行测试</button>
+          <div style="display:flex;gap:8px">
+            <button class="cw-btn cw-btn--primary" id="sf-test-run" ${this.editing ? '' : 'disabled'} style="flex:1">▶ 执行测试</button>
+            <button class="cw-btn" id="sf-test-clear" title="清空测试输出并重置上下文">🔄 重置</button>
+          </div>
           <div id="sf-test-result" style="margin-top:12px"></div>
         </div>
       </div>`;
@@ -1825,6 +2130,24 @@ const SkillBuilder = {
     };
     const testBtn = document.getElementById('sf-test-run');
     if (testBtn) testBtn.onclick = () => this.testRun();
+    document.getElementById('sf-test-clear').onclick = () => {
+      this.testPriorResults = [];
+      const resultEl = document.getElementById('sf-test-result');
+      if (resultEl) resultEl.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary)">已重置, 下轮测试将开启新的上下文</div>';
+      this.updateCtxBadge();
+    };
+    // Emoji / 主题色选择器
+    Pickers.bind(el);
+    this.updateCtxBadge();
+  },
+
+  /** 更新测试上下文徽章 */
+  updateCtxBadge() {
+    const badge = document.getElementById('sf-ctx-badge');
+    if (!badge) return;
+    const n = this.testPriorResults.length;
+    badge.textContent = n ? `上下文 ${n} 步` : '无上下文';
+    badge.classList.toggle('debug-ctx-badge--on', n > 0);
   },
 
   async save() {
@@ -1859,14 +2182,16 @@ const SkillBuilder = {
         this.editing = await API.createSkill(payload);
         App.showToast('已创建, 现在可以测试了', 'success');
       }
+      this.testPriorResults = [];
       this.renderForm({ ...this.editing, code: codeRaw });
     } catch (err) {
       App.showToast(`保存失败: ${err.message}`, 'error');
     }
   },
 
+  /** 执行测试: 携带上下文 prior_results, 累积展示每步入参/出参/耗时 */
   async testRun() {
-    if (!this.editing) return;
+    if (!this.editing || this.testing) return;
     const raw = document.getElementById('sf-test-input').value.trim();
     let inputData = {};
     if (raw) {
@@ -1876,22 +2201,55 @@ const SkillBuilder = {
         return;
       }
     }
+    this.testing = true;
+    const testBtn = document.getElementById('sf-test-run');
+    testBtn.disabled = true;
+
     const resultEl = document.getElementById('sf-test-result');
-    resultEl.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div>';
+    const placeholder = resultEl.querySelector('.debug-hint');
+    if (placeholder) placeholder.remove();
+    const roundDiv = document.createElement('div');
+    roundDiv.className = 'debug-round';
+    roundDiv.innerHTML = `
+      <div class="debug-round__user">输入: ${App.escapeHtml(JSON.stringify(inputData))}</div>
+      <div class="debug-round__body"><div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div></div>`;
+    resultEl.appendChild(roundDiv);
+    const body = roundDiv.querySelector('.debug-round__body');
+
     try {
-      const exec = await API.executeSkill(this.editing.id, inputData);
-      const cls = exec.status === 'success' ? 'exec-status--success' : 'exec-status--failed';
-      resultEl.innerHTML = `
-        <div class="exec-item">
-          <div class="exec-item__head">
-            <span class="exec-status ${cls}">${App.escapeHtml(exec.status)}</span>
-            <span>${exec.duration_ms}ms</span>
-          </div>
-          ${exec.error ? `<pre>错误: ${App.escapeHtml(exec.error)}</pre>` : ''}
-          <pre>${App.escapeHtml(JSON.stringify(exec.output_data, null, 2).slice(0, 2500))}</pre>
+      const res = await API.testSkill(this.editing.id, inputData, this.testPriorResults);
+      // 上下文记忆: 完整 results 供下轮 {{results.N}} 引用
+      this.testPriorResults = res.results || [];
+      this.updateCtxBadge();
+
+      const cls = res.status === 'success' ? 'exec-status--success' : 'exec-status--failed';
+      let html = `
+        <div class="exec-item__head">
+          <span class="exec-status ${cls}">${App.escapeHtml(res.status)}</span>
+          <span>${res.duration_ms}ms</span>
         </div>`;
+      if (res.error) {
+        html += `<pre>错误: ${App.escapeHtml(res.error)}</pre>`;
+      }
+      // 每步详情: 工具/内置能力 + 入参 + 出参 + 耗时
+      (res.steps || []).forEach(step => {
+        html += `
+          <div class="debug-trace-round">
+            <div class="debug-trace-round__head">步骤 ${(step.step ?? 0) + 1} · ${App.escapeHtml(step.tool || '-')}</div>
+            <div class="debug-trace-round__body">
+              <pre>入参: ${App.escapeHtml(JSON.stringify(step.arguments, null, 2))}\n出参: ${App.escapeHtml(JSON.stringify(step.result, null, 2).slice(0, 1500))}\n耗时: ${step.duration_ms}ms</pre>
+            </div>
+          </div>`;
+      });
+      if (!(res.steps || []).length && !res.error) {
+        html += '<pre>无执行步骤</pre>';
+      }
+      body.innerHTML = html;
     } catch (err) {
-      resultEl.innerHTML = `<div class="exec-item"><pre>请求失败: ${App.escapeHtml(err.message)}</pre></div>`;
+      body.innerHTML = `<div class="debug-reply debug-reply--error">请求失败: ${App.escapeHtml(err.message)}</div>`;
+    } finally {
+      this.testing = false;
+      testBtn.disabled = false;
     }
   }
 };
@@ -1902,6 +2260,8 @@ const SkillBuilder = {
 const CoworkMemories = {
   agents: [],
   projects: [],
+  testSessionId: null,  // 记忆测试调试会话 (多轮测试共享上下文)
+  testing: false,
 
   init() {},
 
@@ -1929,6 +2289,21 @@ const CoworkMemories = {
           <button class="cw-btn cw-btn--primary cw-btn--sm" id="mem-add-btn">+ 新增记忆</button>
         </div>
         <div class="memories-list" id="memories-list"><div class="empty-state">请先选择智能体</div></div>
+        <div class="mem-test">
+          <div class="mem-test__title">
+            🧪 记忆测试
+            <span class="debug-ctx-badge" id="mem-test-badge" title="多轮测试共享调试会话上下文"></span>
+          </div>
+          <div class="mem-test__hint">对当前所选智能体发送测试消息, 验证已维护记忆 (含项目关联记忆) 在生成中的注入与表现</div>
+          <div id="mem-test-output"><div class="debug-hint">输入测试消息, 查看哪些记忆被注入以及回复效果</div></div>
+          <div class="form-field debug-input-row">
+            <textarea id="mem-test-input" rows="2" placeholder="输入测试消息… 支持 @ 项目 / 记录 # 资源 (Enter 运行, Shift+Enter 换行)"></textarea>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="cw-btn cw-btn--primary cw-btn--sm" id="mem-test-run" style="flex:1">▶ 运行测试</button>
+            <button class="cw-btn cw-btn--sm" id="mem-test-clear" title="清空输出并重置测试上下文">🔄 重置</button>
+          </div>
+        </div>
       </div>`;
 
     try {
@@ -1948,11 +2323,120 @@ const CoworkMemories = {
     const active = this.projects.find(p => p.is_active);
     if (active) projSel.value = String(active.id);
 
-    agentSel.onchange = () => this.renderList();
+    agentSel.onchange = () => {
+      // 切换智能体: 测试上下文随之失效
+      this.testSessionId = null;
+      this.updateTestBadge();
+      this.renderList();
+    };
     projSel.onchange = () => this.renderList();
     document.getElementById('mem-type-filter').onchange = () => this.renderList();
     document.getElementById('mem-add-btn').onclick = () => this.addMemory();
+
+    // 记忆测试: 运行/重置
+    this.testSessionId = null;
+    document.getElementById('mem-test-run').onclick = () => this.runTest();
+    document.getElementById('mem-test-clear').onclick = () => {
+      this.testSessionId = null;
+      this.updateTestBadge();
+      const output = document.getElementById('mem-test-output');
+      if (output) output.innerHTML = '<div class="debug-hint">已重置, 下轮测试将开启新的上下文</div>';
+    };
+    const testInput = document.getElementById('mem-test-input');
+    testInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.runTest();
+      }
+    });
+    MentionBox.attach(testInput, {});
+    this.updateTestBadge();
     await this.renderList();
+  },
+
+  /** 更新记忆测试上下文徽章 */
+  updateTestBadge() {
+    const badge = document.getElementById('mem-test-badge');
+    if (!badge) return;
+    badge.textContent = this.testSessionId ? `上下文 #${this.testSessionId}` : '无上下文';
+    badge.classList.toggle('debug-ctx-badge--on', !!this.testSessionId);
+  },
+
+  /** 记忆测试: 对当前智能体运行调试, 展示注入记忆/执行轨迹/回复 */
+  async runTest() {
+    if (this.testing) return;
+    const agentId = parseInt(document.getElementById('mem-agent-filter').value, 10);
+    if (!agentId) {
+      App.showToast('请先选择智能体', 'warning');
+      return;
+    }
+    const input = document.getElementById('mem-test-input');
+    const output = document.getElementById('mem-test-output');
+    const message = (input.value || '').trim();
+    if (!message) return;
+
+    this.testing = true;
+    const runBtn = document.getElementById('mem-test-run');
+    runBtn.disabled = true;
+    input.value = '';
+
+    const placeholder = output.querySelector('.debug-hint');
+    if (placeholder) placeholder.remove();
+    const roundDiv = document.createElement('div');
+    roundDiv.className = 'debug-round';
+    roundDiv.innerHTML = `
+      <div class="debug-round__user">${App.escapeHtml(message)}</div>
+      <div class="debug-round__body"><div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div></div>`;
+    output.appendChild(roundDiv);
+    const body = roundDiv.querySelector('.debug-round__body');
+
+    try {
+      const res = await API.debugAgent(agentId, message, this.testSessionId);
+      if (res.session_id) {
+        this.testSessionId = res.session_id;
+        this.updateTestBadge();
+      }
+      let html = '';
+      // 注入的记忆 (验证记忆维护效果的核心)
+      if (res.memories && res.memories.length) {
+        html += `
+          <details class="debug-mem" open>
+            <summary>🧠 本次注入记忆 ${res.memories.length} 条</summary>
+            ${res.memories.map(m => `
+              <div class="debug-mem__item">
+                <span class="memory-item__type">${App.escapeHtml(m.memory_type)}</span>
+                <b>${App.escapeHtml(m.key || '')}</b>${m.project_id ? ` <span class="memory-item__project">项目#${m.project_id}</span>` : ' <span class="memory-item__project">通用</span>'}
+                <div>${App.escapeHtml(m.content)}</div>
+              </div>`).join('')}
+          </details>`;
+      } else {
+        html += '<div class="debug-meta">🧠 本次未注入任何记忆</div>';
+      }
+      (res.trace || []).forEach(round => {
+        html += `
+          <div class="debug-trace-round">
+            <div class="debug-trace-round__head">第 ${round.round} 轮 · ${App.escapeHtml(round.finish_reason || '')}</div>
+            <div class="debug-trace-round__body">
+              ${round.content ? `<pre>输出: ${App.escapeHtml(round.content)}</pre>` : ''}
+              ${(round.tool_calls || []).map(tc => `
+                <pre>🔧 ${App.escapeHtml(tc.name)}\n入参: ${App.escapeHtml(JSON.stringify(tc.arguments, null, 2))}\n出参: ${App.escapeHtml(JSON.stringify(tc.result, null, 2).slice(0, 1500))}\n耗时: ${tc.duration_ms}ms</pre>
+              `).join('')}
+            </div>
+          </div>`;
+      });
+      if (res.error) {
+        html += `<div class="debug-reply debug-reply--error">⚠️ ${App.escapeHtml(res.error)}</div>`;
+      }
+      if (res.reply) {
+        html += `<div class="debug-reply">${App.renderMarkdown(res.reply)}</div>`;
+      }
+      body.innerHTML = html;
+    } catch (err) {
+      body.innerHTML = `<div class="debug-reply debug-reply--error">请求失败: ${App.escapeHtml(err.message)}</div>`;
+    } finally {
+      this.testing = false;
+      runBtn.disabled = false;
+    }
   },
 
   async renderList() {

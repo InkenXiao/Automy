@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4o-mini"
 
+    # ASR 语音识别配置 (录音转文字)
+    ASR_API_URL: str = ""
+    ASR_API_KEY: str = ""
+    ASR_MODEL: str = "paraformer-large"
+    ASR_CHUNK_MS: int = 120000
+
     @property
     def database_url(self) -> str:
         """构建 SQLAlchemy async DATABASE_URL (postgresql+asyncpg://)"""

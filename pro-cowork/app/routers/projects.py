@@ -10,6 +10,18 @@ from app.schemas.project import ProjectCreate, ProjectOut, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["项目元信息"])
 
+
+async def _seed_memories_for_new_project(db, project_id: int) -> None:
+    """新项目钩子: 为四个预置智能体播种项目关联的默认记忆 (失败不阻塞项目创建)"""
+    try:
+        from app.services.agent_presets import seed_project_memories
+
+        await seed_project_memories(db, project_id)
+    except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning("项目 #%s 默认记忆播种失败", project_id, exc_info=True)
+
 # 默认项目 (信投AI2.0) — 无项目时幂等创建
 _DEFAULT_PROJECT = {
     "name": "信投AI2.0",
@@ -60,6 +72,7 @@ async def get_active_project(db=Depends(get_db)) -> ProjectOut:
             proj = Project(**_DEFAULT_PROJECT)
             db.add(proj)
             await db.flush()
+            await _seed_memories_for_new_project(db, proj.id)
         else:
             # 有项目但无激活: 激活第一条
             proj.is_active = True
@@ -78,12 +91,13 @@ async def get_project(project_id: int, db=Depends(get_db)) -> ProjectOut:
 
 @router.post("/", response_model=ProjectOut)
 async def create_project(payload: ProjectCreate, db=Depends(get_db)) -> ProjectOut:
-    """新建项目; 若标记为 active, 则取消其他项目的 active"""
+    """新建项目; 若标记为 active, 则取消其他项目的 active; 并为预置智能体播种项目记忆"""
     if payload.is_active:
         await db.execute(update(Project).values(is_active=False))
     proj = Project(**payload.model_dump())
     db.add(proj)
     await db.flush()
+    await _seed_memories_for_new_project(db, proj.id)
     return ProjectOut.model_validate(proj)
 
 

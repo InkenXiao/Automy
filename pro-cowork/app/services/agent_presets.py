@@ -221,3 +221,42 @@ async def seed_preset_memories(db: AsyncSession):
                 continue
             db.add(AgentMemory(agent_id=agent.id, project_id=None, **mem))
     await db.flush()
+
+
+async def seed_project_memories(db: AsyncSession, project_id: int):
+    """为指定项目的四个预置 Agent 播种项目关联的默认记忆
+
+    以高级项目经理/高级开发经理视角, 将 DEFAULT_MEMORIES 按项目维度复制一份
+    (project_id=项目 id), 对话/任务执行时与通用记忆一起注入系统提示词。
+    幂等: 按 agent_id + project_id + key 判重, 已存在则不同步 (保留用户后续修订)。
+    """
+    from datetime import date
+
+    for preset in PRESET_AGENTS:
+        memories = DEFAULT_MEMORIES.get(preset["type"])
+        if not memories:
+            continue
+        result = await db.execute(
+            select(Agent).where(Agent.type == preset["type"], Agent.name == preset["name"])
+        )
+        agent = result.scalars().first()
+        if not agent:
+            continue
+        for mem in memories:
+            result = await db.execute(
+                select(AgentMemory).where(
+                    AgentMemory.agent_id == agent.id,
+                    AgentMemory.project_id == project_id,
+                    AgentMemory.key == mem["key"],
+                )
+            )
+            if result.scalars().first():
+                continue
+            db.add(AgentMemory(
+                agent_id=agent.id,
+                project_id=project_id,
+                session_id=None,
+                extra_data={"seeded_at": str(date.today()), "source": "preset"},
+                **mem,
+            ))
+    await db.flush()

@@ -65,6 +65,21 @@ PRESET_SKILLS = [
             ]
         }, ensure_ascii=False),
     },
+    {
+        "name": "会议纪要生成",
+        "description": "解析上传的录音文件: 先转写为带时间戳的文字, 再生成结构化会议纪要 (结论/行动项/风险)",
+        "category": "workflow",
+        "trigger_type": "manual",
+        "config": {"icon": "📑", "color": "#EC4899"},
+        "code": json.dumps({
+            "steps": [
+                {"builtin": "meeting_minutes", "arguments": {
+                    "file_name": "{{input.file_name}}",
+                    "project_id": "{{input.project_id}}",
+                }},
+            ]
+        }, ensure_ascii=False),
+    },
 ]
 
 
