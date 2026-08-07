@@ -70,6 +70,7 @@ const Meeting = {
     const container = document.getElementById('view-meeting');
     if (!container) return;
 
+    const canEdit = App.can.fulltime();  // 非全职成员只读
     const items = this.state.meetings;
     const selectedId = this.state.selectedMeeting ? String(this.state.selectedMeeting.id) : '';
 
@@ -100,7 +101,7 @@ const Meeting = {
               <span class="mt-meta-item mt-meta-agenda">📋 ${itemCount} 项议程</span>
               <span class="mt-actions-spacer"></span>
               <button class="mt-btn sm" data-action="open" data-id="${m.id}">详情</button>
-              <button class="mt-icon-btn danger" data-action="delete" data-id="${m.id}" title="删除">🗑</button>
+              ${canEdit ? `<button class="mt-icon-btn danger" data-action="delete" data-id="${m.id}" title="删除">🗑</button>` : ''}
             </div>
           </div>
         `;
@@ -115,7 +116,7 @@ const Meeting = {
             <span class="mt-subtitle">管理会议议程 · 记录会议安排</span>
           </div>
           <div class="mt-header-r">
-            <button class="mt-btn primary" data-action="new-meeting">＋ 新建会议</button>
+            ${canEdit ? '<button class="mt-btn primary" data-action="new-meeting">＋ 新建会议</button>' : ''}
           </div>
         </div>
         <div class="mt-list">${listHtml}</div>
@@ -144,11 +145,14 @@ const Meeting = {
     }
   },
 
-  /** 渲染议程页(仅中栏, 全部可编辑) */
+  /** 渲染议程页(仅中栏, 全职成员可编辑) */
   renderDetail(m) {
     const container = document.getElementById('view-meeting');
     if (!container) return;
 
+    const canEdit = App.can.fulltime();  // 非全职成员只读
+    // contenteditable 属性: 仅全职成员渲染, 否则单元格只读
+    const ce = canEdit ? '${ce}' : '';
     const items = m.items || [];
     const selectedId = this.state.selectedItem ? String(this.state.selectedItem.id) : '';
 
@@ -161,13 +165,13 @@ const Meeting = {
         return `
           <tr class="mt-item-row${active}" data-id="${it.id}">
             <td class="mt-c-idx">${i + 1}</td>
-            <td class="mt-c-time"><div class="mt-cell" contenteditable="true" data-k="item_time" data-id="${it.id}">${App.escapeHtml(it.item_time || '')}</div></td>
-            <td class="mt-c-theme"><div class="mt-cell" contenteditable="true" data-k="theme" data-id="${it.id}">${App.escapeHtml(it.theme || '')}</div></td>
-            <td class="mt-c-speaker"><div class="mt-cell" contenteditable="true" data-k="speaker" data-id="${it.id}">${App.escapeHtml(it.speaker || '')}</div></td>
-            <td class="mt-c-dur"><div class="mt-cell" contenteditable="true" data-k="duration" data-id="${it.id}">${App.escapeHtml(it.duration || '')}</div></td>
-            <td class="mt-c-note"><div class="mt-cell" contenteditable="true" data-k="note" data-id="${it.id}">${App.escapeHtml(it.note || '')}</div></td>
+            <td class="mt-c-time"><div class="mt-cell" ${ce} data-k="item_time" data-id="${it.id}">${App.escapeHtml(it.item_time || '')}</div></td>
+            <td class="mt-c-theme"><div class="mt-cell" ${ce} data-k="theme" data-id="${it.id}">${App.escapeHtml(it.theme || '')}</div></td>
+            <td class="mt-c-speaker"><div class="mt-cell" ${ce} data-k="speaker" data-id="${it.id}">${App.escapeHtml(it.speaker || '')}</div></td>
+            <td class="mt-c-dur"><div class="mt-cell" ${ce} data-k="duration" data-id="${it.id}">${App.escapeHtml(it.duration || '')}</div></td>
+            <td class="mt-c-note"><div class="mt-cell" ${ce} data-k="note" data-id="${it.id}">${App.escapeHtml(it.note || '')}</div></td>
             <td class="mt-c-del">
-              <button class="mt-del-btn" data-action="del-item" data-id="${it.id}" title="删除">×</button>
+              ${canEdit ? `<button class="mt-del-btn" data-action="del-item" data-id="${it.id}" title="删除">×</button>` : ''}
               <button class="mt-info-btn" data-action="select-item" data-id="${it.id}" title="查看简介">📋</button>
             </td>
           </tr>
@@ -182,20 +186,20 @@ const Meeting = {
             <button class="mt-btn" data-action="back">← 返回列表</button>
           </div>
           <div class="mt-header-r">
-            <button class="mt-btn primary" data-action="add-item">＋ 新增议程项</button>
+            ${canEdit ? '<button class="mt-btn primary" data-action="add-item">＋ 新增议程项</button>' : ''}
             <button class="mt-btn" data-action="export-pdf">📄 导出PDF</button>
           </div>
         </div>
         <div class="mt-meeting-info">
           <div class="mt-meeting-info-row mt-meeting-info-row--title">
             <label>主题</label>
-            <div class="mt-meeting-editable mt-meeting-editable--title" contenteditable="true" data-field="title" data-placeholder="会议主题">${App.escapeHtml(m.title || '')}</div>
+            <div class="mt-meeting-editable mt-meeting-editable--title" ${ce} data-field="title" data-placeholder="会议主题">${App.escapeHtml(m.title || '')}</div>
           </div>
           <div class="mt-meeting-info-grid">
-            <div class="mt-meeting-info-row"><label>日期</label><div class="mt-meeting-editable" contenteditable="true" data-field="meet_date">${App.escapeHtml(m.meet_date || '')}</div></div>
-            <div class="mt-meeting-info-row"><label>时间</label><div class="mt-meeting-editable" contenteditable="true" data-field="meet_time">${App.escapeHtml(m.meet_time || '')}</div></div>
-            <div class="mt-meeting-info-row"><label>地点</label><div class="mt-meeting-editable" contenteditable="true" data-field="place">${App.escapeHtml(m.place || '')}</div></div>
-            <div class="mt-meeting-info-row"><label>主持人</label><div class="mt-meeting-editable" contenteditable="true" data-field="host">${App.escapeHtml(m.host || '')}</div></div>
+            <div class="mt-meeting-info-row"><label>日期</label><div class="mt-meeting-editable" ${ce} data-field="meet_date">${App.escapeHtml(m.meet_date || '')}</div></div>
+            <div class="mt-meeting-info-row"><label>时间</label><div class="mt-meeting-editable" ${ce} data-field="meet_time">${App.escapeHtml(m.meet_time || '')}</div></div>
+            <div class="mt-meeting-info-row"><label>地点</label><div class="mt-meeting-editable" ${ce} data-field="place">${App.escapeHtml(m.place || '')}</div></div>
+            <div class="mt-meeting-info-row"><label>主持人</label><div class="mt-meeting-editable" ${ce} data-field="host">${App.escapeHtml(m.host || '')}</div></div>
           </div>
         </div>
         <div class="mt-agenda">
@@ -214,11 +218,11 @@ const Meeting = {
             </thead>
             <tbody id="mt-agenda-body">${rowsHtml}</tbody>
           </table>
-          <button class="mt-add-row" data-action="add-item">＋ 新增议程项</button>
+          ${canEdit ? '<button class="mt-add-row" data-action="add-item">＋ 新增议程项</button>' : ''}
         </div>
         <div class="mt-attendees-readonly">
           <label>参会人员</label>
-          <div class="mt-val attendees" contenteditable="true" data-field="attendees" data-placeholder="列出参会人员，用、或逗号分隔">${App.escapeHtml(m.attendees || '')}</div>
+          <div class="mt-val attendees" ${ce} data-field="attendees" data-placeholder="列出参会人员，用、或逗号分隔">${App.escapeHtml(m.attendees || '')}</div>
         </div>
         ${this._extrasHtml(m) ? `<div class="meeting-extras meeting-extras--page">${this._extrasHtml(m)}</div>` : ''}
       </div>
@@ -237,6 +241,7 @@ const Meeting = {
       if (act === 'edit' || act === 'preview') {
         this.switchRtMode(act);
       } else if (act === 'save') {
+        if (!App.can.fulltime()) return;  // 非全职成员只读
         this.saveRtContent();
       }
       return;
@@ -246,6 +251,10 @@ const Meeting = {
     if (!el) return;
     const action = el.dataset.action;
     const id = el.dataset.id;
+
+    // 维护类操作: 非全职成员只读 (select/open/back/select-item/export-pdf 等查看类放行)
+    const maintainActions = ['new-meeting', 'delete', 'add-item', 'del-item'];
+    if (maintainActions.includes(action) && !App.can.fulltime()) return;
 
     switch (action) {
       case 'new-meeting':
@@ -481,6 +490,7 @@ const Meeting = {
 
   /** 保存富文本编辑器内容到后端 */
   async saveRtContent() {
+    if (!App.can.fulltime()) return;  // 非全职成员只读
     const body = document.querySelector('.detail-panel__body[data-rt-kind]');
     if (!body) return;
     const kind = body.dataset.rtKind;
@@ -524,6 +534,7 @@ const Meeting = {
    * 右栏 contenteditable focus/blur 事件处理
    * ---------------------------------------------------------------- */
   handleFocus(e) {
+    if (!App.can.fulltime()) return;  // 非全职成员只读, 无需记录编辑快照
     // 议程项单元格
     const cell = e.target.closest('.mt-cell[data-k]');
     if (cell) {
@@ -538,6 +549,7 @@ const Meeting = {
   },
 
   async handleBlur(e) {
+    if (!App.can.fulltime()) { this._focusSnapshot = null; return; }  // 非全职成员只读, 不保存
     // 议程项单元格失焦(中栏议程表格)
     const cell = e.target.closest('.mt-cell[data-k]');
     if (cell) {

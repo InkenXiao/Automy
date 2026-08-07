@@ -19,6 +19,10 @@ const API = {
       'Accept': 'application/json',
       ...(options.headers || {})
     };
+    // 统一注入登录用户身份头 (Auth 模块将姓名写入 localStorage)
+    // HTTP header 仅支持 Latin-1, 中文姓名必须 URL 编码, 后端 unquote 还原
+    const userName = (localStorage.getItem('cowork_user') || '').trim();
+    if (userName) headers['X-User-Name'] = encodeURIComponent(userName);
 
     const config = {
       ...options,
@@ -94,6 +98,37 @@ const API = {
     return this.request(path, {
       method: 'DELETE'
     });
+  },
+
+  /* ------------------------------------------------------------------
+     身份认证 (姓名直登)
+     ------------------------------------------------------------------ */
+  login(name) {
+    return this.post('/auth/login', { name });
+  },
+
+  getAuthMe(name) {
+    return this.get(`/auth/me?name=${encodeURIComponent(name)}`);
+  },
+
+  /* ------------------------------------------------------------------
+     使用日志看板
+     ------------------------------------------------------------------ */
+  getUsageStats(period) {
+    return this.get(`/usage-logs/stats?period=${encodeURIComponent(period)}`);
+  },
+
+  getUsageDetails(period, entityType) {
+    return this.get(`/usage-logs/details?period=${encodeURIComponent(period)}&entity_type=${encodeURIComponent(entityType)}`);
+  },
+
+  getUsageOperations(period, entityType, entityId, extra = {}) {
+    const params = [`period=${encodeURIComponent(period)}`];
+    if (entityType) params.push(`entity_type=${encodeURIComponent(entityType)}`);
+    if (entityId !== undefined && entityId !== null && entityId !== '') params.push(`entity_id=${encodeURIComponent(entityId)}`);
+    if (extra.action) params.push(`action=${encodeURIComponent(extra.action)}`);
+    if (extra.user_name) params.push(`user_name=${encodeURIComponent(extra.user_name)}`);
+    return this.get(`/usage-logs/operations?${params.join('&')}`);
   },
 
   /* ------------------------------------------------------------------
@@ -315,8 +350,10 @@ const API = {
   /* ------------------------------------------------------------------
      每周工作任务
      ------------------------------------------------------------------ */
-  getWorkTasks(weekStart) {
-    return this.get(`/work-tasks/?week_start=${weekStart}`);
+  getWorkTasks(weekStart, projectId) {
+    let qs = `?week_start=${weekStart}`;
+    if (projectId) qs += `&project_id=${encodeURIComponent(projectId)}`;
+    return this.get(`/work-tasks/${qs}`);
   },
 
   createWorkTask(data) {

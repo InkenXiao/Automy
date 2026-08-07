@@ -234,26 +234,30 @@ const ProgressPlan = {
     const projectId = p.id || '';
     const projectOptions = (this.projects.length ? this.projects : (p.id ? [p] : []))
       .map(pr => `<option value="${pr.id}" ${String(pr.id) === String(projectId) ? 'selected' : ''}>${App.escapeHtml(pr.name || pr.title || ('项目#' + pr.id))}</option>`).join('');
+    // 非项目经理只读: 维护类控件(行内编辑/新建项目/周期修改/新建任务/编辑阶段)不渲染
+    const canPm = App.can.pm();
 
     view.innerHTML = `
       <div class="pp-container">
         <div class="pp-header">
           <div>
-            <h1 class="pp-editable-title" contenteditable="true" data-pfield="title" data-placeholder="项目进度计划执行图标题">${App.escapeHtml(projTitle)}</h1>
+            <h1 class="pp-editable-title" ${canPm ? 'contenteditable="true"' : ''} data-pfield="title" data-placeholder="项目进度计划执行图标题">${App.escapeHtml(projTitle)}</h1>
             <div class="subtitle">
-              <span>📅 基于《<span class="pp-editable-inline" contenteditable="true" data-pfield="based_doc" data-placeholder="文档名称">${App.escapeHtml(projBasedDoc)}</span>》</span>
+              <span>📅 基于《<span class="pp-editable-inline" ${canPm ? 'contenteditable="true"' : ''} data-pfield="based_doc" data-placeholder="文档名称">${App.escapeHtml(projBasedDoc)}</span>》</span>
               <span>⚡ ${phaseCount}阶段 · ${biweekCount}迭代 · ${msCount}里程碑 · ${taskCount}项任务</span>
             </div>
           </div>
           <div class="pp-header-r">
             <div class="pp-project-switch">
               <select id="pp-project-select" title="切换项目">${projectOptions}</select>
-              <button class="pp-btn" id="pp-new-project-btn" title="新建项目">＋ 新建项目</button>
+              ${canPm ? '<button class="pp-btn" id="pp-new-project-btn" title="新建项目">＋ 新建项目</button>' : ''}
             </div>
             <div class="date-range">
+              ${canPm ? `
               <input type="date" id="pp-proj-start" value="${projStart}" title="项目开始日期">
               <span>—</span>
               <input type="date" id="pp-proj-end" value="${projEnd}" title="项目结束日期">
+              ` : `<span>${projStart} — ${projEnd}</span>`}
             </div>
           </div>
         </div>
@@ -306,8 +310,10 @@ const ProgressPlan = {
             <div class="pp-search-box">
               <input type="text" id="pp-search" placeholder="搜索任务..." value="${App.escapeHtml(this.filters.keyword)}">
             </div>
+            ${canPm ? `
             <button class="pp-btn" id="pp-edit-phases-btn">⚙ 编辑阶段</button>
             <button class="pp-btn" id="pp-new-btn">＋ 新建任务</button>
+            ` : ''}
             <button class="pp-btn" id="pp-reset-btn">🔄 重置</button>
             <button class="pp-btn" id="pp-export-btn">📄 导出PDF</button>
           </div>
@@ -453,6 +459,8 @@ const ProgressPlan = {
 
     let currentPhaseNo = 0;
     let visibleCount = 0;
+    // 非项目经理只读: 任务行不可拖拽, 完成勾选不绑定
+    const canPm = App.can.pm();
 
     sorted.forEach(task => {
       const isMilestone = task.is_milestone || task.status === 'milestone';
@@ -529,7 +537,7 @@ const ProgressPlan = {
       if (isOverdue) row.classList.add('pp-overdue');
       row.dataset.taskId = task.id;
       row.style.position = 'relative';
-      row.draggable = true;
+      row.draggable = canPm;
 
       const startDay = this.dateToDay(task.start_date);
       const endDay = this.dateToDay(task.end_date || task.start_date);
@@ -544,7 +552,9 @@ const ProgressPlan = {
         const checkCls = isDone ? 'checked' : '';
         const nameStyle = isDeleted ? 'text-decoration:line-through;color:#999;' : (isOverdue ? 'color:var(--color-danger);' : '');
         nameEl.innerHTML = `
-          <div class="check-btn ${checkCls}" data-action="toggle-done" data-id="${task.id}" title="标记完成">${isDone ? '✓' : ''}</div>
+          ${canPm
+            ? `<div class="check-btn ${checkCls}" data-action="toggle-done" data-id="${task.id}" title="标记完成">${isDone ? '✓' : ''}</div>`
+            : `<div class="check-btn ${checkCls}">${isDone ? '✓' : ''}</div>`}
           <span class="status-dot ${statusCls}"></span>
           <span class="task-id">${App.escapeHtml(task.task_uid || '')}</span>
           <span title="${App.escapeHtml(task.full_desc || '')}" style="${nameStyle}">${App.escapeHtml(task.name || '')}</span>
@@ -650,7 +660,11 @@ const ProgressPlan = {
    * 绑定事件
    * ---------------------------------------------------------------- */
   bindEvents() {
-    // ---- 项目元信息编辑 (标题/基于文档 contenteditable blur 保存) ----
+    // 非项目经理只读: 行内编辑/状态切换/拖拽排序等维护入口不绑定
+    const canPm = App.can.pm();
+
+    // ---- 项目元信息编辑 (标题/基于文档 contenteditable blur 保存, 仅项目经理) ----
+    if (canPm) {
     document.querySelectorAll('[data-pfield]').forEach(el => {
       if (el.tagName === 'INPUT') return; // 日期用 change 单独处理
       const field = el.dataset.pfield;
@@ -663,6 +677,7 @@ const ProgressPlan = {
         await this.saveProjectField(field, val);
       });
     });
+    }
 
     // 项目周期日期 (开始/结束) change → 保存并重建时间轴
     const projStart = document.getElementById('pp-proj-start');
@@ -810,12 +825,13 @@ const ProgressPlan = {
       });
     }
 
-    // 勾选完成
+    // 勾选完成 (仅项目经理)
     const taskList = document.getElementById('pp-task-list');
     if (taskList) {
       taskList.addEventListener('click', (e) => {
         const check = e.target.closest('[data-action="toggle-done"]');
         if (!check) return;
+        if (!canPm) return;
         e.stopPropagation();
         const id = check.dataset.id;
         const task = this.tasks.find(t => String(t.id) === String(id));
@@ -877,8 +893,9 @@ const ProgressPlan = {
     return Math.round((db - da) / 86400000);
   },
 
-  /** 任务行垂直拖拽排序: 拖到不同阶段区域 → 自动更新 phase_id + 日期 */
+  /** 任务行垂直拖拽排序: 拖到不同阶段区域 → 自动更新 phase_id + 日期 (仅项目经理) */
   bindTaskDragSort() {
+    if (!App.can.pm()) return;
     const taskList = document.getElementById('pp-task-list');
     if (!taskList) return;
     let dragRow = null;
@@ -972,8 +989,9 @@ const ProgressPlan = {
     });
   },
 
-  /** 任务条水平拖拽: 在时间轴上左右拖动任务条 → 更新开始/结束日期, 跨阶段时自动更新 phase_id */
+  /** 任务条水平拖拽: 在时间轴上左右拖动任务条 → 更新开始/结束日期, 跨阶段时自动更新 phase_id (仅项目经理) */
   bindBarDrag() {
+    if (!App.can.pm()) return;
     const barsArea = document.getElementById('pp-bars-area');
     if (!barsArea) return;
 
@@ -1240,6 +1258,8 @@ const ProgressPlan = {
     const isDone = task.status === 'done';
     const phase = App.getPhase(task.phase_id);
     const phaseNo = this.phaseNo(task.phase_id);
+    // 非项目经理只读: 不渲染状态切换/编辑操作
+    const canPm = App.can.pm();
 
     const badgeCls = isMilestone ? 'ms' : `p${phaseNo}`;
     const badgeText = isMilestone
@@ -1292,6 +1312,7 @@ const ProgressPlan = {
             <div style="font-size:13px;">${App.escapeHtml(task.owner)}</div>
           </div>
         ` : ''}
+        ${canPm ? `
         <div>
           <div style="font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📎 操作</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1299,6 +1320,7 @@ const ProgressPlan = {
             <button class="pp-btn" id="pp-modal-edit">✏️ 编辑</button>
           </div>
         </div>
+        ` : ''}
       `,
       footerHtml: `<button class="btn btn-ghost" data-modal-close>关闭</button>`
     });
@@ -1330,49 +1352,52 @@ const ProgressPlan = {
   showTaskDetail(task) {
     const isMilestone = task.is_milestone || task.status === 'milestone';
     const refCount = task.ref_count || task.reference_count || 0;
+    // 非项目经理只读: 表单控件禁用, 不渲染保存按钮
+    const canPm = App.can.pm();
+    const ro = canPm ? '' : 'disabled';
     const phaseOpts = App.state.phases.map(p =>
       `<option value="${p.id}" ${String(task.phase_id) === String(p.id) ? 'selected' : ''}>${App.escapeHtml(p.name)}</option>`
     ).join('');
 
     App.showDetail(`
       <div class="detail-panel__header">
-        <div class="detail-panel__title">${isMilestone ? '★ ' : ''}编辑进度计划任务</div>
+        <div class="detail-panel__title">${isMilestone ? '★ ' : ''}${canPm ? '编辑进度计划任务' : '进度计划任务详情'}</div>
         <div class="detail-panel__meta">UID: ${App.escapeHtml(task.task_uid || '—')} · #${App.escapeHtml(String(task.id))} · 被引用 ${refCount} 次</div>
       </div>
       <div class="detail-panel__body is-pp-edit" data-pp-id="${task.id}">
         <div class="pp-edit-form">
           <div class="form-group">
             <label>任务名称 *</label>
-            <input type="text" id="ppd-name" value="${App.escapeHtml(task.name || '')}">
+            <input type="text" id="ppd-name" value="${App.escapeHtml(task.name || '')}" ${ro}>
           </div>
           <div class="form-row">
             <div class="form-group" style="flex:1;">
               <label>任务 UID *</label>
-              <input type="text" id="ppd-uid" value="${App.escapeHtml(task.task_uid || '')}">
+              <input type="text" id="ppd-uid" value="${App.escapeHtml(task.task_uid || '')}" ${ro}>
             </div>
             <div class="form-group" style="flex:1;">
               <label>所属阶段</label>
-              <select id="ppd-phase"><option value="">— 请选择 —</option>${phaseOpts}</select>
+              <select id="ppd-phase" ${ro}><option value="">— 请选择 —</option>${phaseOpts}</select>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>开始日期</label>
-              <input type="date" id="ppd-start" value="${task.start_date ? App.formatDate(task.start_date) : ''}">
+              <input type="date" id="ppd-start" value="${task.start_date ? App.formatDate(task.start_date) : ''}" ${ro}>
             </div>
             <div class="form-group">
               <label>结束日期</label>
-              <input type="date" id="ppd-end" value="${task.end_date ? App.formatDate(task.end_date) : ''}">
+              <input type="date" id="ppd-end" value="${task.end_date ? App.formatDate(task.end_date) : ''}" ${ro}>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group" style="flex:1;">
               <label>责任方</label>
-              <input type="text" id="ppd-owner" value="${App.escapeHtml(task.owner || '')}">
+              <input type="text" id="ppd-owner" value="${App.escapeHtml(task.owner || '')}" ${ro}>
             </div>
             <div class="form-group" style="flex:1;">
               <label>状态</label>
-              <select id="ppd-status">
+              <select id="ppd-status" ${ro}>
                 <option value="planned" ${task.status === 'planned' ? 'selected' : ''}>待开始</option>
                 <option value="ongoing" ${task.status === 'ongoing' ? 'selected' : ''}>进行中</option>
                 <option value="done" ${task.status === 'done' ? 'selected' : ''}>已完成</option>
@@ -1383,19 +1408,19 @@ const ProgressPlan = {
           </div>
           <div class="form-group">
             <label>类型</label>
-            <select id="ppd-ms">
+            <select id="ppd-ms" ${ro}>
               <option value="false" ${!isMilestone ? 'selected' : ''}>普通任务</option>
               <option value="true" ${isMilestone ? 'selected' : ''}>★ 里程碑</option>
             </select>
           </div>
           <div class="form-group pp-edit-desc-group">
             <label>完整描述</label>
-            <textarea id="ppd-desc" placeholder="任务详细说明 (含责任方等), 支持 Markdown 语法">${App.escapeHtml(task.full_desc || '')}</textarea>
+            <textarea id="ppd-desc" placeholder="任务详细说明 (含责任方等), 支持 Markdown 语法" ${ro}>${App.escapeHtml(task.full_desc || '')}</textarea>
           </div>
         </div>
         <div class="pp-edit-actions">
           <span class="pp-edit-status" data-pp-status></span>
-          <button class="btn btn-primary" id="ppd-save">💾 保存</button>
+          ${canPm ? '<button class="btn btn-primary" id="ppd-save">💾 保存</button>' : ''}
         </div>
       </div>
     `);

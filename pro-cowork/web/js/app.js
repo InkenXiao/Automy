@@ -21,6 +21,9 @@ const App = {
     this.initWeekPicker();
     this.createToastContainer();
 
+    // 身份确认: 未登录则阻塞展示登录页 (无效姓名可进入但无项目数据)
+    await Auth.ensure();
+
     // 加载基础数据
     try {
       await this.loadModules();
@@ -45,9 +48,21 @@ const App = {
     CoworkSkills.init();
     SkillBuilder.init();
     CoworkMemories.init();
+    // 系统模块
+    UsageLogs.init();
 
     // 触发默认视图(进度计划)的首次加载, 避免首屏主区域空白
     this.switchView(this.state.currentView);
+  },
+
+  /* ------------------------------------------------------------------
+   * 维护权限 (依赖 Auth 身份与当前激活项目)
+   * pm():       当前用户是当前激活项目的项目经理
+   * fulltime(): 当前用户是当前激活项目的全职成员 (经理视同全职)
+   * ---------------------------------------------------------------- */
+  can: {
+    pm() { return Auth.isPm(); },
+    fulltime() { return Auth.isFulltime(); },
   },
 
   /** 绑定左侧导航切换 */
@@ -93,6 +108,7 @@ const App = {
       'skills': CoworkSkills,
       'skill-builder': SkillBuilder,
       'memories': CoworkMemories,
+      'usage-logs': UsageLogs,
     };
     const mod = viewModuleMap[viewName] || null;
     if (mod && typeof mod.onShow === 'function') {
@@ -102,7 +118,7 @@ const App = {
     // CoWork 全屏视图 (对话/构建器) 隐藏右栏详情面板
     const rightPanel = document.querySelector('.app-frame__right');
     if (rightPanel) {
-      const fullWidthViews = ['tasks', 'agents', 'agent-chat', 'builder', 'skills', 'skill-builder', 'memories'];
+      const fullWidthViews = ['tasks', 'agents', 'agent-chat', 'builder', 'skills', 'skill-builder', 'memories', 'usage-logs'];
       rightPanel.style.display = fullWidthViews.includes(viewName) ? 'none' : '';
     }
 
@@ -148,10 +164,14 @@ const App = {
     this.state.phases = Array.isArray(data) ? data : (data.items || []);
   },
 
-  /** 加载当前激活项目元信息到全局状态 (无项目时后端会幂等创建默认项目) */
+  /** 加载当前激活项目元信息到全局状态 (无所属项目时后端返回 403, 置空即可) */
   async loadActiveProject() {
-    const data = await API.getActiveProject();
-    this.state.project = data || null;
+    try {
+      const data = await API.getActiveProject();
+      this.state.project = data || null;
+    } catch (err) {
+      this.state.project = null;
+    }
     return this.state.project;
   },
 

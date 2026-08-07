@@ -1,4 +1,7 @@
-"""个人周报路由 · 项目驾驶舱-个人周报填写页 (全量保存: 子表整体替换)"""
+"""个人周报路由 · 项目驾驶舱-个人周报填写页 (全量保存: 子表整体替换)
+
+填写限制 (需求: 成员状态): 退出状态成员不能填写该项目周报; 非项目成员同样禁止
+"""
 from datetime import date
 from typing import Optional
 
@@ -13,6 +16,7 @@ from app.models.personal_report import (
     PersonalReportPlanItem,
     PersonalReportWorkItem,
 )
+from app.models.project_member import ProjectMember
 from app.schemas.personal_report import (
     PersonalReportCreate,
     PersonalReportOut,
@@ -21,6 +25,22 @@ from app.schemas.personal_report import (
 from app.utils import resolve_project_id
 
 router = APIRouter(prefix="/personal-reports", tags=["个人周报"])
+
+
+async def _check_member_can_report(db: AsyncSession, project_id: int, member_name: str) -> None:
+    """校验成员可填写该项目周报: 必须是项目成员且状态不为 退出"""
+    result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.is_delete.is_(False),
+            ProjectMember.project_id == project_id,
+            ProjectMember.name == member_name,
+        )
+    )
+    member = result.scalars().first()
+    if not member:
+        raise HTTPException(status_code=403, detail="该人员不是项目成员, 不能填写周报")
+    if (member.status or "全职") == "退出":
+        raise HTTPException(status_code=403, detail="已退出成员不能填写该项目周报")
 
 
 def _with_items(stmt):
@@ -108,9 +128,10 @@ async def get_personal_report(
 async def create_personal_report(
     payload: PersonalReportCreate, db: AsyncSession = Depends(get_db)
 ) -> PersonalReportOut:
-    """新建个人周报 (含完整子表); 同项目同人员同周已存在则 409"""
+    """新建个人周报 (含完整子表); 同项目同人员同周已存在则 409; 退出成员禁止填写"""
     data = payload.model_dump(exclude={"work_items", "plan_items"})
     data["project_id"] = await resolve_project_id(db, data.get("project_id"))
+    await _check_member_can_report(db, data["project_id"], data["member_name"])
 
     dup = await db.execute(
         select(PersonalReport).where(
@@ -137,8 +158,9 @@ async def create_personal_report(
 async def update_personal_report(
     report_id: int, payload: PersonalReportUpdate, db: AsyncSession = Depends(get_db)
 ) -> PersonalReportOut:
-    """更新个人周报 (子表全量替换); 显式提交保证紧随的读取拿到最新值"""
+    """更新个人周报 (子表全量替换); 显式提交保证紧随的读取拿到最新值; 退出成员禁止填写"""
     report = await _load_report(db, report_id)
+    await _check_member_can_report(db, report.project_id, report.member_name)
     _replace_items(report, payload)
     await db.flush()
     await db.commit()

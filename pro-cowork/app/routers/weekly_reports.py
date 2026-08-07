@@ -1,12 +1,16 @@
-"""周报路由 · 含 KPI / 进展事项 / 下周任务 / 风险 等子资源"""
+"""周报路由 · 含 KPI / 进展事项 / 下周任务 / 风险 等子资源 (维护权限: 仅项目经理)"""
+from datetime import date
 from typing import Optional
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
+from app.deps import get_user_name, require_project_manager
 from app.models.module import Module
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
@@ -74,6 +78,15 @@ async def _load_report(db: AsyncSession, report_id: int) -> WeeklyReport:
     return report
 
 
+async def _require_report_pm(db: AsyncSession, report_id: int, name: str) -> WeeklyReport:
+    """加载周报并要求当前用户为该项目经理 (写端点统一入口)"""
+    report = await db.get(WeeklyReport, report_id)
+    if not report or report.is_delete:
+        raise HTTPException(status_code=404, detail="周报不存在")
+    await require_project_manager(db, report.project_id, name)
+    return report
+
+
 async def _load_plan_task(db: AsyncSession, task_id: int) -> WeeklyPlanTask:
     """加载单条下周任务 (含 module 与 progress_task 关系, 避免异步懒加载)"""
     stmt = (
@@ -133,6 +146,43 @@ async def list_weekly_reports(
     return [WeeklyReportOut.model_validate(it) for it in items]
 
 
+@router.get("/export-excel")
+async def export_weekly_reports_excel(
+    week_start: date,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """导出当前项目经理全部项目的周工作周报 Excel (仅项目经理; 严格按参照格式)
+
+    注意: 必须定义在 /{report_id} 之前, 避免路径冲突
+    """
+    from app.services.excel_export import build_pm_weekly_excel
+    from app.services.log_service import record_operation
+
+    name = get_user_name(request)
+    if not name:
+        raise HTTPException(status_code=403, detail="请先登录")
+    result = await build_pm_weekly_excel(db, name, week_start)
+    if result is None:
+        raise HTTPException(status_code=403, detail="仅项目经理可导出周报")
+    buffer, filename = result
+    await record_operation(
+        user_name=name,
+        method="GET",
+        path="/api/weekly-reports/export-excel",
+        entity_type="项目周报",
+        action="export",
+        detail=f"week_start={week_start} file={filename}",
+    )
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"
+        },
+    )
+
+
 @router.get("/{report_id}", response_model=WeeklyReportOut)
 async def get_weekly_report(
     report_id: int, db: AsyncSession = Depends(get_db)
@@ -144,11 +194,12 @@ async def get_weekly_report(
 
 @router.post("/", response_model=WeeklyReportOut)
 async def create_weekly_report(
-    payload: WeeklyReportCreate, db: AsyncSession = Depends(get_db)
+    payload: WeeklyReportCreate, request: Request, db: AsyncSession = Depends(get_db)
 ) -> WeeklyReportOut:
-    """新建周报; project_id 未传时默认用当前激活项目"""
+    """新建周报; project_id 未传时默认用当前激活项目 (仅项目经理)"""
     data = payload.model_dump()
     data["project_id"] = await resolve_project_id(db, data.get("project_id"))
+    await require_project_manager(db, data["project_id"], get_user_name(request))
     report = WeeklyReport(**data)
     db.add(report)
     await db.flush()
@@ -159,9 +210,9 @@ async def create_weekly_report(
 
 @router.post("/copy-last", response_model=WeeklyReportOut)
 async def copy_last_week_report(
-    payload: CopyLastWeekRequest, db: AsyncSession = Depends(get_db)
+    payload: CopyLastWeekRequest, request: Request, db: AsyncSession = Depends(get_db)
 ) -> WeeklyReportOut:
-    """复制最近一份周报到新周次 (复制 KPI / 进展 / 下周任务 / 风险 全部子表)
+    """复制最近一份周报到新周次 (复制 KPI / 进展 / 下周任务 / 风险 全部子表) (仅项目经理)
 
     - 在 week_start 之前查找最近一份未删除周报作为源 (同项目内)
     - 新周报保留源的所有内容, 仅更新周次范围与标题, project_id 继承自源
@@ -169,6 +220,7 @@ async def copy_last_week_report(
     """
     # 解析 project_id (未传则用当前激活项目)
     pid = await resolve_project_id(db, payload.project_id)
+    await require_project_manager(db, pid, get_user_name(request))
 
     # 1. 查找源周报 (同项目内, week_start 严格早于目标 week_start, 按 week_start 倒序取首条)
     src_stmt = (
@@ -272,12 +324,11 @@ async def copy_last_week_report(
 async def update_weekly_report(
     report_id: int,
     payload: WeeklyReportUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyReportOut:
-    """更新周报"""
-    report = await db.get(WeeklyReport, report_id)
-    if not report or report.is_delete:
-        raise HTTPException(status_code=404, detail="周报不存在")
+    """更新周报 (仅项目经理)"""
+    report = await _require_report_pm(db, report_id, get_user_name(request))
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(report, key, value)
     await db.flush()
@@ -288,12 +339,10 @@ async def update_weekly_report(
 
 @router.delete("/{report_id}")
 async def delete_weekly_report(
-    report_id: int, db: AsyncSession = Depends(get_db)
+    report_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除周报 (级联删除子表)"""
-    report = await db.get(WeeklyReport, report_id)
-    if not report or report.is_delete:
-        raise HTTPException(status_code=404, detail="周报不存在")
+    """删除周报 (级联删除子表) (仅项目经理)"""
+    report = await _require_report_pm(db, report_id, get_user_name(request))
     report.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": report_id}
@@ -304,12 +353,11 @@ async def delete_weekly_report(
 async def create_plan_task(
     report_id: int,
     payload: WeeklyPlanTaskCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyPlanTaskOut:
-    """新增下周任务"""
-    report = await db.get(WeeklyReport, report_id)
-    if not report or report.is_delete:
-        raise HTTPException(status_code=404, detail="周报不存在")
+    """新增下周任务 (仅项目经理)"""
+    await _require_report_pm(db, report_id, get_user_name(request))
     item = WeeklyPlanTask(report_id=report_id, **payload.model_dump())
     db.add(item)
     await db.flush()
@@ -322,12 +370,14 @@ async def update_plan_task(
     report_id: int,
     task_id: int,
     payload: WeeklyPlanTaskUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyPlanTaskOut:
-    """更新下周任务"""
+    """更新下周任务 (仅项目经理)"""
     item = await db.get(WeeklyPlanTask, task_id)
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="下周任务不存在")
+    await _require_report_pm(db, report_id, get_user_name(request))
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
     await db.flush()
@@ -337,12 +387,13 @@ async def update_plan_task(
 
 @router.delete("/{report_id}/plan-tasks/{task_id}")
 async def delete_plan_task(
-    report_id: int, task_id: int, db: AsyncSession = Depends(get_db)
+    report_id: int, task_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除下周任务"""
+    """删除下周任务 (仅项目经理)"""
     item = await db.get(WeeklyPlanTask, task_id)
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="下周任务不存在")
+    await _require_report_pm(db, report_id, get_user_name(request))
     item.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": task_id}
@@ -352,12 +403,11 @@ async def delete_plan_task(
 async def link_plan_task_from_progress(
     report_id: int,
     payload: PlanTaskLinkRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyPlanTaskOut:
-    """从进度计划关联任务 (创建一个关联 progress_task 的 plan_task)"""
-    report = await db.get(WeeklyReport, report_id)
-    if not report or report.is_delete:
-        raise HTTPException(status_code=404, detail="周报不存在")
+    """从进度计划关联任务 (创建一个关联 progress_task 的 plan_task) (仅项目经理)"""
+    await _require_report_pm(db, report_id, get_user_name(request))
     progress_task = await db.get(ProgressTask, payload.progress_task_id)
     if not progress_task or progress_task.is_delete:
         raise HTTPException(status_code=404, detail="进度计划任务不存在")
@@ -382,12 +432,11 @@ async def link_plan_task_from_progress(
 async def save_kpis(
     report_id: int,
     payload: list[WeeklyKpiCreate],
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> list[WeeklyKpiOut]:
-    """批量保存周报 KPI (按 module_id upsert)"""
-    report = await db.get(WeeklyReport, report_id)
-    if not report or report.is_delete:
-        raise HTTPException(status_code=404, detail="周报不存在")
+    """批量保存周报 KPI (按 module_id upsert) (仅项目经理)"""
+    await _require_report_pm(db, report_id, get_user_name(request))
 
     # 查询现有 KPI
     stmt = select(WeeklyKpi).where(
@@ -434,12 +483,13 @@ async def save_kpis(
 
 @router.delete("/{report_id}/kpis/{kpi_id}")
 async def delete_kpi(
-    report_id: int, kpi_id: int, db: AsyncSession = Depends(get_db)
+    report_id: int, kpi_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除单个周报 KPI"""
+    """删除单个周报 KPI (仅项目经理)"""
     item = await db.get(WeeklyKpi, kpi_id)
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="KPI 不存在")
+    await _require_report_pm(db, report_id, get_user_name(request))
     item.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": kpi_id}
@@ -450,12 +500,11 @@ async def delete_kpi(
 async def create_progress_item(
     report_id: int,
     payload: WeeklyProgressItemCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyProgressItemOut:
-    """新增周报进展事项"""
-    report = await db.get(WeeklyReport, report_id)
-    if not report or report.is_delete:
-        raise HTTPException(status_code=404, detail="周报不存在")
+    """新增周报进展事项 (仅项目经理)"""
+    await _require_report_pm(db, report_id, get_user_name(request))
     item = WeeklyProgressItem(report_id=report_id, **payload.model_dump())
     db.add(item)
     await db.flush()
@@ -481,12 +530,14 @@ async def update_progress_item(
     report_id: int,
     item_id: int,
     payload: WeeklyProgressItemUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyProgressItemOut:
-    """更新周报进展事项"""
+    """更新周报进展事项 (仅项目经理)"""
     item = await db.get(WeeklyProgressItem, item_id)
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="进展事项不存在")
+    await _require_report_pm(db, report_id, get_user_name(request))
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
     await db.flush()
@@ -509,12 +560,13 @@ async def update_progress_item(
 
 @router.delete("/{report_id}/progress-items/{item_id}")
 async def delete_progress_item(
-    report_id: int, item_id: int, db: AsyncSession = Depends(get_db)
+    report_id: int, item_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除周报进展事项"""
+    """删除周报进展事项 (仅项目经理)"""
     item = await db.get(WeeklyProgressItem, item_id)
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="进展事项不存在")
+    await _require_report_pm(db, report_id, get_user_name(request))
     item.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": item_id}
@@ -525,12 +577,11 @@ async def delete_progress_item(
 async def create_risk(
     report_id: int,
     payload: WeeklyRiskCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyRiskOut:
-    """新增周报风险"""
-    report = await db.get(WeeklyReport, report_id)
-    if not report or report.is_delete:
-        raise HTTPException(status_code=404, detail="周报不存在")
+    """新增周报风险 (仅项目经理)"""
+    await _require_report_pm(db, report_id, get_user_name(request))
     item = WeeklyRisk(report_id=report_id, **payload.model_dump())
     db.add(item)
     await db.flush()
@@ -543,12 +594,14 @@ async def update_risk(
     report_id: int,
     risk_id: int,
     payload: WeeklyRiskUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyRiskOut:
-    """更新周报风险"""
+    """更新周报风险 (仅项目经理)"""
     item = await db.get(WeeklyRisk, risk_id)
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="风险不存在")
+    await _require_report_pm(db, report_id, get_user_name(request))
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
     await db.flush()
@@ -558,12 +611,13 @@ async def update_risk(
 
 @router.delete("/{report_id}/risks/{risk_id}")
 async def delete_risk(
-    report_id: int, risk_id: int, db: AsyncSession = Depends(get_db)
+    report_id: int, risk_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除周报风险"""
+    """删除周报风险 (仅项目经理)"""
     item = await db.get(WeeklyRisk, risk_id)
     if not item or item.is_delete or item.report_id != report_id:
         raise HTTPException(status_code=404, detail="风险不存在")
+    await _require_report_pm(db, report_id, get_user_name(request))
     item.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": risk_id}

@@ -35,6 +35,9 @@ const WeeklyReport = {
     const view = document.getElementById('view-weekly-report');
     if (!view) return;
 
+    // 非项目经理只读: 不渲染新建/复制入口
+    const canPm = App.can.pm();
+
     view.innerHTML = `
       <div class="view__header">
         <div>
@@ -42,8 +45,10 @@ const WeeklyReport = {
           <div class="view__subtitle">本周概览、进展、下周计划与风险</div>
         </div>
         <div class="view__actions">
+          ${canPm ? `
           <button class="btn btn-ghost btn-sm" id="wr-copy-btn" title="复制最近一份周报到新周次">📋 复制上周周报</button>
           <button class="btn btn-primary btn-sm" id="wr-new-btn">＋ 新建周报</button>
+          ` : ''}
         </div>
       </div>
       <div id="wr-list-loading">${App.renderLoading()}</div>
@@ -90,11 +95,15 @@ const WeeklyReport = {
     const visible = expanded ? sorted : sorted.slice(0, 2);
     const hiddenCount = sorted.length - visible.length;
 
-    // 状态切换徽章 (待汇报 / 已汇报)
+    // 状态切换徽章 (待汇报 / 已汇报); 非项目经理渲染静态徽章, 不可点击
+    const canPm = App.can.pm();
     const renderStatusToggle = (r) => {
       const isSubmitted = (r.status || 'draft') === 'submitted';
       const label = isSubmitted ? '已汇报' : '待汇报';
       const cls = isSubmitted ? 'badge--success' : 'badge--gray';
+      if (!canPm) {
+        return `<span class="badge ${cls}">${label}</span>`;
+      }
       return `<span class="badge ${cls} wr-status-toggle" data-action="toggle-status" data-id="${r.id}" title="点击切换状态" style="cursor:pointer;">${label}</span>`;
     };
 
@@ -194,6 +203,8 @@ const WeeklyReport = {
       const report = await API.getWeeklyReport(id);
       this.current = report;
       this.renderReport(report);
+      // 自动在右栏加载周报概括 (无概括时显示占位, 项目经理可一键生成)
+      this.showDigestPanel(report, report.week_digest);
       // 刷新后恢复滚动位置
       if (savedScrollTop !== null && scrollContainer) {
         scrollContainer.scrollTop = savedScrollTop;
@@ -212,6 +223,9 @@ const WeeklyReport = {
     const detail = document.getElementById('wr-detail');
     if (!detail) return;
 
+    // 非项目经理只读: 维护类按钮不渲染, 仅保留导出/查看
+    const canPm = App.can.pm();
+
     const formatRange = (r) => {
       if (r.week_start && r.week_end) return `${App.formatDate(r.week_start)} - ${App.formatDate(r.week_end)}`;
       return r.week_start || '—';
@@ -228,9 +242,12 @@ const WeeklyReport = {
           <div class="wr-week-bar-r">
             <button class="btn btn-ghost btn-sm" data-action="export-pdf" data-id="${report.id}">📄 导出PDF</button>
             <button class="btn btn-ghost btn-sm" data-action="week-digest" data-id="${report.id}" title="调用周工作小结技能, AI 生成微信汇报版概括">📣 周报概括</button>
+            ${canPm ? `<button class="btn btn-ghost btn-sm" data-action="export-excel" data-id="${report.id}">📊 导出Excel</button>` : ''}
+            ${canPm ? `
             <button class="btn btn-ghost btn-sm" data-action="edit-report" data-id="${report.id}">编辑</button>
             <button class="btn btn-ghost btn-sm" data-action="edit-kpi" data-id="${report.id}">编辑模块</button>
             <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${report.id}">删除</button>
+            ` : ''}
           </div>
         </div>
         <div class="wr-week-body">
@@ -261,7 +278,7 @@ const WeeklyReport = {
               <h3>本周进展</h3>
               <span class="line"></span>
               <span class="count">${(report.progress_items || []).length} 项</span>
-              <button class="btn btn-ghost btn-sm" data-action="add-progress" data-id="${report.id}" style="margin-left:8px;">＋ 新增进展</button>
+              ${canPm ? `<button class="btn btn-ghost btn-sm" data-action="add-progress" data-id="${report.id}" style="margin-left:8px;">＋ 新增进展</button>` : ''}
             </div>
             ${this.renderProgressItems(report.progress_items || [], report.id, report)}
           </div>
@@ -271,8 +288,10 @@ const WeeklyReport = {
               <h3>下周计划</h3>
               <span class="line"></span>
               <span class="count">${(report.plan_tasks || []).length} 项</span>
+              ${canPm ? `
               <button class="btn btn-primary btn-sm" data-action="link-plan" data-id="${report.id}" style="margin-left:8px;">🔗 关联进度计划</button>
               <button class="btn btn-ghost btn-sm" data-action="add-plan" data-id="${report.id}">＋ 新增任务</button>
+              ` : ''}
             </div>
             ${this.renderPlanTasks(report.plan_tasks || [], report.id)}
           </div>
@@ -282,7 +301,7 @@ const WeeklyReport = {
               <h3>风险与应对</h3>
               <span class="line"></span>
               <span class="count">${(report.risks || []).length} 项</span>
-              <button class="btn btn-ghost btn-sm" data-action="add-risk" data-id="${report.id}" style="margin-left:8px;">＋ 新增风险</button>
+              ${canPm ? `<button class="btn btn-ghost btn-sm" data-action="add-risk" data-id="${report.id}" style="margin-left:8px;">＋ 新增风险</button>` : ''}
             </div>
             ${this.renderRisks(report.risks || [], report.id)}
           </div>
@@ -303,6 +322,8 @@ const WeeklyReport = {
    * 输出到右栏详情看板, 支持编辑后保存到 weekly_reports.week_digest
    * ---------------------------------------------------------------- */
   async generateWeekDigest(report) {
+    // 生成消耗 token, 仅项目经理可操作
+    if (!App.can.pm()) { App.showToast('仅项目经理可生成周报概括', 'warning'); return; }
     App.showDetail(`
       <div class="detail-panel__header">
         <div class="detail-panel__title">📣 周报概括</div>
@@ -339,22 +360,26 @@ const WeeklyReport = {
     }
   },
 
-  /** 右栏看板: 展示 AI 概括 (textarea 可编辑) + 保存/重新生成 */
+  /** 右栏看板: 展示 AI 概括 (textarea 可编辑) + 保存/重新生成; 无概括时占位并提供生成入口 (仅项目经理) */
   showDigestPanel(report, digest) {
+    const canPm = App.can.pm();
+    const hasDigest = !!(digest && String(digest).trim());
     App.showDetail(`
       <div class="detail-panel__header">
         <div class="detail-panel__title">📣 周报概括</div>
         <div class="detail-panel__meta">${App.escapeHtml(report.title || '')} · 微信汇报版</div>
       </div>
-      <div class="detail-panel__body">
+      <div class="detail-panel__body detail-panel__body--stretch">
         <div class="detail-section">
           <div class="detail-section__label">AI 生成概括 (可直接编辑, 用于微信汇报)</div>
           <div class="form-group" style="margin-top:6px;">
-            <textarea id="wr-digest-text" rows="8" style="width:100%;resize:vertical;">${App.escapeHtml(digest || '')}</textarea>
+            <textarea id="wr-digest-text" rows="22" placeholder="尚未生成概括" style="width:100%;resize:vertical;">${App.escapeHtml(digest || '')}</textarea>
           </div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
-          <button class="btn btn-ghost btn-sm" id="wr-digest-regen">🔄 重新生成</button>
+          ${canPm ? (hasDigest
+            ? '<button class="btn btn-ghost btn-sm" id="wr-digest-regen">🔄 重新生成</button>'
+            : '<button class="btn btn-ghost btn-sm" id="wr-digest-gen">✨ 生成概括</button>') : ''}
           <button class="btn btn-primary btn-sm" id="wr-digest-save">💾 保存概括</button>
         </div>
       </div>
@@ -380,6 +405,8 @@ const WeeklyReport = {
     }
     const regenBtn = document.getElementById('wr-digest-regen');
     if (regenBtn) regenBtn.addEventListener('click', () => this.generateWeekDigest(report));
+    const genBtn = document.getElementById('wr-digest-gen');
+    if (genBtn) genBtn.addEventListener('click', () => this.generateWeekDigest(report));
   },
 
   /** 导出当前周报详情为 PDF (使用浏览器原生打印, A4 多页, 格式正确, 内容不被裁切) */
@@ -414,6 +441,51 @@ const WeeklyReport = {
       printWin.onload = () => setTimeout(triggerPrint, 200);
     }
     App.showToast('已在新窗口打开打印预览, 选择"另存为PDF"即可导出', 'info', 5000);
+  },
+
+  /** 导出周报到 Excel (后端生成 xlsx, 前端解析文件名并触发下载) */
+  async exportToExcel(report) {
+    // 导出期间禁用按钮, 防重复点击
+    const btn = document.querySelector('#wr-detail [data-action="export-excel"]');
+    if (btn) btn.disabled = true;
+    try {
+      const resp = await fetch(`/api/weekly-reports/export-excel?week_start=${report.week_start}`, {
+        method: 'GET',
+        headers: { 'X-User-Name': encodeURIComponent(localStorage.getItem('cowork_user') || '') }
+      });
+      if (!resp.ok) {
+        let msg = `导出失败 (${resp.status})`;
+        try {
+          const data = await resp.json();
+          if (data && data.detail) {
+            msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+          }
+        } catch (e) { /* 响应非 JSON 时使用默认错误信息 */ }
+        App.showToast(msg, 'error');
+        return;
+      }
+      const blob = await resp.blob();
+      // 从 Content-Disposition 解析文件名 (filename*=UTF-8''xxx), 失败则用默认名
+      let filename = `weekly_report_${report.week_start}.xlsx`;
+      const cd = resp.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+      if (m && m[1]) {
+        try { filename = decodeURIComponent(m[1]); } catch (e) { /* 保留默认文件名 */ }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      App.showToast('Excel 已导出', 'success');
+    } catch (err) {
+      App.showToast(`导出失败: ${err.message}`, 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   },
 
   /** 构建打印专用 HTML (自包含, A4 多页, 完整内容, 与页面渲染格式一致) */
@@ -665,11 +737,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
 </html>`;
   },
 
-  /** 渲染 KPI 网格: 模块卡片 (背景色+进度条+状态+百分比), 支持点击直接编辑 */
+  /** 渲染 KPI 网格: 模块卡片 (背景色+进度条+状态+百分比), 项目经理可点击直接编辑 */
   renderKpis(kpis) {
     if (!kpis || kpis.length === 0) {
       return App.renderEmpty('暂无 KPI', '点击右上角"编辑模块"录入指标', '📊');
     }
+    // 非项目经理只读: 状态/进度渲染为静态文本, 不可点击
+    const canPm = App.can.pm();
     // 按 App.state.modules 的 sort_order 排序 KPI
     const moduleOrder = {};
     App.state.modules.forEach((m, i) => { moduleOrder[m.id] = m.sort_order ?? i; });
@@ -691,14 +765,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
           };
           const stCls = statusMap[k.status] || 'wr-sg';
           const pct = Math.max(0, Math.min(100, k.progress_pct ?? 0));
+          const statusHtml = canPm
+            ? `<span class="${stCls} wr-kpi-status" data-kpi-id="${k.id}" data-module-id="${k.module_id}" style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;" title="点击切换状态">${App.escapeHtml(k.status || '正常')}</span>`
+            : `<span class="${stCls}" style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${App.escapeHtml(k.status || '正常')}</span>`;
+          const pctHtml = canPm
+            ? `<span class="pct-val wr-kpi-pct" data-kpi-id="${k.id}" data-module-id="${k.module_id}" style="color:${color};cursor:pointer;" title="点击编辑进度">${pct}%</span>`
+            : `<span class="pct-val" style="color:${color};">${pct}%</span>`;
           return `
             <div class="wr-kpi" style="background:${colorBg};color:${color};">
               <div class="n">${mod ? App.escapeHtml(mod.idx + ' · ' + mod.tag) : '—'}</div>
               <div class="t">${mod ? App.escapeHtml(mod.title) : '未指定模块'}</div>
               <div class="pb"><div class="pf" style="width:${pct}%;background:${color};"></div></div>
               <div class="pv">
-                <span class="${stCls} wr-kpi-status" data-kpi-id="${k.id}" data-module-id="${k.module_id}" style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;" title="点击切换状态">${App.escapeHtml(k.status || '正常')}</span>
-                <span class="pct-val wr-kpi-pct" data-kpi-id="${k.id}" data-module-id="${k.module_id}" style="color:${color};cursor:pointer;" title="点击编辑进度">${pct}%</span>
+                ${statusHtml}
+                ${pctHtml}
               </div>
             </div>
           `;
@@ -712,6 +792,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
     if (!items || items.length === 0) {
       return App.renderEmpty('暂无进展记录', '点击右上角"新增进展"或编辑模块后自动同步', '📝');
     }
+
+    // 非项目经理只读: 不渲染编辑/删除入口
+    const canPm = App.can.pm();
 
     // 按模块分组
     const grouped = {};
@@ -747,8 +830,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
                     <li>
                       <b>${App.escapeHtml(it.content || '')}</b>
                       ${it.detail ? `<i>${App.escapeHtml(it.detail)}</i>` : ''}
+                      ${canPm ? `
                       <span class="wr-item-edit" data-action="edit-progress" data-id="${it.id}" data-report-id="${reportId}">编辑</span>
                       <span class="wr-del-item" data-action="delete-progress" data-id="${it.id}" data-report-id="${reportId}">×</span>
+                      ` : ''}
                     </li>
                   `).join('')}
                 </ul>
@@ -769,6 +854,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
     if (!planTasks || planTasks.length === 0) {
       return App.renderEmpty('暂无下周计划', '点击右上角"关联进度计划"或"新增任务"', '📌');
     }
+
+    // 非项目经理只读: 不渲染编辑/删除入口
+    const canPm = App.can.pm();
 
     // 按模块分组
     const grouped = {};
@@ -800,8 +888,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
                       <b>${App.escapeHtml(t.name || '')}</b>
                       ${isLinked ? ` <i>🔗 ${App.escapeHtml(linkedName)}</i>` : ''}
                       ${t.owner ? ` <i>👤 ${App.escapeHtml(t.owner)}</i>` : ''}
+                      ${canPm ? `
                       <span class="wr-item-edit" data-action="edit-plan" data-id="${t.id}" data-report-id="${reportId}">编辑</span>
                       <span class="wr-del-item" data-action="delete-plan" data-id="${t.id}" data-report-id="${reportId}">×</span>
+                      ` : ''}
                     </li>
                   `;
                 }).join('')}
@@ -813,11 +903,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
     `;
   },
 
-  /** 渲染风险表 (grid 48px/1fr/2fr/88px/70px) */
+  /** 渲染风险表 (grid 48px/1fr/2fr/88px/70px); 非项目经理只读: 不可拖拽排序, 无编辑/删除 */
   renderRisks(risks, reportId) {
     if (!risks || risks.length === 0) {
       return App.renderEmpty('暂无风险记录', '点击右上角"新增风险"录入', '✅');
     }
+    const canPm = App.can.pm();
     return `
       <div class="wr-risk-table" id="wr-risk-list">
         <div class="wr-risk-head">
@@ -832,15 +923,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
           const uCls = urgency === '高' ? 'u-high' : urgency === '低' ? 'u-low' : 'u-mid';
           const rkCls = urgency === '高' ? '' : urgency === '低' ? 'rk-green' : 'rk-amber';
           return `
-            <div class="wr-rk ${rkCls} wr-rk-draggable" draggable="true" data-risk-id="${r.id}" data-risk-idx="${i}">
-              <span class="wr-drag-handle" title="拖拽排序">⠿</span>
+            <div class="wr-rk ${rkCls}${canPm ? ' wr-rk-draggable' : ''}"${canPm ? ' draggable="true"' : ''} data-risk-id="${r.id}" data-risk-idx="${i}">
+              ${canPm ? '<span class="wr-drag-handle" title="拖拽排序">⠿</span>' : ''}
               <span class="lv">${App.escapeHtml(r.seq || ('R' + (i+1)))}</span>
               <span class="wr-rk-title">${App.escapeHtml(r.title || '')}</span>
               <span class="wr-rk-content">${App.escapeHtml(r.coordination || r.content || '—')}</span>
               <span class="wr-urgency ${uCls}">${App.escapeHtml(urgency)}</span>
               <span class="wr-rk-actions">
+                ${canPm ? `
                 <span class="wr-item-edit" data-action="edit-risk" data-id="${r.id}" data-report-id="${reportId}">编辑</span>
                 <span class="wr-del-item" data-action="delete-risk" data-id="${r.id}" data-report-id="${reportId}">×</span>
+                ` : ''}
               </span>
             </div>
           `;
@@ -856,6 +949,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
     const detail = document.getElementById('wr-detail');
     if (!detail) return;
 
+    // 非项目经理只读: 维护类操作直接拦截 (渲染层已隐藏, 此处兜底)
+    const canPm = App.can.pm();
+    const pmActions = ['export-excel', 'edit-report', 'edit-kpi', 'delete',
+      'add-progress', 'edit-progress', 'delete-progress',
+      'link-plan', 'add-plan', 'edit-plan', 'delete-plan', 'toggle-key-group',
+      'add-risk', 'edit-risk', 'delete-risk'];
+
     detail.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -863,12 +963,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
         const id = btn.getAttribute('data-id');
         const reportId = btn.getAttribute('data-report-id');
 
+        if (!canPm && pmActions.includes(action)) return;
+
         switch (action) {
           case 'export-pdf':
             this.exportToPdf(report);
             break;
           case 'week-digest':
             this.generateWeekDigest(report);
+            break;
+          case 'export-excel':
+            this.exportToExcel(report);
             break;
           case 'edit-kpi':
             this.editModules(report);
@@ -937,6 +1042,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
       });
     });
 
+    // KPI 状态/进度点击编辑 (仅项目经理; 非 PM 渲染为静态文本, 此处再兜底)
+    if (canPm) {
     // KPI 状态点击切换 (正常→关注→风险→正常)
     detail.querySelectorAll('.wr-kpi-status').forEach(el => {
       el.addEventListener('click', async () => {
@@ -1037,8 +1144,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
         input.addEventListener('blur', () => finish(true));
       });
     });
+    }
 
-    // 风险拖拽排序
+    // 风险拖拽排序 (方法内对非项目经理有守卫)
     this.bindRiskDragSort(report);
   },
 
@@ -1048,8 +1156,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
     if (this.current) this.loadReport(this.current.id);
   },
 
-  /** 绑定风险拖拽排序 */
+  /** 绑定风险拖拽排序 (仅项目经理; 非 PM 只读) */
   bindRiskDragSort(report) {
+    if (!App.can.pm()) return;
     const list = document.getElementById('wr-risk-list');
     if (!list) return;
     let dragSrc = null;

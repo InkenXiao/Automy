@@ -56,6 +56,7 @@ const WorkTasks = {
     }
 
     const range = App.weekRange(document.getElementById('week-picker')?.value || '');
+    const canEdit = App.can.fulltime();  // 非全职成员只读
 
     view.innerHTML = `
       <div class="view__header">
@@ -64,9 +65,9 @@ const WorkTasks = {
           <div class="view__subtitle">周次: ${App.escapeHtml(range.label || weekStart)}</div>
         </div>
         <div class="view__actions">
-          <button class="btn btn-ghost btn-sm" id="wt-import-btn">📥 从周报导入</button>
+          ${canEdit ? '<button class="btn btn-ghost btn-sm" id="wt-import-btn">📥 从周报导入</button>' : ''}
           <button class="btn btn-ghost btn-sm" id="wt-export-btn">📄 导出PDF</button>
-          <button class="btn btn-primary btn-sm" id="wt-add-btn">⚡ 新建临时任务</button>
+          ${canEdit ? '<button class="btn btn-primary btn-sm" id="wt-add-btn">⚡ 新建临时任务</button>' : ''}
         </div>
       </div>
       <div id="wt-kanban">${App.renderLoading('加载工作任务...')}</div>
@@ -157,6 +158,7 @@ const WorkTasks = {
    * 渲染单个任务卡片
    * ---------------------------------------------------------------- */
   renderTaskCard(task) {
+    const canEdit = App.can.fulltime();  // 非全职成员只读
     const mod = App.getModule(task.module_id);
     const color = App.getModuleColor(task.module_id);
 
@@ -177,7 +179,7 @@ const WorkTasks = {
     const isDone = task.status === 'done' || task.status === 'completed' || task.status === '已完成';
 
     return `
-      <div class="task-item" draggable="true" data-task-id="${task.id}" title="拖拽卡片可跨列改变状态, 或在列内重排">
+      <div class="task-item" ${canEdit ? 'draggable="true"' : ''} data-task-id="${task.id}" title="${canEdit ? '拖拽卡片可跨列改变状态, 或在列内重排' : '点击查看详情'}">
         <div class="task-item__header">
           <div class="task-item__name">${App.escapeHtml(task.name || '')}</div>
           ${sourceBadge}
@@ -188,6 +190,7 @@ const WorkTasks = {
           <span class="task-item__meta-item"><span class="badge ${pri.cls}">${pri.label}</span></span>
           ${hours ? `<span class="task-item__meta-item">⏱ ${hours}h</span>` : ''}
         </div>
+        ${canEdit ? `
         <div class="task-item__actions">
           <button class="btn-icon" data-action="edit" data-id="${task.id}" title="编辑">✏️</button>
           ${!isDone
@@ -195,7 +198,7 @@ const WorkTasks = {
             : `<button class="btn-icon" data-action="advance" data-id="${task.id}" data-value="todo" title="重置为待开始">↺</button>`
           }
           <button class="btn-icon" data-action="delete" data-id="${task.id}" title="删除">🗑</button>
-        </div>
+        </div>` : ''}
       </div>
     `;
   },
@@ -221,6 +224,7 @@ const WorkTasks = {
     container.querySelectorAll('[data-action="edit"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (!App.can.fulltime()) return;  // 非全职成员只读
         const id = btn.getAttribute('data-id');
         this.editTask(id);
       });
@@ -230,6 +234,7 @@ const WorkTasks = {
     container.querySelectorAll('[data-action="advance"]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        if (!App.can.fulltime()) return;  // 非全职成员只读
         const id = btn.getAttribute('data-id');
         const resetValue = btn.getAttribute('data-value');
         const task = this.tasks.find(t => String(t.id) === String(id));
@@ -243,6 +248,7 @@ const WorkTasks = {
     container.querySelectorAll('[data-action="delete"]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        if (!App.can.fulltime()) return;  // 非全职成员只读
         const id = btn.getAttribute('data-id');
         if (!confirm('确认删除该任务?')) return;
         try {
@@ -336,6 +342,7 @@ const WorkTasks = {
    * 4. 重新渲染看板
    */
   async _applyDrop(draggedId, targetColStatus, beforeId) {
+    if (!App.can.fulltime()) return;  // 非全职成员只读
     const dragged = this.tasks.find(t => String(t.id) === String(draggedId));
     if (!dragged) return;
     const newStatus = this.STATUS_FROM_COL[targetColStatus] || dragged.status;
@@ -453,6 +460,7 @@ const WorkTasks = {
    * 从周报导入
    * ---------------------------------------------------------------- */
   async importFromPlan() {
+    if (!App.can.fulltime()) return;  // 非全职成员只读
     // 弹出周报选择器
     let reports = [];
     try {
@@ -530,6 +538,7 @@ const WorkTasks = {
    * 新增临时任务
    * ---------------------------------------------------------------- */
   addTemporaryTask() {
+    if (!App.can.fulltime()) return;  // 非全职成员只读
     // 状态值映射: 前端英文 -> 后端中文
     const statusMap = { 'todo': '待开始', 'in_progress': '进行中', 'done': '已完成' };
 
@@ -624,6 +633,7 @@ const WorkTasks = {
    * 编辑工作任务 (完整表单)
    * ---------------------------------------------------------------- */
   editTask(id) {
+    if (!App.can.fulltime()) return;  // 非全职成员只读
     const task = this.tasks.find(t => String(t.id) === String(id));
     if (!task) {
       App.showToast('未找到任务', 'error');
@@ -735,6 +745,7 @@ const WorkTasks = {
    * 更新任务状态
    * ---------------------------------------------------------------- */
   async updateStatus(id, status) {
+    if (!App.can.fulltime()) return;  // 非全职成员只读
     try {
       await API.updateWorkTask(id, { status });
       // 更新本地缓存

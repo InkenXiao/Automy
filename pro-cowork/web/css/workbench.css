@@ -213,6 +213,246 @@ input, textarea, select { font-family: inherit; font-size: 14px; }
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* 侧边栏当前用户 */
+.sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sidebar__user-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__user-logout {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar__user-logout:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #FCA5A5;
+}
+
+/* 登录覆盖层 */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 360px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 36px 32px 28px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+
+.auth-card__logo {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 12px;
+}
+
+.auth-card__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.auth-card__subtitle {
+  font-size: 13px;
+  color: #64748B;
+  margin: 6px 0 22px;
+}
+
+.auth-card__input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.auth-card__input:focus {
+  border-color: #FF8C00;
+  box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.12);
+}
+
+.auth-card__btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 0;
+  font-size: 14px;
+}
+
+.auth-card__hint {
+  min-height: 18px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #EF4444;
+}
+
+/* 使用日志看板 */
+.ul-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.ul-card {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ul-card:hover {
+  border-color: #FF8C00;
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.08);
+}
+
+.ul-card--active {
+  border-color: #FF8C00;
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.12);
+}
+
+.ul-card__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 10px;
+}
+
+.ul-card__grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.ul-metric__v {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.ul-metric__l {
+  font-size: 11px;
+  color: #94A3B8;
+  margin-top: 2px;
+}
+
+.ul-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.ul-row--link {
+  cursor: pointer;
+}
+
+.ul-row--link:hover {
+  background: #FFF8ED;
+}
+
+.ul-path,
+.ul-detail {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 个人周报工作内容行: 周几下拉 */
+.pr-day-select {
+  min-width: 64px;
+}
+
+/* 斜杠任务选择弹层 */
+.pr-slash-popup {
+  position: absolute;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  max-height: 240px;
+  overflow-y: auto;
+  min-width: 260px;
+}
+
+.pr-slash-popup__item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pr-slash-popup__item:hover,
+.pr-slash-popup__item--active {
+  background: #FFF8ED;
+}
+
+.pr-slash-popup__item .tag {
+  flex-shrink: 0;
+}
+
+.pr-slash-popup__empty {
+  padding: 12px;
+  font-size: 12px;
+  color: #94A3B8;
+  text-align: center;
+}
+
+/* 周报概括编辑框拉长: 右栏撑满 */
+#detail-panel .detail-panel__body--stretch {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 140px);
+}
+
+#detail-panel .detail-panel__body--stretch .form-group,
+#detail-panel .detail-panel__body--stretch textarea {
+  flex: 1;
+}
+
+#detail-panel .detail-panel__body--stretch textarea {
+  min-height: 420px;
+  resize: none;
+}
+
+
 /* 中栏: 主工作区 */
 .app-frame__main {
   flex: 1;

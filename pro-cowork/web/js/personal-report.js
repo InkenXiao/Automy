@@ -1,7 +1,8 @@
 /* ==========================================================================
    个人周报模块 PersonalReport (项目驾驶舱)
    - 选择人员 + 周报周期 (YYYY/MM/DD - YYYY/MM/DD, 周一~周日) 后填写
-   - 本周工作内容: 动态行 (项目名称/周一~周日/参与人员/交付物/工时H)
+   - 本周工作内容: 动态行, 每行一天 (项目名称/周几/工作内容/参与人员/交付物/工时H)
+   - 工作内容输入 '/' 可弹出该项目本周工作任务选择层, 快速填入任务名称
    - 下周工作计划: 动态行 (项目名称/计划内容)
    - 实时计算本周工作总工时
    ========================================================================== */
@@ -9,15 +10,17 @@
 const PersonalReport = {
   // 全部项目
   projects: [],
-  // 当前激活项目的成员 (人员选择器)
+  // 当前激活项目的成员 (人员选择器, 不含已退出)
   members: [],
-  // 成员姓名 -> 所属项目数组 (跨项目归属, 用于工作行项目下拉)
+  // 成员姓名 -> 所属项目数组 (跨项目归属, 用于工作行项目下拉, 不含已退出)
   memberProjects: {},
   // 当前选择
   currentMember: '',
   currentWeekStart: '',   // YYYY-MM-DD (周一)
   // 已存在的周报 (null = 未填报)
   currentReport: null,
+  // '/' 任务选择弹层状态 (同一时刻只有一个实例)
+  _slash: null,
 
   DAYS: [
     { key: 'mon', label: '周一' },
@@ -38,6 +41,7 @@ const PersonalReport = {
 
   /** 切换到此视图时触发 */
   onShow() {
+    this.closeSlashPopup();
     this.loadPage();
   },
 
@@ -114,31 +118,36 @@ const PersonalReport = {
       this.projects = (projects || []).filter(p => (p.status || '进行中') !== '已停止');
       const activeId = activeProject ? activeProject.id : null;
 
-      // 各项目成员 (构建 姓名 -> 项目 归属映射)
+      // 各项目成员 (构建 姓名 -> 项目 归属映射, 跳过已退出成员)
       const memberLists = await Promise.all(
         (projects || []).map(p => API.getProjectMembers(p.id).catch(() => []))
       );
       this.memberProjects = {};
       (projects || []).forEach((p, i) => {
         (memberLists[i] || []).forEach(m => {
+          if (m.status === '退出') return; // 退出成员不可填对应项目的周报
           if (!this.memberProjects[m.name]) this.memberProjects[m.name] = [];
           this.memberProjects[m.name].push({ id: p.id, name: p.name, status: m.status });
         });
       });
 
-      // 人员选择器 = 当前激活项目成员 (在职优先)
+      // 人员选择器 = 当前激活项目成员 (不含已退出, 全职优先)
       const activeMembers = activeId
         ? (memberLists[(projects || []).findIndex(p => p.id === activeId)] || [])
         : [];
-      this.members = [...activeMembers].sort((a, b) => {
-        const ao = (a.status || '在职') === '在职' ? 0 : 1;
-        const bo = (b.status || '在职') === '在职' ? 0 : 1;
-        return ao - bo || a.sort_order - b.sort_order || a.id - b.id;
-      });
+      this.members = activeMembers
+        .filter(m => m.status !== '退出')
+        .sort((a, b) => {
+          const ao = (a.status || '全职') === '全职' ? 0 : 1;
+          const bo = (b.status || '全职') === '全职' ? 0 : 1;
+          return ao - bo || a.sort_order - b.sort_order || a.id - b.id;
+        });
 
-      // 默认选择: 保留原选择, 否则第一个在职成员
+      // 默认选择: 保留原选择; 否则当前登录用户; 否则第一个全职成员
       if (!this.currentMember || !this.members.some(m => m.name === this.currentMember)) {
-        const first = this.members.find(m => (m.status || '在职') === '在职') || this.members[0];
+        const loginName = Auth.user();
+        const mine = loginName ? this.members.find(m => m.name === loginName) : null;
+        const first = mine || this.members.find(m => (m.status || '全职') === '全职') || this.members[0];
         this.currentMember = first ? first.name : '';
       }
       // 默认周期: 本周周一
@@ -159,6 +168,7 @@ const PersonalReport = {
    * 渲染选择区 + 表单骨架
    * ---------------------------------------------------------------- */
   renderBody() {
+    this.closeSlashPopup();
     const body = document.getElementById('pr-body');
     if (!body) return;
 
@@ -171,10 +181,9 @@ const PersonalReport = {
       return;
     }
 
-    const memberOpts = this.members.map(m => {
-      const tag = (m.status || '在职') === '在职' ? '' : ' (已退出)';
-      return `<option value="${App.escapeHtml(m.name)}" ${m.name === this.currentMember ? 'selected' : ''}>${App.escapeHtml(m.name)}${tag}</option>`;
-    }).join('');
+    const memberOpts = this.members.map(m =>
+      `<option value="${App.escapeHtml(m.name)}" ${m.name === this.currentMember ? 'selected' : ''}>${App.escapeHtml(m.name)}</option>`
+    ).join('');
 
     const weekOpts = this.weekOptions().map(ws =>
       `<option value="${ws}" ${ws === this.currentWeekStart ? 'selected' : ''}>${this.weekLabel(ws)}</option>`
@@ -205,11 +214,8 @@ const PersonalReport = {
             <thead>
               <tr>
                 <th style="min-width:130px;">项目名称</th>
-                ${this.DAYS.map((d, i) => {
-                  const date = new Date(`${this.currentWeekStart}T00:00:00`);
-                  date.setDate(date.getDate() + i);
-                  return `<th class="pr-day-col">${d.label}<br><span class="pr-day-date">${date.getMonth() + 1}/${date.getDate()}</span></th>`;
-                }).join('')}
+                <th style="width:76px;">周几</th>
+                <th style="min-width:220px;">工作内容</th>
                 <th style="min-width:90px;">参与人员</th>
                 <th style="min-width:90px;">交付物</th>
                 <th style="width:64px;">工时(H)</th>
@@ -256,7 +262,7 @@ const PersonalReport = {
     });
     document.getElementById('pr-week-select').addEventListener('change', (e) => {
       this.currentWeekStart = e.target.value;
-      // 周期变化 -> 表头日期需重绘
+      // 周期变化 -> 重绘表单
       this.renderBody();
       this.loadReport();
     });
@@ -275,9 +281,10 @@ const PersonalReport = {
       if (btn) btn.closest('tr').remove();
     });
 
-    // 实时总工时
+    // 实时总工时 + '/' 任务选择弹层
     document.getElementById('pr-work-tbody').addEventListener('input', (e) => {
       if (e.target.matches('[data-f="hours"]')) this.recalcTotal();
+      if (e.target.matches('textarea[data-f="content"]')) this.onContentInput(e.target);
     });
 
     // 保存 / 删除
@@ -353,7 +360,16 @@ const PersonalReport = {
     return placeholder + opts;
   },
 
-  /** 添加本周工作行 */
+  /** 周几下拉 (新增空行时默认今天对应的周几) */
+  dayOptionsHtml(selectedDay) {
+    const todayDow = new Date().getDay() || 7; // 周日=7
+    const cur = selectedDay || todayDow;
+    return this.DAYS.map((d, i) =>
+      `<option value="${i + 1}" ${i + 1 === cur ? 'selected' : ''}>${d.label}</option>`
+    ).join('');
+  },
+
+  /** 添加本周工作行 (每行一天) */
   addWorkRow(item = null) {
     const tbody = document.getElementById('pr-work-tbody');
     if (!tbody) return;
@@ -361,9 +377,8 @@ const PersonalReport = {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><select data-f="project_id">${this.projectOptionsHtml(w.project_id)}</select></td>
-      ${this.DAYS.map(d =>
-        `<td><textarea data-f="${d.key}" rows="2" placeholder="">${App.escapeHtml(w[d.key] || '')}</textarea></td>`
-      ).join('')}
+      <td><select data-f="day_of_week">${this.dayOptionsHtml(w.day_of_week)}</select></td>
+      <td><textarea data-f="content" rows="2" placeholder="输入 / 可选择本周工作任务">${App.escapeHtml(w.content || '')}</textarea></td>
       <td><input type="text" data-f="participants" value="${App.escapeHtml(w.participants || '')}"></td>
       <td><input type="text" data-f="deliverable" value="${App.escapeHtml(w.deliverable || '')}"></td>
       <td><input type="number" data-f="hours" min="0" step="0.5" value="${w.hours || ''}" placeholder="0"></td>
@@ -400,6 +415,150 @@ const PersonalReport = {
   },
 
   /* ------------------------------------------------------------------
+   * '/' 工作任务选择弹层
+   * ---------------------------------------------------------------- */
+  /** 工作内容输入回调: 检测 '/关键词' 并弹出/更新任务选择层 */
+  onContentInput(textarea) {
+    const pos = textarea.selectionStart;
+    const before = textarea.value.slice(0, pos);
+    const slashIdx = before.lastIndexOf('/');
+    if (slashIdx === -1) { this.closeSlashPopup(); return; }
+    const query = before.slice(slashIdx + 1);
+    if (query.includes('\n')) { this.closeSlashPopup(); return; }
+
+    if (this._slash && this._slash.textarea === textarea) {
+      // 弹层已打开: 仅更新过滤关键字
+      this._slash.slashIdx = slashIdx;
+      this._slash.query = query;
+      this.renderSlashItems();
+    } else {
+      this.openSlashPopup(textarea, slashIdx, query);
+    }
+  },
+
+  /** 打开任务选择弹层 */
+  async openSlashPopup(textarea, slashIdx, query) {
+    this.closeSlashPopup();
+    const tr = textarea.closest('tr');
+    const projectEl = tr ? tr.querySelector('[data-f="project_id"]') : null;
+    const projectId = projectEl && projectEl.value ? parseInt(projectEl.value, 10) : null;
+
+    // 拉取该项目本周的工作任务
+    let tasks = [];
+    if (projectId) {
+      try {
+        tasks = await API.getWorkTasks(this.currentWeekStart, projectId) || [];
+      } catch (err) {
+        tasks = [];
+      }
+    }
+    // 等待期间可能已打开新弹层, 先清理旧实例
+    this.closeSlashPopup();
+
+    const popup = document.createElement('div');
+    popup.className = 'pr-slash-popup';
+    document.body.appendChild(popup);
+
+    this._slash = { textarea, slashIdx, query, tasks, activeIdx: 0, popup };
+
+    // 绝对定位在 textarea 下方
+    const rect = textarea.getBoundingClientRect();
+    popup.style.left = `${rect.left + window.scrollX}px`;
+    popup.style.top = `${rect.bottom + window.scrollY + 4}px`;
+
+    // 键盘操作: ↑/↓ 移动, Enter 选择, Esc 关闭
+    this._slash.onKeydown = (e) => {
+      if (!this._slash) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); this.moveSlashActive(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); this.moveSlashActive(-1); }
+      else if (e.key === 'Enter') { e.preventDefault(); this.pickSlashTask(); }
+      else if (e.key === 'Escape') { e.preventDefault(); this.closeSlashPopup(); }
+    };
+    textarea.addEventListener('keydown', this._slash.onKeydown);
+
+    // 点击外部 / 页面滚动时关闭
+    this._slash.onDocDown = (e) => {
+      if (this._slash && !this._slash.popup.contains(e.target) && e.target !== textarea) {
+        this.closeSlashPopup();
+      }
+    };
+    document.addEventListener('mousedown', this._slash.onDocDown);
+    this._slash.onScroll = () => this.closeSlashPopup();
+    window.addEventListener('scroll', this._slash.onScroll, true);
+
+    this.renderSlashItems();
+  },
+
+  /** 按关键字过滤并渲染弹层列表 */
+  renderSlashItems() {
+    const s = this._slash;
+    if (!s) return;
+    const q = (s.query || '').toLowerCase();
+    s.filtered = (s.tasks || []).filter(t =>
+      !q || (t.name || '').toLowerCase().includes(q)
+    );
+    if (s.activeIdx >= s.filtered.length) s.activeIdx = 0;
+
+    if (s.filtered.length === 0) {
+      s.popup.innerHTML = '<div class="pr-slash-popup__empty">暂无可选任务</div>';
+      return;
+    }
+    s.popup.innerHTML = s.filtered.map((t, i) => `
+      <div class="pr-slash-popup__item ${i === s.activeIdx ? 'pr-slash-popup__item--active' : ''}" data-idx="${i}">
+        <span>${App.escapeHtml(t.name || '')}</span>
+        <span class="tag">${App.escapeHtml(t.owner || '')}</span>
+      </div>
+    `).join('');
+    // 鼠标点击选择
+    s.popup.querySelectorAll('.pr-slash-popup__item').forEach(el => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // 保持 textarea 焦点
+        this.pickSlashTask(parseInt(el.dataset.idx, 10));
+      });
+    });
+  },
+
+  /** 键盘上下移动高亮项 */
+  moveSlashActive(delta) {
+    const s = this._slash;
+    if (!s || !s.filtered || s.filtered.length === 0) return;
+    s.activeIdx = (s.activeIdx + delta + s.filtered.length) % s.filtered.length;
+    this.renderSlashItems();
+  },
+
+  /** 选择任务: 把 '/关键词' 替换为任务名称 */
+  pickSlashTask(idx = null) {
+    const s = this._slash;
+    if (!s || !s.filtered || s.filtered.length === 0) return;
+    const task = s.filtered[idx === null ? s.activeIdx : idx];
+    if (!task) return;
+
+    const ta = s.textarea;
+    const pos = ta.selectionStart;
+    // '/关键词' 前的文本若不以空白结尾, 补一个空格再拼接任务名
+    let head = ta.value.slice(0, s.slashIdx);
+    if (head && !/\s$/.test(head)) head += ' ';
+    const tail = ta.value.slice(pos);
+    ta.value = head + task.name + tail;
+    const newPos = (head + task.name).length;
+    ta.setSelectionRange(newPos, newPos);
+
+    this.closeSlashPopup();
+    ta.focus();
+  },
+
+  /** 关闭弹层并移除 DOM 与事件 */
+  closeSlashPopup() {
+    const s = this._slash;
+    if (!s) return;
+    if (s.textarea && s.onKeydown) s.textarea.removeEventListener('keydown', s.onKeydown);
+    if (s.onDocDown) document.removeEventListener('mousedown', s.onDocDown);
+    if (s.onScroll) window.removeEventListener('scroll', s.onScroll, true);
+    if (s.popup) s.popup.remove();
+    this._slash = null;
+  },
+
+  /* ------------------------------------------------------------------
    * 保存 / 删除
    * ---------------------------------------------------------------- */
   /** 收集表单数据 */
@@ -413,17 +572,17 @@ const PersonalReport = {
       const pid = val('project_id');
       const row = {
         project_id: pid ? parseInt(pid, 10) : null,
-        mon: val('mon'), tue: val('tue'), wed: val('wed'), thu: val('thu'),
-        fri: val('fri'), sat: val('sat'), sun: val('sun'),
+        day_of_week: parseInt(val('day_of_week'), 10) || 1,
+        content: val('content'),
         participants: val('participants'),
         deliverable: val('deliverable'),
         hours: parseFloat(val('hours')) || 0,
         sort_order: idx,
       };
       // 跳过完全空白行
-      const hasContent = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun', 'participants', 'deliverable']
-        .some(k => row[k]);
-      if (hasContent || row.hours > 0 || row.project_id) workItems.push(row);
+      if (row.content || row.participants || row.deliverable || row.hours > 0 || row.project_id) {
+        workItems.push(row);
+      }
     });
 
     const planItems = [];

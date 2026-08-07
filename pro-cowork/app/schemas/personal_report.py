@@ -15,16 +15,11 @@ def _none_to_list(v):
 
 # ---------- 本周工作内容 ----------
 class PersonalReportWorkItemIn(BaseModel):
-    """本周工作内容包括行 (创建/更新共用; 全量替换)"""
+    """本周工作内容行 (创建/更新共用; 全量替换; 每行一天)"""
 
     project_id: Optional[int] = None  # 所属项目 (选择)
-    mon: str = ""
-    tue: str = ""
-    wed: str = ""
-    thu: str = ""
-    fri: str = ""
-    sat: str = ""
-    sun: str = ""
+    day_of_week: int = 1       # 周几: 1=周一 ~ 7=周日
+    content: str = ""          # 当天工作内容
     participants: str = ""   # 参与人员
     deliverable: str = ""    # 交付物
     hours: float = 0         # 工时(H)

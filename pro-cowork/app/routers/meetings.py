@@ -1,4 +1,4 @@
-"""会议议程路由 · 含议程项子资源 + 会议录音播放"""
+"""会议议程路由 · 含议程项子资源 + 会议录音播放 (维护权限: 项目经理或全职成员)"""
 import re
 from pathlib import Path
 from typing import Optional
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
+from app.deps import get_user_name, require_fulltime
 from app.models.meeting import Meeting, MeetingItem
 from app.schemas.meeting import (
     MeetingCreate,
@@ -149,13 +150,14 @@ async def get_meeting_audio(
 
 @router.post("/", response_model=MeetingOut)
 async def create_meeting(
-    payload: MeetingCreate, db: AsyncSession = Depends(get_db)
+    payload: MeetingCreate, request: Request, db: AsyncSession = Depends(get_db)
 ) -> MeetingOut:
-    """创建会议 (含议程项批量创建); project_id 未传时默认用当前激活项目"""
+    """创建会议 (含议程项批量创建); project_id 未传时默认用当前激活项目 (项目经理或全职成员)"""
     data = payload.model_dump()
     items_data = data.pop("items", [])
     # 解析 project_id (未传则用当前激活项目)
     data["project_id"] = await resolve_project_id(db, data.get("project_id"))
+    await require_fulltime(db, data["project_id"], get_user_name(request))
     meeting = Meeting(**data)
     for item_in in items_data:
         meeting.items.append(MeetingItem(**item_in))
@@ -170,12 +172,14 @@ async def create_meeting(
 async def update_meeting(
     meeting_id: int,
     payload: MeetingUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> MeetingOut:
-    """更新会议主记录"""
+    """更新会议主记录 (项目经理或全职成员)"""
     meeting = await db.get(Meeting, meeting_id)
     if not meeting or meeting.is_delete:
         raise HTTPException(status_code=404, detail="会议不存在")
+    await require_fulltime(db, meeting.project_id, get_user_name(request))
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(meeting, key, value)
     await db.commit()  # 显式提交: 保证前端紧随的读取能读到更新 (含纪要/转写/录音关联)
@@ -186,12 +190,13 @@ async def update_meeting(
 
 @router.delete("/{meeting_id}")
 async def delete_meeting(
-    meeting_id: int, db: AsyncSession = Depends(get_db)
+    meeting_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除会议 (级联删除议程项)"""
+    """删除会议 (级联删除议程项) (项目经理或全职成员)"""
     meeting = await db.get(Meeting, meeting_id)
     if not meeting or meeting.is_delete:
         raise HTTPException(status_code=404, detail="会议不存在")
+    await require_fulltime(db, meeting.project_id, get_user_name(request))
     meeting.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": meeting_id}
@@ -202,12 +207,14 @@ async def delete_meeting(
 async def create_meeting_item(
     meeting_id: int,
     payload: MeetingItemCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> MeetingItemOut:
-    """新增议程项"""
+    """新增议程项 (项目经理或全职成员)"""
     meeting = await db.get(Meeting, meeting_id)
     if not meeting or meeting.is_delete:
         raise HTTPException(status_code=404, detail="会议不存在")
+    await require_fulltime(db, meeting.project_id, get_user_name(request))
     item = MeetingItem(meeting_id=meeting_id, **payload.model_dump())
     db.add(item)
     await db.flush()
@@ -220,12 +227,17 @@ async def update_meeting_item(
     meeting_id: int,
     item_id: int,
     payload: MeetingItemUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> MeetingItemOut:
-    """更新议程项"""
+    """更新议程项 (项目经理或全职成员)"""
     item = await db.get(MeetingItem, item_id)
     if not item or item.is_delete or item.meeting_id != meeting_id:
         raise HTTPException(status_code=404, detail="议程项不存在")
+    meeting = await db.get(Meeting, meeting_id)
+    if not meeting or meeting.is_delete:
+        raise HTTPException(status_code=404, detail="会议不存在")
+    await require_fulltime(db, meeting.project_id, get_user_name(request))
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
     await db.flush()
@@ -235,12 +247,16 @@ async def update_meeting_item(
 
 @router.delete("/{meeting_id}/items/{item_id}")
 async def delete_meeting_item(
-    meeting_id: int, item_id: int, db: AsyncSession = Depends(get_db)
+    meeting_id: int, item_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除议程项"""
+    """删除议程项 (项目经理或全职成员)"""
     item = await db.get(MeetingItem, item_id)
     if not item or item.is_delete or item.meeting_id != meeting_id:
         raise HTTPException(status_code=404, detail="议程项不存在")
+    meeting = await db.get(Meeting, meeting_id)
+    if not meeting or meeting.is_delete:
+        raise HTTPException(status_code=404, detail="会议不存在")
+    await require_fulltime(db, meeting.project_id, get_user_name(request))
     item.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": item_id}

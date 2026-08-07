@@ -1,14 +1,15 @@
-"""每周工作任务安排路由"""
+"""每周工作任务安排路由 (维护权限: 项目经理或全职成员)"""
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
+from app.deps import get_user_name, require_fulltime
 from app.models.module import Module
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
@@ -96,11 +97,12 @@ async def get_work_task(
 
 @router.post("/", response_model=WeeklyWorkTaskOut)
 async def create_work_task(
-    payload: WeeklyWorkTaskCreate, db: AsyncSession = Depends(get_db)
+    payload: WeeklyWorkTaskCreate, request: Request, db: AsyncSession = Depends(get_db)
 ) -> WeeklyWorkTaskOut:
-    """新建每周工作任务; project_id 未传时默认用当前激活项目"""
+    """新建每周工作任务; project_id 未传时默认用当前激活项目 (项目经理或全职成员)"""
     data = payload.model_dump()
     data["project_id"] = await resolve_project_id(db, data.get("project_id"))
+    await require_fulltime(db, data["project_id"], get_user_name(request))
     item = WeeklyWorkTask(**data)
     db.add(item)
     await db.flush()
@@ -112,14 +114,16 @@ async def create_work_task(
 async def create_work_tasks_from_plan(
     report_id: int,
     payload: FromPlanRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> list[WeeklyWorkTaskOut]:
-    """从周报下周任务批量生成每周工作任务 (project_id 从周报继承)"""
+    """从周报下周任务批量生成每周工作任务 (project_id 从周报继承) (项目经理或全职成员)"""
     # 取周报的 project_id 作为新工作任务的 project_id
     report = await db.get(WeeklyReport, report_id)
     if not report or report.is_delete:
         raise HTTPException(status_code=404, detail="周报不存在")
     pid = report.project_id
+    await require_fulltime(db, pid, get_user_name(request))
 
     stmt = (
         select(WeeklyPlanTask)
@@ -183,12 +187,14 @@ async def create_work_tasks_from_plan(
 async def update_work_task(
     item_id: int,
     payload: WeeklyWorkTaskUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyWorkTaskOut:
-    """更新每周工作任务"""
+    """更新每周工作任务 (项目经理或全职成员)"""
     item = await db.get(WeeklyWorkTask, item_id)
     if not item or item.is_delete:
         raise HTTPException(status_code=404, detail="每周工作任务不存在")
+    await require_fulltime(db, item.project_id, get_user_name(request))
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
     await db.flush()
@@ -198,12 +204,13 @@ async def update_work_task(
 
 @router.delete("/{item_id}")
 async def delete_work_task(
-    item_id: int, db: AsyncSession = Depends(get_db)
+    item_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """删除每周工作任务"""
+    """删除每周工作任务 (项目经理或全职成员)"""
     item = await db.get(WeeklyWorkTask, item_id)
     if not item or item.is_delete:
         raise HTTPException(status_code=404, detail="每周工作任务不存在")
+    await require_fulltime(db, item.project_id, get_user_name(request))
     item.is_delete = True
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True, "id": item_id}

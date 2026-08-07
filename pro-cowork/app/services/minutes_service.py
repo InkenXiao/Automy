@@ -28,8 +28,8 @@ async def generate_minutes(transcript: str) -> str:
     return "".join(parts).strip()
 
 
-async def generate_minutes_stream(transcript: str) -> AsyncGenerator[str, None]:
-    """流式生成会议纪要: 逐段产出文本增量, 供执行输出窗口实时显示"""
+async def generate_minutes_stream(transcript: str, user_name: str = "system") -> AsyncGenerator[str, None]:
+    """流式生成会议纪要: 逐段产出文本增量, 供执行输出窗口实时显示; 流尾记录 token 消耗"""
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("LLM 未配置: 请在 .env 中设置 OPENAI_API_KEY / OPENAI_BASE_URL")
     if not transcript.strip():
@@ -45,10 +45,18 @@ async def generate_minutes_stream(transcript: str) -> AsyncGenerator[str, None]:
             {"role": "user", "content": MINUTES_PROMPT.format(transcript=transcript[:30000])}
         ],
         stream=True,
+        stream_options={"include_usage": True},
     )
+    total_tokens = 0
     async for chunk in stream:
         if not chunk.choices:
+            if chunk.usage:
+                total_tokens = chunk.usage.total_tokens or 0
             continue
         delta = chunk.choices[0].delta.content
         if delta:
             yield delta
+    # 流尾: 落库 token 消耗 (异常静默)
+    from app.services.log_service import record_llm_usage
+
+    await record_llm_usage(user_name, "会议纪要", total_tokens, settings.OPENAI_MODEL)

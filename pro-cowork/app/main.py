@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
+from app.middleware import OperationLogMiddleware
 from app.routers import (
     agents,
+    auth,
     meetings,
     modules,
     personal_reports,
@@ -18,6 +20,7 @@ from app.routers import (
     projects,
     skills,
     task_runs,
+    usage_logs,
     weekly_reports,
     work_tasks,
 )
@@ -75,9 +78,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 操作日志中间件 (自动记录 /api 写操作; 注意 add_middleware 为后添加先执行,
+# 此处置于 CORS 之后注册, 实际执行在 CORS 之前, 不影响业务)
+app.add_middleware(OperationLogMiddleware)
+
 # 注册 API 路由 (统一前缀 /api)
 for router in [
     agents.router,
+    auth.router,
     meetings.router,
     modules.router,
     personal_reports.router,
@@ -87,6 +95,7 @@ for router in [
     projects.router,
     skills.router,
     task_runs.router,
+    usage_logs.router,
     weekly_reports.router,
     work_tasks.router,
 ]:

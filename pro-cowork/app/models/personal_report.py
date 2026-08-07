@@ -39,7 +39,7 @@ class PersonalReport(Base, TimestampMixin, SoftDeleteMixin):
 
 
 class PersonalReportWorkItem(Base, SoftDeleteMixin):
-    """个人周报-本周工作内容 (动态行: 项目 + 周一~周日内容 + 参与人员/交付物/工时)"""
+    """个人周报-本周工作内容 (动态行: 每行一天 = 项目 + 周几 + 当天内容 + 参与人员/交付物/工时)"""
 
     __tablename__ = "personal_report_work_items"
 
@@ -50,13 +50,8 @@ class PersonalReportWorkItem(Base, SoftDeleteMixin):
     project_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
     )  # 工作内容所属项目 (选择)
-    mon: Mapped[str] = mapped_column(Text, default="")   # 周一工作内容
-    tue: Mapped[str] = mapped_column(Text, default="")   # 周二
-    wed: Mapped[str] = mapped_column(Text, default="")   # 周三
-    thu: Mapped[str] = mapped_column(Text, default="")   # 周四
-    fri: Mapped[str] = mapped_column(Text, default="")   # 周五
-    sat: Mapped[str] = mapped_column(Text, default="")   # 周六
-    sun: Mapped[str] = mapped_column(Text, default="")   # 周日
+    day_of_week: Mapped[int] = mapped_column(Integer, default=1)  # 周几: 1=周一 ~ 7=周日
+    content: Mapped[str] = mapped_column(Text, default="")  # 当天工作内容
     participants: Mapped[str] = mapped_column(String(256), default="")  # 参与人员
     deliverable: Mapped[str] = mapped_column(String(256), default="")   # 交付物
     hours: Mapped[float] = mapped_column(Float, default=0)  # 工时(H)

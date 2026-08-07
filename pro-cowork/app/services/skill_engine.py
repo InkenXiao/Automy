@@ -41,7 +41,7 @@ def _find_task_file(project_id: Optional[int], file_name: str) -> Optional[Path]
     return None
 
 
-async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Optional[int] = None) -> dict:
+async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Optional[int] = None, user_name: str = "system") -> dict:
     """内置能力: 会议纪要生成
 
     入参: file_name (任务附件中的录音文件名), project_id (可选, 默认当前激活项目)
@@ -84,7 +84,7 @@ async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Opt
 
     minutes_parts: list[str] = []
     try:
-        async for delta in generate_minutes_stream(transcript):
+        async for delta in generate_minutes_stream(transcript, user_name=user_name):
             minutes_parts.append(delta)
             await emit_run_event(session_id, "minutes_delta", {"content": delta})
     except RuntimeError as e:
@@ -99,7 +99,7 @@ async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Opt
     }
 
 
-async def _builtin_weekly_digest(db: AsyncSession, args: dict, session_id: Optional[int] = None) -> dict:
+async def _builtin_weekly_digest(db: AsyncSession, args: dict, session_id: Optional[int] = None, user_name: str = "system") -> dict:
     """内置能力: 项目周工作小结
 
     入参: report_id (可选, 默认当前项目最新一份周报), project_id (可选, 默认当前激活项目)
@@ -164,7 +164,7 @@ async def _builtin_weekly_digest(db: AsyncSession, args: dict, session_id: Optio
 
     digest_parts: list[str] = []
     try:
-        async for delta in generate_week_digest_stream(source):
+        async for delta in generate_week_digest_stream(source, user_name=user_name):
             digest_parts.append(delta)
             await emit_run_event(session_id, "digest_delta", {"content": delta})
     except RuntimeError as e:
@@ -180,7 +180,7 @@ async def _builtin_weekly_digest(db: AsyncSession, args: dict, session_id: Optio
     }
 
 
-# 内置能力注册表: builtin 名 -> async fn(db, args, session_id=None)
+# 内置能力注册表: builtin 名 -> async fn(db, args, session_id=None, user_name="system")
 BUILTIN_REGISTRY = {
     "meeting_minutes": _builtin_meeting_minutes,
     "weekly_digest": _builtin_weekly_digest,
@@ -190,9 +190,10 @@ BUILTIN_REGISTRY = {
 class SkillEngine:
     """Skill 执行引擎: 根据 Skill 配置执行工具链/内置能力链"""
 
-    def __init__(self, db: AsyncSession, session_id: Optional[int] = None):
+    def __init__(self, db: AsyncSession, session_id: Optional[int] = None, user_name: str = "system"):
         self.db = db
         self.session_id = session_id
+        self.user_name = user_name
         self.tool_executor = ToolExecutor(db)
 
     async def execute(self, skill: Skill, input_data: dict, prior_results: list | None = None) -> dict:
@@ -234,7 +235,7 @@ class SkillEngine:
                     result = {"error": f"未知内置能力: {builtin_name}"}
                 else:
                     try:
-                        result = await handler(self.db, args, session_id=self.session_id)
+                        result = await handler(self.db, args, session_id=self.session_id, user_name=self.user_name)
                     except Exception as e:  # noqa: BLE001
                         logger.exception("builtin %s 执行异常", builtin_name)
                         result = {"error": f"{type(e).__name__}: {e}"}

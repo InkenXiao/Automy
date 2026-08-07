@@ -63,6 +63,107 @@ async def init_db():
         await _ensure_weekly_report_digest_column(conn)
         # 项目经理/状态字段 (需求: 项目成员页维护项目经理、起止时间与项目状态)
         await _ensure_project_staff_columns(conn)
+        # 个人周报工作项: 7 列(mon~sun) → 按天行(day_of_week+content) 拆行迁移
+        await _migrate_pr_work_items_to_daily(conn)
+        # 成员状态: 在职→全职, 已退出→退出
+        await _migrate_member_status(conn)
+
+
+async def _migrate_member_status(conn):
+    """project_members.status 值迁移: 在职→全职, 已退出→退出 (幂等)"""
+    from sqlalchemy import inspect, text
+
+    existing_tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+    if "project_members" not in existing_tables:
+        return
+    await conn.execute(
+        text("UPDATE project_members SET status='全职' WHERE status='在职'")
+    )
+    await conn.execute(
+        text("UPDATE project_members SET status='退出' WHERE status='已退出'")
+    )
+
+
+async def _migrate_pr_work_items_to_daily(conn):
+    """personal_report_work_items 结构迁移: mon~sun 7 列 → day_of_week+content 按天行 (幂等)
+
+    旧行中每天非空内容拆成独立新行; hours/participants/deliverable 仅挂到
+    当天序号最小的新行, 其余新行 hours=0; 迁移完成后旧行置 is_delete=true。
+    新列不存在时先 ALTER 补齐; 无待迁移旧行即跳过。
+    """
+    from sqlalchemy import inspect, text
+
+    existing_tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+    if "personal_report_work_items" not in existing_tables:
+        return
+    cols = await conn.run_sync(
+        lambda sync_conn: inspect(sync_conn).get_columns("personal_report_work_items")
+    )
+    names = {c["name"] for c in cols}
+
+    # 新列补齐 (旧表无 day_of_week/content)
+    if "day_of_week" not in names:
+        await conn.execute(
+            text("ALTER TABLE personal_report_work_items ADD COLUMN day_of_week INTEGER DEFAULT 1 NOT NULL")
+        )
+    if "content" not in names:
+        await conn.execute(
+            text("ALTER TABLE personal_report_work_items ADD COLUMN content TEXT DEFAULT '' NOT NULL")
+        )
+    if "mon" not in names:
+        return  # 已是新结构 (无旧列), 无需迁移
+
+    # 待迁移旧行: 未删除且 mon~sun 任一非空
+    rows = (await conn.execute(
+        text(
+            "SELECT id, report_id, project_id, mon, tue, wed, thu, fri, sat, sun, "
+            "participants, deliverable, hours, sort_order "
+            "FROM personal_report_work_items "
+            "WHERE is_delete = false AND ("
+            "COALESCE(mon,'') <> '' OR COALESCE(tue,'') <> '' OR COALESCE(wed,'') <> '' "
+            "OR COALESCE(thu,'') <> '' OR COALESCE(fri,'') <> '' OR COALESCE(sat,'') <> '' "
+            "OR COALESCE(sun,'') <> '')"
+        )
+    )).mappings().all()
+
+    day_cols = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+    # 先删除旧 7 列 (其 NOT NULL 约束会阻断新结构插入; 旧数据已读入内存)
+    for col in day_cols:
+        await conn.execute(
+            text(f"ALTER TABLE personal_report_work_items DROP COLUMN {col}")
+        )
+
+    for r in rows:
+        non_empty = [(i + 1, (r[c] or "").strip()) for i, c in enumerate(day_cols) if (r[c] or "").strip()]
+        if not non_empty:
+            continue
+        first = True
+        for day, content in non_empty:
+            await conn.execute(
+                text(
+                    "INSERT INTO personal_report_work_items "
+                    "(report_id, project_id, day_of_week, content, participants, deliverable, "
+                    "hours, sort_order, is_delete) "
+                    "VALUES (:rid, :pid, :dow, :content, :participants, :deliverable, "
+                    ":hours, :sort, false)"
+                ),
+                {
+                    "rid": r["report_id"],
+                    "pid": r["project_id"],
+                    "dow": day,
+                    "content": content,
+                    "participants": r["participants"] or "",
+                    "deliverable": r["deliverable"] or "",
+                    "hours": float(r["hours"] or 0) if first else 0,
+                    "sort": (r["sort_order"] or 0) * 10 + day,
+                },
+            )
+            first = False
+        await conn.execute(
+            text("UPDATE personal_report_work_items SET is_delete = true WHERE id = :oid"),
+            {"oid": r["id"]},
+        )
 
 
 async def _ensure_project_staff_columns(conn):

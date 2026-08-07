@@ -20,7 +20,7 @@ class ProjectMember(Base, TimestampMixin, SoftDeleteMixin):
     name: Mapped[str] = mapped_column(String(64))  # 成员姓名
     role: Mapped[str] = mapped_column(String(64), default="")  # 角色/岗位
     join_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)  # 入组时间
-    status: Mapped[str] = mapped_column(String(16), default="在职")  # 当前状态: 在职/已退出
+    status: Mapped[str] = mapped_column(String(16), default="全职")  # 当前状态: 全职/临时/退出
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     # 关联项目

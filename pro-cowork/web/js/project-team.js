@@ -275,10 +275,15 @@ const ProjectTeam = {
     }
   },
 
-  /** 成员状态徽章 */
+  /** 成员状态徽章 (全职/临时/退出) */
   memberStatusBadge(status) {
-    const cls = status === '在职' ? 'badge--success' : 'badge--gray';
-    return `<span class="badge ${cls}">${App.escapeHtml(status || '在职')}</span>`;
+    const map = {
+      '全职': 'badge--success',
+      '临时': 'badge--warning',
+      '退出': 'badge--gray',
+    };
+    const cls = map[status] || 'badge--success';
+    return `<span class="badge ${cls}">${App.escapeHtml(status || '全职')}</span>`;
   },
 
   /** 渲染成员表格 */
@@ -320,7 +325,7 @@ const ProjectTeam = {
                   <td>${this.memberStatusBadge(m.status)}</td>
                   <td>
                     <button class="btn btn-ghost btn-sm" data-action="edit-member" data-id="${m.id}">编辑</button>
-                    ${(m.status || '在职') === '在职'
+                    ${(m.status || '全职') !== '退出'
                       ? `<button class="btn btn-ghost btn-sm" data-action="leave-member" data-id="${m.id}">退出</button>`
                       : `<button class="btn btn-ghost btn-sm" data-action="rejoin-member" data-id="${m.id}">返岗</button>`}
                     <button class="btn btn-ghost btn-sm" data-action="delete-member" data-id="${m.id}">删除</button>
@@ -345,7 +350,8 @@ const ProjectTeam = {
         if (action === 'edit-member') {
           this.showMemberForm(member);
         } else if (action === 'leave-member' || action === 'rejoin-member') {
-          const status = action === 'leave-member' ? '已退出' : '在职';
+          const status = action === 'leave-member' ? '退出' : '全职';
+          if (action === 'leave-member' && !confirm('确认将该成员标记为退出?')) return;
           try {
             await API.updateProjectMember(id, { status });
             member.status = status;
@@ -376,8 +382,8 @@ const ProjectTeam = {
     const isEdit = !!member;
     const m = member || {};
     const project = this.projects.find(p => String(p.id) === String(this.currentProjectId));
-    const statusOptions = ['在职', '已退出']
-      .map(s => `<option value="${s}" ${(m.status || '在职') === s ? 'selected' : ''}>${s}</option>`)
+    const statusOptions = ['全职', '临时', '退出']
+      .map(s => `<option value="${s}" ${(m.status || '全职') === s ? 'selected' : ''}>${s}</option>`)
       .join('');
 
     const modal = App.openModal({

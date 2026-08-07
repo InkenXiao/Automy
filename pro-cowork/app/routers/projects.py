@@ -1,10 +1,16 @@
-"""项目元信息路由 · 支持多项目, GET /active 在无项目时幂等创建默认项目"""
+"""项目元信息路由 · 支持多项目, GET /active 在无项目时幂等创建默认项目
+
+身份相关 (需求: 身份确认):
+- GET /        按 X-User-Name 过滤为该用户所属项目 (匿名/无效姓名 → 空列表)
+- GET /active  该用户无所属项目 → 403; 全局激活项目不在其归属内时自动切换为其首个项目
+"""
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, update
 
 from app.database import get_db
+from app.deps import get_user_name, get_user_project_ids
 from app.models.project import Project
 from app.schemas.project import ProjectCreate, ProjectOut, ProjectUpdate
 
@@ -35,11 +41,17 @@ _DEFAULT_PROJECT = {
 
 
 @router.get("/", response_model=list[ProjectOut])
-async def list_projects(db=Depends(get_db)) -> list[ProjectOut]:
-    """获取全部项目 (按 sort_order, id 排序)"""
+async def list_projects(request: Request, db=Depends(get_db)) -> list[ProjectOut]:
+    """获取该用户所属项目 (按 sort_order, id 排序); 匿名/无效姓名返回空列表"""
+    name = get_user_name(request)
+    if not name:
+        return []
+    ids = await get_user_project_ids(db, name)
+    if not ids:
+        return []
     stmt = (
         select(Project)
-        .where(Project.is_delete.is_(False))
+        .where(Project.is_delete.is_(False), Project.id.in_(ids))
         .order_by(Project.sort_order, Project.id)
     )
     result = await db.execute(stmt)
@@ -48,8 +60,18 @@ async def list_projects(db=Depends(get_db)) -> list[ProjectOut]:
 
 
 @router.get("/active", response_model=ProjectOut)
-async def get_active_project(db=Depends(get_db)) -> ProjectOut:
-    """获取当前激活项目; 若无任何项目则幂等创建默认项目"""
+async def get_active_project(request: Request, db=Depends(get_db)) -> ProjectOut:
+    """获取当前激活项目; 若无任何项目则幂等创建默认项目
+
+    已登录用户: 无所属项目 → 403; 全局激活项目不在其归属内 → 自动切换为其首个项目
+    """
+    name = get_user_name(request)
+    allowed_ids: list[int] | None = None
+    if name:
+        allowed_ids = await get_user_project_ids(db, name)
+        if not allowed_ids:
+            raise HTTPException(status_code=403, detail="当前姓名不属于任何项目")
+
     stmt = (
         select(Project)
         .where(Project.is_active.is_(True), Project.is_delete.is_(False))
@@ -57,8 +79,33 @@ async def get_active_project(db=Depends(get_db)) -> ProjectOut:
     )
     result = await db.execute(stmt)
     proj = result.scalars().first()
+
+    if proj is not None and allowed_ids is not None and proj.id not in allowed_ids:
+        # 激活项目不属于该用户: 切换为其首个归属项目
+        proj = None
+
     if proj is None:
-        # 无激活项目: 看是否已有任意项目
+        if allowed_ids:
+            # 取该用户首个归属项目并激活
+            own_stmt = (
+                select(Project)
+                .where(Project.is_delete.is_(False), Project.id.in_(allowed_ids))
+                .order_by(Project.sort_order, Project.id)
+                .limit(1)
+            )
+            own_result = await db.execute(own_stmt)
+            proj = own_result.scalars().first()
+            if proj is None:
+                raise HTTPException(status_code=403, detail="当前姓名不属于任何项目")
+            await db.execute(
+                update(Project)
+                .where(Project.id != proj.id, Project.is_delete.is_(False))
+                .values(is_active=False)
+            )
+            proj.is_active = True
+            await db.flush()
+            return ProjectOut.model_validate(proj)
+        # 无登录身份 (兼容旧调用): 看是否已有任意项目
         any_stmt = (
             select(Project)
             .where(Project.is_delete.is_(False))

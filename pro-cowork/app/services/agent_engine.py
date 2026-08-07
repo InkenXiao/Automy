@@ -45,6 +45,7 @@ class AgentEngine:
         history: List[AgentMessage],
         memories: List[AgentMemory],
         user_message: str,
+        user_name: str = "system",
     ) -> AsyncGenerator[dict, None]:
         """
         流式对话核心, 产出结构化事件:
@@ -62,6 +63,7 @@ class AgentEngine:
         tool_executor = ToolExecutor(self.db, agent_id=agent.id, session_id=session.id)
         messages = await self._build_messages(agent, history, memories, user_message)
         tools = self._get_tools(agent)
+        total_tokens_all = 0
 
         for round_num in range(MAX_TOOL_ROUNDS):
             try:
@@ -72,6 +74,7 @@ class AgentEngine:
                     messages=messages,
                     tools=tools if tools else None,
                     stream=True,
+                    stream_options={"include_usage": True},
                 )
 
                 full_content = ""
@@ -79,6 +82,8 @@ class AgentEngine:
 
                 async for chunk in stream:
                     if not chunk.choices:
+                        if chunk.usage:
+                            total_tokens_all += chunk.usage.total_tokens or 0
                         continue
                     delta = chunk.choices[0].delta
 
@@ -158,6 +163,15 @@ class AgentEngine:
                 yield {"type": "content", "content": f"\n\n⚠️ 调用出错: {e}"}
                 break
 
+        # 对话结束: 汇总落库 token 消耗 (异常静默)
+        if total_tokens_all > 0:
+            from app.services.log_service import record_llm_usage
+
+            await record_llm_usage(
+                user_name, "数字分身", total_tokens_all,
+                f"{agent.name} · {settings.OPENAI_MODEL}",
+            )
+
     # ---------- 调试: 非流式 + 结构化 Trace ----------
 
     async def chat_with_trace(
@@ -166,6 +180,7 @@ class AgentEngine:
         history: List[AgentMessage],
         memories: List[AgentMemory],
         user_message: str,
+        user_name: str = "system",
     ) -> dict:
         """调试模式: 非流式执行一轮对话, 返回回复与完整执行轨迹"""
         if not self.client:
@@ -181,6 +196,7 @@ class AgentEngine:
         tools = self._get_tools(agent)
         trace: list[dict] = []
         reply = ""
+        total_tokens_all = 0
 
         for round_num in range(MAX_TOOL_ROUNDS):
             round_trace: dict[str, Any] = {"round": round_num + 1, "content": "", "tool_calls": []}
@@ -194,6 +210,9 @@ class AgentEngine:
             except Exception as e:
                 logger.error(f"Agent debug error (round {round_num}): {e}")
                 return {"reply": reply, "trace": trace, "error": str(e), "model": settings.OPENAI_MODEL}
+
+            if resp.usage:
+                total_tokens_all += resp.usage.total_tokens or 0
 
             choice = resp.choices[0]
             msg = choice.message
@@ -240,6 +259,15 @@ class AgentEngine:
                 })
 
             trace.append(round_trace)
+
+        # 调试结束: 汇总落库 token 消耗 (异常静默)
+        if total_tokens_all > 0:
+            from app.services.log_service import record_llm_usage
+
+            await record_llm_usage(
+                user_name, "数字分身", total_tokens_all,
+                f"{agent.name} · debug · {settings.OPENAI_MODEL}",
+            )
 
         return {"reply": reply, "trace": trace, "model": settings.OPENAI_MODEL}
 
