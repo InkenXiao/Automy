@@ -23,6 +23,8 @@ class Meeting(Base, TimestampMixin, SoftDeleteMixin):
     host: Mapped[str] = mapped_column(String(64), default="")  # 主持人
     attendees: Mapped[str] = mapped_column(Text, default="")  # 参会人员 (逗号分隔)
     description: Mapped[str] = mapped_column(Text, default="")  # 会议描述/纪要
+    audio_file: Mapped[str] = mapped_column(String(256), default="")  # 原始录音文件名 (任务附件目录内)
+    transcript: Mapped[str] = mapped_column(Text, default="")  # 录音转写完整文字 (带时间戳)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     # 关联项目

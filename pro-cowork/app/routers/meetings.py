@@ -1,7 +1,10 @@
-"""会议议程路由 · 含议程项子资源"""
+"""会议议程路由 · 含议程项子资源 + 会议录音播放"""
+import re
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
@@ -16,9 +19,21 @@ from app.schemas.meeting import (
     MeetingOut,
     MeetingUpdate,
 )
+from app.services.skill_engine import _find_task_file
 from app.utils import resolve_project_id
 
 router = APIRouter(prefix="/meetings", tags=["项目会议"])
+
+_AUDIO_MEDIA_TYPES = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+    ".aac": "audio/aac",
+    ".wma": "audio/x-ms-wma",
+    ".opus": "audio/opus",
+}
 
 
 async def _load_meeting(db: AsyncSession, meeting_id: int) -> Meeting:
@@ -75,6 +90,63 @@ async def get_meeting(
     return MeetingOut.model_validate(meeting)
 
 
+@router.get("/{meeting_id}/audio")
+async def get_meeting_audio(
+    meeting_id: int, request: Request, db: AsyncSession = Depends(get_db)
+):
+    """播放会议录音: 支持 HTTP Range (进度条拖拽定位)"""
+    meeting = await db.get(Meeting, meeting_id)
+    if not meeting or meeting.is_delete:
+        raise HTTPException(status_code=404, detail="会议不存在")
+    if not meeting.audio_file:
+        raise HTTPException(status_code=404, detail="该会议暂无关联录音")
+    audio_path = _find_task_file(meeting.project_id, Path(meeting.audio_file).name)
+    if not audio_path:
+        raise HTTPException(status_code=404, detail="录音文件不存在或已被清理")
+
+    file_size = audio_path.stat().st_size
+    media_type = _AUDIO_MEDIA_TYPES.get(audio_path.suffix.lower(), "application/octet-stream")
+
+    range_header = request.headers.get("range")
+    if range_header:
+        m = re.match(r"bytes=(\d*)-(\d*)", range_header.strip())
+        if m:
+            start = int(m.group(1)) if m.group(1) else 0
+            end = int(m.group(2)) if m.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+            if start >= file_size or start > end:
+                raise HTTPException(status_code=416, detail="Range Not Satisfiable")
+            length = end - start + 1
+
+            def iter_file():
+                with open(audio_path, "rb") as f:
+                    f.seek(start)
+                    remaining = length
+                    while remaining > 0:
+                        chunk = f.read(min(256 * 1024, remaining))
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        yield chunk
+
+            return StreamingResponse(
+                iter_file(),
+                status_code=206,
+                media_type=media_type,
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(length),
+                },
+            )
+
+    return FileResponse(
+        audio_path,
+        media_type=media_type,
+        headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)},
+    )
+
+
 @router.post("/", response_model=MeetingOut)
 async def create_meeting(
     payload: MeetingCreate, db: AsyncSession = Depends(get_db)
@@ -88,7 +160,7 @@ async def create_meeting(
     for item_in in items_data:
         meeting.items.append(MeetingItem(**item_in))
     db.add(meeting)
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到新会议
     # 重新加载以避免异步懒加载子表
     meeting = await _load_meeting(db, meeting.id)
     return MeetingOut.model_validate(meeting)
@@ -106,7 +178,7 @@ async def update_meeting(
         raise HTTPException(status_code=404, detail="会议不存在")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(meeting, key, value)
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的读取能读到更新 (含纪要/转写/录音关联)
     # 重新加载以避免异步懒加载子表
     meeting = await _load_meeting(db, meeting_id)
     return MeetingOut.model_validate(meeting)

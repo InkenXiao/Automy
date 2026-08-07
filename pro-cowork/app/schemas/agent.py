@@ -85,6 +85,15 @@ class MemoryCreate(BaseModel):
     extra_data: dict = {}
 
 
+class MemoryUpdate(BaseModel):
+    """记忆更新 (全部字段可选; project_id 传 null 表示转为通用记忆)"""
+
+    memory_type: Optional[str] = None
+    key: Optional[str] = None
+    content: Optional[str] = None
+    project_id: Optional[int] = None
+
+
 class MemoryOut(BaseModel):
     id: int
     agent_id: int

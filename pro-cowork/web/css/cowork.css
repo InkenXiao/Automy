@@ -525,6 +525,14 @@
 
 .memory-item__del:hover { color: var(--color-danger); }
 
+.memory-item__edit {
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.memory-item__edit:hover { color: var(--color-primary); }
+
 .memory-item__content {
   color: var(--color-text-secondary);
   line-height: 1.5;
@@ -1344,4 +1352,97 @@
 
 #mem-test-output {
   margin-bottom: 10px;
+}
+
+/* ------------------------------------------------------------------
+   任务输出: 意图识别 / 用户选择面板 / 模型调用行
+   ------------------------------------------------------------------ */
+.intent-line {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.8;
+}
+
+.intent-line--reason {
+  color: var(--color-text-tertiary);
+  font-size: 11.5px;
+}
+
+.chat-model-line {
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
+  padding: 2px 4px 2px 40px;
+}
+
+.choice-panel .chat-trace__body { display: block; }
+
+.choice-panel--done .choice-agent,
+.choice-panel--done .choice-skills .chip {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.choice-reason {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.choice-sec-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 10px 0 6px;
+}
+
+.choice-agent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+.choice-agent:hover { border-color: var(--color-primary); }
+
+.choice-agent--on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light, rgba(59, 130, 246, 0.08));
+}
+
+.choice-agent__icon { font-size: 18px; line-height: 1.2; }
+
+.choice-agent__main { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+.choice-agent__name { font-size: 13px; font-weight: 600; }
+
+.choice-agent__desc {
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
+.choice-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.choice-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.sm-attach-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-warning-light);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  margin-top: 4px;
 }

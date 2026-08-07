@@ -65,6 +65,8 @@ class AgentEngine:
 
         for round_num in range(MAX_TOOL_ROUNDS):
             try:
+                yield {"type": "model_call", "stage": "start", "round": round_num + 1}
+                round_start = time.time()
                 stream = await self.client.chat.completions.create(
                     model=settings.OPENAI_MODEL,
                     messages=messages,
@@ -98,6 +100,14 @@ class AgentEngine:
                                     tool_calls_data[idx]["arguments"] += tc.function.arguments
 
                 # 无工具调用: 决策完成, 结束对话
+                yield {
+                    "type": "model_call",
+                    "stage": "end",
+                    "round": round_num + 1,
+                    "chars": len(full_content),
+                    "tool_calls": len(tool_calls_data),
+                    "duration_ms": int((time.time() - round_start) * 1000),
+                }
                 if not tool_calls_data:
                     break
 

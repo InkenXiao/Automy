@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.agent import Agent, AgentMessage, AgentSession
 from app.models.task_run import TaskRun, TaskRunEvent
-from app.schemas.task_run import TaskRunContinue, TaskRunCreate, TaskRunOut
+from app.schemas.task_run import TaskRunChoice, TaskRunContinue, TaskRunCreate, TaskRunOut
 from app.services.task_runner import task_runner
 from app.utils import get_active_project_id
 
@@ -126,14 +126,16 @@ async def list_task_runs(
 async def create_task_run(
     payload: TaskRunCreate, db: AsyncSession = Depends(get_db)
 ) -> TaskRunOut:
-    agent = await db.get(Agent, payload.agent_id)
-    if not agent or agent.is_delete:
-        raise HTTPException(status_code=404, detail="智能体不存在")
+    # agent_id 可不传: 执行时由意图识别自动选择, 识别不了由用户在执行窗口选择
+    if payload.agent_id is not None:
+        agent = await db.get(Agent, payload.agent_id)
+        if not agent or agent.is_delete:
+            raise HTTPException(status_code=404, detail="智能体不存在")
     pid = payload.project_id or await get_active_project_id(db)
     run = TaskRun(
         project_id=pid,
         agent_id=payload.agent_id,
-        title=payload.title or (payload.input_text[:40] or f"任务 - {agent.name}"),
+        title=payload.title or (payload.input_text[:40] or "未命名任务"),
         input_text=payload.input_text,
         skill_ids=payload.skill_ids,
         file_names=[_safe_filename(f) for f in payload.file_names],
@@ -159,6 +161,7 @@ async def delete_task_run(run_id: int, db: AsyncSession = Depends(get_db)):
     if not run or run.is_delete:
         raise HTTPException(status_code=404, detail="任务不存在")
     run.is_delete = True
+    task_runner.resolve_choice(run_id, None)  # 若正等待用户选择: 取消等待
     await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到删除结果
     return {"ok": True}
 
@@ -234,6 +237,9 @@ async def _next_seq(db: AsyncSession, run_id: int) -> int:
 async def run_task(run_id: int, db: AsyncSession = Depends(get_db)):
     """启动任务执行 (后台): 准备会话与首条消息后交由 TaskRunner 执行, 立即返回
 
+    - 已指定分身: 直接创建会话与首条消息
+    - 未指定分身 (agent_id 为空): 仅写入用户事件, 由 TaskRunner 先进行意图识别,
+      识别不了时通过 choice_request 事件等待用户在执行输出窗口选择
     执行过程通过 GET /{run_id}/events (SSE) 订阅。
     """
     run = await db.get(TaskRun, run_id)
@@ -241,24 +247,31 @@ async def run_task(run_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="任务不存在")
     if run.status == "running" or task_runner.is_running(run_id):
         raise HTTPException(status_code=409, detail="任务正在执行中")
-    agent = await db.get(Agent, run.agent_id)
-    if not agent or agent.is_delete:
-        raise HTTPException(status_code=404, detail="智能体不存在")
+
+    if run.agent_id is not None:
+        agent = await db.get(Agent, run.agent_id)
+        if not agent or agent.is_delete:
+            raise HTTPException(status_code=404, detail="智能体不存在")
 
     message = await _build_prompt(
-        db, run.project_id, run.input_text, run.file_names, run.skill_ids
+        db, run.project_id, run.input_text, run.file_names, run.skill_ids or []
     )
     if not message:
         raise HTTPException(status_code=400, detail="任务内容为空, 请填写任务描述或选择文件")
 
-    # ---- 创建执行会话 (run 模式总是新会话) ----
-    session = AgentSession(agent_id=agent.id, title=run.title[:50])
-    db.add(session)
-    await db.flush()
-    await db.refresh(session)
-    run.session_id = session.id
+    session_id = None
+    if run.agent_id is not None:
+        # ---- 创建执行会话 (run 模式总是新会话) ----
+        session = AgentSession(agent_id=run.agent_id, title=run.title[:50])
+        db.add(session)
+        await db.flush()
+        await db.refresh(session)
+        session_id = session.id
+        run.session_id = session.id
+        db.add(AgentMessage(session_id=session.id, role="user", content=message))
+    # 未指定分身: 会话与首条消息由 TaskRunner 在意图识别后创建
+
     run.status = "running"
-    db.add(AgentMessage(session_id=session.id, role="user", content=message))
 
     # 清理旧事件 (重新执行时, 逻辑删除) 并写入 user 事件
     old_events = await db.execute(
@@ -272,7 +285,30 @@ async def run_task(run_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     task_runner.start(run_id)
-    return {"ok": True, "run_id": run_id, "session_id": session.id, "status": "running"}
+    return {"ok": True, "run_id": run_id, "session_id": session_id, "status": "running"}
+
+
+@router.post("/{run_id}/choose")
+async def choose_task_agent(
+    run_id: int, payload: TaskRunChoice, db: AsyncSession = Depends(get_db)
+):
+    """意图识别失败后的用户选择: 指定数字分身 (+可选技能), 任务继续执行
+
+    用户的选择结果会沉淀为对应智能体的长期记忆 (由 TaskRunner 完成)。
+    """
+    run = await db.get(TaskRun, run_id)
+    if not run or run.is_delete:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    agent = await db.get(Agent, payload.agent_id)
+    if not agent or agent.is_delete:
+        raise HTTPException(status_code=404, detail="智能体不存在")
+    ok = task_runner.resolve_choice(run_id, {
+        "agent_id": payload.agent_id,
+        "skill_ids": payload.skill_ids or [],
+    })
+    if not ok:
+        raise HTTPException(status_code=409, detail="任务不在等待选择状态 (可能已完成/超时)")
+    return {"ok": True}
 
 
 @router.post("/{run_id}/continue")

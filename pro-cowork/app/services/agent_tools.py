@@ -214,7 +214,7 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "update_meeting",
-            "description": "将对话中确认的会议内容更新到数据库 (主题/日期/时间/地点/主持人/参会人/会议纪要), 用于会议记录落库",
+            "description": "将对话中确认的会议内容更新到数据库 (主题/日期/时间/地点/主持人/参会人/会议纪要/录音转写原文/录音文件), 用于会议记录落库",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -226,6 +226,8 @@ TOOL_DEFINITIONS = [
                     "host": {"type": "string", "description": "主持人"},
                     "attendees": {"type": "string", "description": "参会人员, 逗号分隔"},
                     "description": {"type": "string", "description": "会议描述/纪要正文"},
+                    "transcript": {"type": "string", "description": "录音转写完整文字 (带时间戳)"},
+                    "audio_file": {"type": "string", "description": "原始录音文件名 (任务附件中的文件)"},
                 },
                 "required": ["meeting_id"],
             },
@@ -669,6 +671,8 @@ class ToolExecutor:
             "host": meeting.host,
             "attendees": meeting.attendees,
             "description": meeting.description,
+            "audio_file": meeting.audio_file or "",
+            "has_transcript": bool(meeting.transcript),
             "items": [
                 {
                     "id": it.id, "item_time": it.item_time, "theme": it.theme,
@@ -684,7 +688,8 @@ class ToolExecutor:
         meeting = await self.db.get(Meeting, meeting_id)
         if not meeting or meeting.is_delete:
             return {"error": "会议不存在"}
-        allowed = {"title", "meet_date", "meet_time", "place", "host", "attendees", "description"}
+        allowed = {"title", "meet_date", "meet_time", "place", "host", "attendees",
+                   "description", "transcript", "audio_file"}
         updated = []
         for k, v in kwargs.items():
             if k in allowed and v is not None:
@@ -803,7 +808,7 @@ class ToolExecutor:
         self.db.add(execution)
         await self.db.flush()
 
-        engine = SkillEngine(self.db)
+        engine = SkillEngine(self.db, session_id=self.session_id)
         try:
             output = await engine.execute(skill, input_data or {})
             execution.output_data = output

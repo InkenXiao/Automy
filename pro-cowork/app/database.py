@@ -55,6 +55,47 @@ async def init_db():
         await _ensure_is_delete_column(conn)
         # 记忆按项目隔离: 补充 agent_memories.project_id + 存量回填
         await _ensure_memory_project_column(conn)
+        # 会议录音/转写原文字段 (需求: 纪要关联原始音频与转写文字)
+        await _ensure_meeting_media_columns(conn)
+        # 任务分身允许为空 (需求: 创建任务后由意图识别确定分身)
+        await _ensure_task_run_agent_nullable(conn)
+
+
+async def _ensure_meeting_media_columns(conn):
+    """meetings 补充 audio_file / transcript 字段 (幂等)"""
+    from sqlalchemy import inspect, text
+
+    existing_tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+    if "meetings" not in existing_tables:
+        return
+    cols = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_columns("meetings"))
+    names = {c["name"] for c in cols}
+    if "audio_file" not in names:
+        await conn.execute(
+            text("ALTER TABLE meetings ADD COLUMN audio_file VARCHAR(256) DEFAULT '' NOT NULL")
+        )
+    if "transcript" not in names:
+        await conn.execute(
+            text("ALTER TABLE meetings ADD COLUMN transcript TEXT DEFAULT '' NOT NULL")
+        )
+
+
+async def _ensure_task_run_agent_nullable(conn):
+    """task_runs.agent_id 允许 NULL (幂等); 仅 PostgreSQL 需要, SQLite 重建表略过"""
+    from sqlalchemy import inspect, text
+
+    existing_tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+    if "task_runs" not in existing_tables:
+        return
+    cols = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_columns("task_runs"))
+    agent_col = next((c for c in cols if c["name"] == "agent_id"), None)
+    if agent_col and not agent_col.get("nullable", True):
+        try:
+            await conn.execute(
+                text("ALTER TABLE task_runs ALTER COLUMN agent_id DROP NOT NULL")
+            )
+        except Exception:
+            pass  # 非 PostgreSQL 方言忽略
 
 
 async def _ensure_memory_project_column(conn):

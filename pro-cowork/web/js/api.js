@@ -386,6 +386,10 @@ const API = {
     return this.post(`/agents/${agentId}/memories`, data);
   },
 
+  updateAgentMemory(agentId, memoryId, data) {
+    return this.put(`/agents/${agentId}/memories/${memoryId}`, data);
+  },
+
   deleteAgentMemory(agentId, memoryId) {
     return this.del(`/agents/${agentId}/memories/${memoryId}`);
   },
@@ -447,6 +451,11 @@ const API = {
 
   deleteTaskRun(id) {
     return this.del(`/task-runs/${id}`);
+  },
+
+  /** 意图识别失败后的用户选择: 指定分身/技能, 任务继续执行 */
+  chooseTaskRun(id, data) {
+    return this.post(`/task-runs/${id}/choose`, data);
   },
 
   /** 任务会话消息列表 */

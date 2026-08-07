@@ -18,6 +18,7 @@ from app.schemas.agent import (
     ChatRequest,
     MemoryCreate,
     MemoryOut,
+    MemoryUpdate,
     MessageOut,
     SessionCreate,
     SessionOut,
@@ -366,7 +367,29 @@ async def create_memory(
 ) -> MemoryOut:
     memory = AgentMemory(agent_id=agent_id, **payload.model_dump())
     db.add(memory)
-    await db.flush()
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到新记忆
+    await db.refresh(memory)
+    return MemoryOut.model_validate(memory)
+
+
+@router.put("/{agent_id}/memories/{memory_id}", response_model=MemoryOut)
+async def update_memory(
+    agent_id: int, memory_id: int, payload: MemoryUpdate, db: AsyncSession = Depends(get_db)
+) -> MemoryOut:
+    """编辑记忆 (类型/键名/内容/所属项目); project_id 传 null 转为通用记忆"""
+    memory = await db.get(AgentMemory, memory_id)
+    if not memory or memory.agent_id != agent_id or memory.is_delete:
+        raise HTTPException(status_code=404, detail="记忆不存在")
+    data = payload.model_dump(exclude_unset=True)
+    if "memory_type" in data and data["memory_type"] not in (
+        "fact", "preference", "context", "decision"
+    ):
+        data.pop("memory_type")
+    if "content" in data and not (data["content"] or "").strip():
+        raise HTTPException(status_code=400, detail="记忆内容不能为空")
+    for key, value in data.items():
+        setattr(memory, key, value)
+    await db.commit()  # 显式提交: 保证前端紧随的列表刷新能读到修改结果
     await db.refresh(memory)
     return MemoryOut.model_validate(memory)
 

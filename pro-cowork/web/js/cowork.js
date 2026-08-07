@@ -13,7 +13,6 @@ const TaskCenter = {
   skills: [],
   files: [],              // 当前项目已上传附件 [{name,size}]
   selectedFiles: new Set(),
-  selectedSkills: new Set(),
   runs: [],
   running: false,
   currentRunId: null,     // 当前输出窗口对应的任务 id
@@ -21,6 +20,8 @@ const TaskCenter = {
   _eventsAbort: null,     // 事件流中止控制器 (切换任务时断开旧流)
   _lastMinutes: '',       // 最近一次工具产出的会议纪要 (优先保存对象)
   _lastReply: '',         // 最近一条助手完整回复 (纪要保存兜底)
+  _lastTranscript: '',    // 最近一次工具产出的录音转写原文 (随纪要一并保存)
+  _lastAudioFile: '',     // 最近一次处理的原始录音文件名 (随纪要一并保存)
 
   init() {},
 
@@ -36,31 +37,17 @@ const TaskCenter = {
         <div class="task-left">
           <div class="task-card">
             <div class="task-card__title">📋 新建长任务</div>
-            <div class="form-row">
-              <div class="form-field">
-                <label>选择项目</label>
-                <select id="tc-project"></select>
-              </div>
-              <div class="form-field">
-                <label>选择数字分身</label>
-                <select id="tc-agent"></select>
-              </div>
-            </div>
             <div class="form-field">
-              <label>选择技能 (可多选, 分身将按需调用)</label>
-              <div class="chip-box" id="tc-skills"></div>
-            </div>
-            <div class="form-field">
-              <label>选择文件 (点击选中作为任务上下文, 支持录音文件生成会议纪要)</label>
+              <label>任务附件 (点击选中作为任务上下文, 支持录音文件生成会议纪要)</label>
               <div class="chip-box" id="tc-files"></div>
               <div style="margin-top:6px">
-                <button class="cw-btn cw-btn--sm" id="tc-upload">📎 上传文件</button>
+                <button class="cw-btn cw-btn--sm tc-plus" id="tc-upload" title="上传文件">＋ 上传文件</button>
                 <input type="file" id="tc-file-input" style="display:none">
               </div>
             </div>
             <div class="form-field">
               <label>任务描述</label>
-              <textarea id="tc-input" rows="4" placeholder="描述要让智能体完成的任务, 如: 汇总本周进度并识别风险; 输入 / 引用会议/周报/里程碑/周任务记录, # 选择智能体/技能/工具"></textarea>
+              <textarea id="tc-input" rows="5" placeholder="描述要让智能体完成的任务, 如: 生成 xxx 会议的纪要; 汇总本周进度并识别风险。项目 / 数字分身 / 技能将按描述自动识别, 识别不了会在执行窗口请你选择; 输入 / 引用会议/周报/里程碑/周任务记录, # 选择智能体/技能/工具"></textarea>
             </div>
             <button class="cw-btn cw-btn--primary" id="tc-run" style="width:100%">▶ 创建并执行长任务</button>
           </div>
@@ -77,7 +64,7 @@ const TaskCenter = {
                 title="将生成的会议纪要保存到当前任务的会议记录 (支持覆盖/追加)">📥 保存到会议记录</button>
             </div>
             <div class="task-output" id="tc-output">
-              <div class="empty-state">选择项目 / 文件 / 智能体 / 技能, 创建并执行任务</div>
+              <div class="empty-state">填写任务描述 (可上传附件), 创建并执行任务</div>
             </div>
           </div>
           <div class="task-card task-followup-card" id="tc-followup-card">
@@ -97,16 +84,11 @@ const TaskCenter = {
       App.showToast(`加载基础数据失败: ${err.message}`, 'error');
     }
 
-    this.fillSelectors();
-    document.getElementById('tc-project').onchange = () => {
-      this.selectedFiles.clear();
-      this.loadFiles();
-    };
     document.getElementById('tc-upload').onclick = () => document.getElementById('tc-file-input').click();
     document.getElementById('tc-file-input').onchange = (e) => this.uploadFile(e);
     document.getElementById('tc-run').onclick = () => this.createAndRun();
 
-    // 新任务窗口: 输入 / 引用当前所选项目的 会议/周报/里程碑/周任务 记录
+    // 新任务窗口: 输入 / 引用当前激活项目的 会议/周报/里程碑/周任务 记录
     MentionBox.attach(document.getElementById('tc-input'), {
       getProjectId: () => this.currentProjectId(),
     });
@@ -130,39 +112,11 @@ const TaskCenter = {
     await this.loadRuns();
   },
 
+  /** 当前项目: 激活项目 (任务项目可由意图识别调整) */
   currentProjectId() {
-    const v = document.getElementById('tc-project')?.value;
-    return v ? parseInt(v, 10) : null;
-  },
-
-  fillSelectors() {
-    const projSel = document.getElementById('tc-project');
-    projSel.innerHTML = this.projects.map(p =>
-      `<option value="${p.id}">${App.escapeHtml(p.name)}${p.is_active ? ' ★' : ''}</option>`).join('');
     const active = this.projects.find(p => p.is_active);
-    if (active) projSel.value = String(active.id);
-
-    const agentSel = document.getElementById('tc-agent');
-    agentSel.innerHTML = this.agents.map(a =>
-      `<option value="${a.id}">${(a.config || {}).icon || '🤖'} ${App.escapeHtml(a.name)}</option>`).join('');
-
-    // 技能多选 chips
-    const skillBox = document.getElementById('tc-skills');
-    skillBox.innerHTML = this.skills.map(s =>
-      `<span class="chip" data-skill-id="${s.id}">${(s.config || {}).icon || '⚡'} ${App.escapeHtml(s.name)}</span>`).join('')
-      || '<span style="font-size:12px;color:var(--color-text-tertiary)">暂无技能</span>';
-    skillBox.querySelectorAll('.chip').forEach(chip => {
-      chip.onclick = () => {
-        const id = parseInt(chip.dataset.skillId, 10);
-        if (this.selectedSkills.has(id)) {
-          this.selectedSkills.delete(id);
-          chip.classList.remove('chip--on');
-        } else {
-          this.selectedSkills.add(id);
-          chip.classList.add('chip--on');
-        }
-      };
-    });
+    if (active) return active.id;
+    return this.projects.length ? this.projects[0].id : null;
   },
 
   async loadFiles() {
@@ -237,7 +191,9 @@ const TaskCenter = {
       done: ['已完成', 'badge--success'],
       failed: ['失败', 'badge--danger'],
     };
-    const agentName = (id) => (this.agents.find(a => a.id === id) || {}).name || `Agent#${id}`;
+    const agentName = (id) => id == null
+      ? '自动识别'
+      : ((this.agents.find(a => a.id === id) || {}).name || `Agent#${id}`);
     const projName = (id) => (this.projects.find(p => p.id === id) || {}).name || '—';
     box.innerHTML = this.runs.map(r => {
       const [label, cls] = statusMap[r.status] || [r.status, 'badge--gray'];
@@ -326,6 +282,8 @@ const TaskCenter = {
     this.running = run.status === 'running';
     this._lastMinutes = '';
     this._lastReply = '';
+    this._lastTranscript = '';
+    this._lastAudioFile = '';
     this.updateFollowupState();
     this.updateSaveBtn();
 
@@ -342,6 +300,9 @@ const TaskCenter = {
     let replyBody = null;
     let replyText = '';
     let lastTrace = null;
+    let asrBlock = null;      // 实时转写块 (asr_segment 事件聚合)
+    let minutesBlock = null;  // 流式纪要块 (minutes_delta 事件聚合)
+    let intentTrace = null;   // 意图识别块 (start/done 合并更新)
 
     const ensureReply = () => {
       if (!replyBody) {
@@ -357,8 +318,104 @@ const TaskCenter = {
         if (event.type === 'user') {
           if (replyText) this._lastReply = replyText; // 新一轮开始前冻结上一条完整回复
           replyBody = null; replyText = ''; lastTrace = null;
+          asrBlock = null; minutesBlock = null; intentTrace = null;
           this.appendChatMsg(out, 'user',
             App.escapeHtml(this.displayUserText(event.payload.content)).replace(/\n/g, '<br>'));
+        } else if (event.type === 'intent') {
+          // 意图识别过程: 项目/数字分身/技能 自动识别结果 (start/done 合并为同一块)
+          replyBody = null; replyText = ''; lastTrace = null;
+          const p = event.payload;
+          if (p.stage === 'start') {
+            intentTrace = this.appendTrace(out, '意图识别', '进行中');
+            intentTrace.querySelector('.chat-trace__head span:first-child').textContent = '🧭';
+            intentTrace.classList.add('open');
+            intentTrace.querySelector('.chat-trace__body').innerHTML =
+              `<div class="intent-line">${App.escapeHtml(p.content || '')}</div>`;
+          } else if (p.stage === 'done') {
+            const projName = (this.projects.find(x => x.id === p.project_id) || {}).name
+              || (p.project_id ? `项目#${p.project_id}` : '未识别');
+            const agentName = p.agent_id != null
+              ? ((this.agents.find(a => a.id === p.agent_id) || {}).name || `Agent#${p.agent_id}`)
+              : '未识别 (请在下方选择)';
+            const skillNames = (p.skill_ids || [])
+              .map(id => (this.skills.find(s => s.id === id) || {}).name || `技能#${id}`);
+            const trace = intentTrace || this.appendTrace(out, '意图识别', '');
+            intentTrace = trace;
+            trace.querySelector('.chat-trace__head span:first-child').textContent = '🧭';
+            trace.classList.add('open');
+            const badge = trace.querySelector('.chat-trace__badge');
+            badge.textContent = p.agent_id != null ? '完成' : '未命中';
+            trace.querySelector('.chat-trace__body').innerHTML = `
+              <div class="intent-line">📁 项目: ${App.escapeHtml(projName)}</div>
+              <div class="intent-line">🤖 数字分身: ${App.escapeHtml(agentName)}</div>
+              <div class="intent-line">⚡ 技能: ${skillNames.length ? App.escapeHtml(skillNames.join('、')) : '未指定'}</div>
+              ${p.reason ? `<div class="intent-line intent-line--reason">识别依据: ${App.escapeHtml(p.reason)}</div>` : ''}`;
+          }
+        } else if (event.type === 'choice_request') {
+          // 意图识别未命中: 渲染分身/技能选择面板, 等待用户选择
+          replyBody = null; replyText = ''; lastTrace = null;
+          this.renderChoicePanel(out, run, event.payload);
+        } else if (event.type === 'choice_done') {
+          // 用户选择完成: 冻结选择面板并展示结果
+          const p = event.payload;
+          const panel = out.querySelector('.choice-panel');
+          if (panel) {
+            panel.classList.add('choice-panel--done');
+            const btn = panel.querySelector('.choice-submit');
+            if (btn) btn.style.display = 'none';
+          }
+          const skillNames = (p.skill_ids || [])
+            .map(id => (this.skills.find(s => s.id === id) || {}).name || `技能#${id}`);
+          const trace = this.appendTrace(out, '用户选择', '已确认');
+          trace.querySelector('.chat-trace__head span:first-child').textContent = '✅';
+          trace.classList.add('open');
+          trace.querySelector('.chat-trace__body').innerHTML = `
+            <div class="intent-line">🤖 数字分身: ${App.escapeHtml(p.agent_name || '')}${skillNames.length ? ` · ⚡ 技能: ${App.escapeHtml(skillNames.join('、'))}` : ''}</div>
+            <div class="intent-line intent-line--reason">选择结果已记入该分身长期记忆, 后续同类任务将自动分流</div>`;
+        } else if (event.type === 'model') {
+          // 模型调用简要过程 (每轮一行)
+          const p = event.payload;
+          if (p.stage === 'end') {
+            const line = document.createElement('div');
+            line.className = 'chat-model-line';
+            line.textContent = `🧮 模型调用 第${p.round}轮 · ${p.duration_ms}ms`
+              + (p.tool_calls ? ` · 发起 ${p.tool_calls} 个工具调用` : ` · 生成回复 ${p.chars || 0} 字`);
+            out.appendChild(line);
+            out.scrollTop = out.scrollHeight;
+          }
+        } else if (event.type === 'asr_start') {
+          // 录音转写开始: 创建实时转写块 (属于 run_skill 工具内部过程, 不影响工具轨迹状态)
+          replyBody = null; replyText = '';
+          asrBlock = this.appendOutputBlock(out, '🗣', `录音转写文字 · ${event.payload.file || ''} (实时)`, '');
+        } else if (event.type === 'asr_segment') {
+          // 每段转写文字实时追加
+          const seg = event.payload;
+          if (!asrBlock) asrBlock = this.appendOutputBlock(out, '🗣', '录音转写文字 (实时)', '');
+          const pre = asrBlock.querySelector('pre');
+          pre.textContent += `${seg.ts} ${seg.text}\n`;
+          this._lastTranscript += `${seg.ts} ${seg.text}\n`;
+          const badge = asrBlock.querySelector('.chat-trace__badge');
+          if (badge) badge.textContent = `${seg.index} 段 · 切片 ${seg.chunk}/${seg.chunks}`;
+          out.scrollTop = out.scrollHeight;
+        } else if (event.type === 'asr_done') {
+          // 转写完成
+          if (asrBlock) {
+            const head = asrBlock.querySelector('.chat-trace__head span:nth-child(2)');
+            if (head) head.textContent = head.textContent.replace(' (实时)', '');
+            const badge = asrBlock.querySelector('.chat-trace__badge');
+            if (badge) badge.textContent = `转写完成 · ${event.payload.segments} 段 · ${event.payload.chars} 字`;
+          }
+        } else if (event.type === 'minutes_delta') {
+          // 会议纪要流式增量输出 (不影响工具轨迹状态)
+          if (!minutesBlock) {
+            replyBody = null; replyText = '';
+            minutesBlock = this.appendOutputBlock(out, '📑', '会议纪要 (生成中…)', '');
+          }
+          minutesBlock.querySelector('pre').textContent += event.payload.content;
+          this._lastMinutes += event.payload.content;
+          const badge = minutesBlock.querySelector('.chat-trace__badge');
+          if (badge) badge.textContent = `${this._lastMinutes.length} 字`;
+          out.scrollTop = out.scrollHeight;
         } else if (event.type === 'content') {
           replyText += event.payload.content || '';
           ensureReply().innerHTML = App.renderMarkdown(replyText);
@@ -374,6 +431,14 @@ const TaskCenter = {
           // 会议纪要技能产物: 录音文字 / 会议纪要 分区块展示
           let resObj = event.payload.result;
           if (typeof resObj === 'string') { try { resObj = JSON.parse(resObj); } catch (e) { /* 非 JSON */ } }
+          // run_skill 产物嵌套在 output.results[].result, 向下提取含转写/纪要的步骤结果
+          if (resObj && typeof resObj === 'object' && !resObj.transcript && !resObj.minutes
+              && resObj.output && Array.isArray(resObj.output.results)) {
+            const inner = resObj.output.results
+              .map(r => r && r.result)
+              .find(r => r && typeof r === 'object' && (r.transcript || r.minutes));
+            if (inner) resObj = inner;
+          }
           const hasMinutes = resObj && typeof resObj === 'object' && (resObj.transcript || resObj.minutes);
           if (lastTrace) {
             const badge = lastTrace.querySelector('.chat-trace__badge');
@@ -388,10 +453,27 @@ const TaskCenter = {
               `<pre>结果: ${App.escapeHtml(JSON.stringify(event.payload.result, null, 2).slice(0, 4000))}</pre>`;
           }
           if (hasMinutes) {
-            if (resObj.transcript) this.appendOutputBlock(out, '🗣', '录音转写文字', resObj.transcript);
+            // 完整产物回写 (权威版本); 实时块已存在时仅更新徽标, 不重复建块
+            if (resObj.file) this._lastAudioFile = resObj.file;
+            if (resObj.transcript) {
+              this._lastTranscript = resObj.transcript;
+              if (asrBlock) {
+                const badge = asrBlock.querySelector('.chat-trace__badge');
+                if (badge) badge.textContent = `${resObj.transcript.length} 字`;
+              } else {
+                asrBlock = this.appendOutputBlock(out, '🗣', '录音转写文字', resObj.transcript);
+              }
+            }
             if (resObj.minutes) {
-              this.appendOutputBlock(out, '📑', '会议纪要', resObj.minutes);
               this._lastMinutes = resObj.minutes;
+              if (minutesBlock) {
+                const head = minutesBlock.querySelector('.chat-trace__head span:nth-child(2)');
+                if (head) head.textContent = '会议纪要';
+                const badge = minutesBlock.querySelector('.chat-trace__badge');
+                if (badge) badge.textContent = `${resObj.minutes.length} 字`;
+              } else {
+                minutesBlock = this.appendOutputBlock(out, '📑', '会议纪要', resObj.minutes);
+              }
             }
           }
           out.scrollTop = out.scrollHeight;
@@ -486,7 +568,12 @@ const TaskCenter = {
         <div class="form-field">
           <label>待保存内容 (保存前可编辑)</label>
           <textarea id="sm-content" rows="10">${App.escapeHtml(content)}</textarea>
-        </div>`,
+        </div>
+        ${(this._lastTranscript || this._lastAudioFile) ? `
+        <div class="sm-attach-hint">📎 将随纪要一并保存到会议: ${[
+          this._lastAudioFile ? `原始录音「${App.escapeHtml(this._lastAudioFile)}」` : '',
+          this._lastTranscript ? `录音转写完整文字 (${this._lastTranscript.length} 字)` : '',
+        ].filter(Boolean).join(' + ')}</div>` : ''}`,
       footerHtml: `
         <button class="cw-btn" data-modal-close>取消</button>
         <button class="cw-btn" id="sm-append">追加到纪要</button>
@@ -513,7 +600,11 @@ const TaskCenter = {
       const description = (mode === 'append' && m.description)
         ? `${m.description}\n\n---\n\n${newText}` : newText;
       try {
-        await API.updateMeeting(m.id, { description });
+        // 需求: 纪要保存时, 原始录音文件与完整转写文字一并入库并与会议关联
+        const payload = { description };
+        if (this._lastTranscript) payload.transcript = this._lastTranscript;
+        if (this._lastAudioFile) payload.audio_file = this._lastAudioFile;
+        await API.updateMeeting(m.id, payload);
         App.closeModal(modal);
         App.showToast(`已${mode === 'append' ? '追加到' : '覆盖保存到'}「${m.title}」`, 'success');
       } catch (err) {
@@ -574,12 +665,7 @@ const TaskCenter = {
 
   async createAndRun() {
     if (this.running) return;
-    const agentId = parseInt(document.getElementById('tc-agent').value, 10);
     const inputText = document.getElementById('tc-input').value.trim();
-    if (!agentId) {
-      App.showToast('请选择智能体', 'warning');
-      return;
-    }
     if (!inputText && !this.selectedFiles.size) {
       App.showToast('请填写任务描述或选择文件', 'warning');
       return;
@@ -596,10 +682,11 @@ const TaskCenter = {
     out.innerHTML = '<div class="empty-state">任务已创建, 正在启动后台执行…</div>';
 
     try {
+      // 不指定项目/分身/技能: 由后端意图识别自动选择, 识别不了在执行窗口由用户选择
       const run = await API.createTaskRun({
         project_id: this.currentProjectId(),
-        agent_id: agentId,
-        skill_ids: Array.from(this.selectedSkills),
+        agent_id: null,
+        skill_ids: [],
         file_names: Array.from(this.selectedFiles),
         input_text: inputText,
       });
@@ -632,6 +719,96 @@ const TaskCenter = {
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
     return div;
+  },
+
+  /**
+   * 意图识别未命中时的分身/技能选择面板
+   * 任务执行中: 可交互, 确认后提交 /task-runs/{id}/choose 继续执行
+   * 历史回放: 只读展示 (配合 choice_done 事件呈现选择结果)
+   */
+  renderChoicePanel(out, run, payload) {
+    const div = document.createElement('div');
+    div.className = 'chat-trace output-block open choice-panel';
+    div.innerHTML = `
+      <div class="chat-trace__head">
+        <span>🙋</span><span>需要你的选择</span>
+        <span class="chat-trace__badge">意图识别未命中</span>
+      </div>
+      <div class="chat-trace__body">
+        <div class="choice-reason">${App.escapeHtml(payload.reason || '未能自动识别合适的数字分身')}</div>
+        <div class="choice-sec-title">选择数字分身 (必选)</div>
+        <div class="choice-agents">
+          ${(payload.agents || []).map(a => `
+            <div class="choice-agent" data-agent-id="${a.id}">
+              <span class="choice-agent__icon">${App.escapeHtml(a.icon || '🤖')}</span>
+              <span class="choice-agent__main">
+                <span class="choice-agent__name">${App.escapeHtml(a.name)}</span>
+                <span class="choice-agent__desc">${App.escapeHtml(a.description || '')}</span>
+              </span>
+            </div>`).join('')}
+        </div>
+        <div class="choice-sec-title">附加技能 (可选, 多选)</div>
+        <div class="chip-box choice-skills">
+          ${(payload.skills || []).map(s => `
+            <span class="chip" data-skill-id="${s.id}">${App.escapeHtml(s.icon || '⚡')} ${App.escapeHtml(s.name)}</span>`).join('')
+          || '<span style="font-size:12px;color:var(--color-text-tertiary)">暂无可用技能</span>'}
+        </div>
+        <div class="choice-actions">
+          <button class="cw-btn cw-btn--primary choice-submit" disabled>确认选择并继续执行</button>
+          <span class="choice-hint">选择结果将记入该分身长期记忆, 后续同类任务自动分流</span>
+        </div>
+      </div>`;
+    out.appendChild(div);
+    out.scrollTop = out.scrollHeight;
+
+    const submitBtn = div.querySelector('.choice-submit');
+    const interactive = run.status === 'running';
+    if (!interactive) {
+      // 历史回放: 只读展示
+      div.classList.add('choice-panel--done');
+      submitBtn.style.display = 'none';
+      div.querySelector('.choice-hint').textContent = '历史任务回放 (选择结果见下方记录)';
+      return;
+    }
+
+    let agentId = null;
+    const skillIds = new Set();
+    div.querySelectorAll('.choice-agent').forEach(el => {
+      el.onclick = () => {
+        div.querySelectorAll('.choice-agent').forEach(x => x.classList.remove('choice-agent--on'));
+        el.classList.add('choice-agent--on');
+        agentId = parseInt(el.dataset.agentId, 10);
+        submitBtn.disabled = false;
+      };
+    });
+    div.querySelectorAll('.choice-skills .chip').forEach(chip => {
+      chip.onclick = () => {
+        const id = parseInt(chip.dataset.skillId, 10);
+        if (skillIds.has(id)) {
+          skillIds.delete(id);
+          chip.classList.remove('chip--on');
+        } else {
+          skillIds.add(id);
+          chip.classList.add('chip--on');
+        }
+      };
+    });
+    submitBtn.onclick = async () => {
+      if (!agentId) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = '已提交, 任务继续执行…';
+      div.querySelectorAll('.choice-agent, .choice-skills .chip')
+        .forEach(el => { el.style.pointerEvents = 'none'; });
+      try {
+        await API.chooseTaskRun(run.id, { agent_id: agentId, skill_ids: [...skillIds] });
+      } catch (err) {
+        App.showToast(`提交选择失败: ${err.message}`, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '确认选择并继续执行';
+        div.querySelectorAll('.choice-agent, .choice-skills .chip')
+          .forEach(el => { el.style.pointerEvents = ''; });
+      }
+    };
   },
 };
 
@@ -2456,6 +2633,7 @@ const CoworkMemories = {
     } catch (err) {
       App.showToast(`加载记忆失败: ${err.message}`, 'error');
     }
+    this._memories = memories;
     const projName = (pid) => {
       const p = this.projects.find(x => x.id === pid);
       return p ? p.name : (pid ? `项目#${pid}` : '通用');
@@ -2466,6 +2644,7 @@ const CoworkMemories = {
           <span class="memory-item__type">${App.escapeHtml(m.memory_type)}</span>
           <span class="memory-item__project">${App.escapeHtml(projName(m.project_id))}</span>
           <span class="memory-item__key">${App.escapeHtml(m.key || '')}</span>
+          <span class="memory-item__edit" data-edit-id="${m.id}" title="编辑记忆">✏️</span>
           <span class="memory-item__del" data-mem-id="${m.id}">×</span>
         </div>
         <div class="memory-item__content">${App.escapeHtml(m.content)}</div>
@@ -2484,6 +2663,68 @@ const CoworkMemories = {
         }
       };
     });
+    list.querySelectorAll('[data-edit-id]').forEach(btn => {
+      btn.onclick = () => {
+        const m = (this._memories || []).find(x => String(x.id) === btn.dataset.editId);
+        if (m) this.editMemory(m);
+      };
+    });
+  },
+
+  /** 编辑已有记忆: 类型/键名/内容/所属项目 (保存走 PUT memories/{id}) */
+  editMemory(m) {
+    const projectOptions = '<option value="">通用(不关联项目)</option>' +
+      this.projects.map(p => `<option value="${p.id}">${App.escapeHtml(p.name)}</option>`).join('');
+    const modal = App.openModal({
+      title: '编辑记忆',
+      bodyHtml: `
+        <div class="form-field">
+          <label>所属项目</label>
+          <select id="mem-edit-project">${projectOptions}</select>
+        </div>
+        <div class="form-field">
+          <label>类型</label>
+          <select id="mem-edit-type">
+            <option value="fact">事实 fact</option>
+            <option value="preference">偏好 preference</option>
+            <option value="context">上下文 context</option>
+            <option value="decision">决策 decision</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>键名 (简短概括)</label>
+          <input type="text" id="mem-edit-key" value="${App.escapeHtml(m.key || '')}">
+        </div>
+        <div class="form-field">
+          <label>内容 *</label>
+          <textarea id="mem-edit-content" rows="5">${App.escapeHtml(m.content || '')}</textarea>
+        </div>`,
+      footerHtml: `
+        <button class="cw-btn" data-modal-close>取消</button>
+        <button class="cw-btn cw-btn--primary" id="mem-edit-save">保存修改</button>`,
+    });
+    modal.querySelector('#mem-edit-type').value = m.memory_type || 'fact';
+    modal.querySelector('#mem-edit-project').value = m.project_id || '';
+    modal.querySelector('#mem-edit-save').onclick = async () => {
+      const content = modal.querySelector('#mem-edit-content').value.trim();
+      if (!content) {
+        App.showToast('记忆内容不能为空', 'warning');
+        return;
+      }
+      try {
+        await API.updateAgentMemory(m.agent_id, m.id, {
+          memory_type: modal.querySelector('#mem-edit-type').value,
+          key: modal.querySelector('#mem-edit-key').value.trim(),
+          content,
+          project_id: modal.querySelector('#mem-edit-project').value || null,
+        });
+        App.closeModal(modal);
+        App.showToast('已保存修改', 'success');
+        this.renderList();
+      } catch (err) {
+        App.showToast(`保存失败: ${err.message}`, 'error');
+      }
+    };
   },
 
   addMemory() {

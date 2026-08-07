@@ -22,9 +22,9 @@ class TaskRun(Base, TimestampMixin, SoftDeleteMixin):
     project_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
     )
-    agent_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False
-    )
+    agent_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("agents.id", ondelete="CASCADE"), nullable=True
+    )  # 允许为空: 创建时不指定, 由意图识别/用户选择确定
     title: Mapped[str] = mapped_column(String(256), default="")
     input_text: Mapped[str] = mapped_column(Text, default="")
     skill_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
@@ -42,6 +42,8 @@ class TaskRunEvent(Base, TimestampMixin, SoftDeleteMixin):
     """任务执行过程事件 (后台执行持久化, 供过程回放/断线续看)
 
     type: user / content / tool_call / tool_result / error / done
+          intent(意图识别) / choice_request(等待用户选择) / choice_done(选择完成)
+          model(模型调用) / asr_segment(转写分段) / asr_done(转写完成) / minutes_delta(纪要流式增量)
     payload: content→{"content"}; tool_call→{"arguments"}; tool_result→{"result","duration_ms"}
     """
 

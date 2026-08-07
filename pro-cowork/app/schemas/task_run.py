@@ -8,7 +8,7 @@ from pydantic import BaseModel
 class TaskRunCreate(BaseModel):
     title: str = ""
     project_id: Optional[int] = None
-    agent_id: int
+    agent_id: Optional[int] = None  # 可不传: 执行时意图识别自动选择, 识别不了由用户选择
     skill_ids: list[int] = []
     file_names: list[str] = []
     input_text: str = ""
@@ -22,10 +22,17 @@ class TaskRunContinue(BaseModel):
     skill_ids: list[int] = []
 
 
+class TaskRunChoice(BaseModel):
+    """意图识别失败时的用户选择 (在执行输出窗口中完成)"""
+
+    agent_id: int
+    skill_ids: list[int] = []
+
+
 class TaskRunOut(BaseModel):
     id: int
     project_id: Optional[int] = None
-    agent_id: int
+    agent_id: Optional[int] = None
     title: str
     input_text: str
     skill_ids: list

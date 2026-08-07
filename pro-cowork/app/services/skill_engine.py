@@ -6,12 +6,15 @@
 
 参数支持 {{input.xxx}} / {{results.N.result.xxx}} 变量引用;
 每步执行记录解析后的 arguments 与 duration_ms, 供调试面板展示入参/出参。
+
+session_id 不为空时, 内置能力可通过 emit_run_event 向任务执行窗口实时推送
+过程事件 (如 asr_segment 录音转写分段 / minutes_delta 纪要流式增量)。
 """
 import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,14 +28,29 @@ logger = logging.getLogger(__name__)
 TASK_FILES_ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "task_files"
 
 
-async def _builtin_meeting_minutes(db: AsyncSession, args: dict) -> dict:
+def _find_task_file(project_id: Optional[int], file_name: str) -> Optional[Path]:
+    """按 项目目录 → 全部项目目录 顺序查找任务附件 (意图识别切换项目后仍可命中)"""
+    direct = TASK_FILES_ROOT / str(project_id or 0) / file_name
+    if direct.exists():
+        return direct
+    if TASK_FILES_ROOT.exists():
+        for d in sorted(TASK_FILES_ROOT.iterdir()):
+            candidate = d / file_name
+            if d.is_dir() and candidate.exists():
+                return candidate
+    return None
+
+
+async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Optional[int] = None) -> dict:
     """内置能力: 会议纪要生成
 
     入参: file_name (任务附件中的录音文件名), project_id (可选, 默认当前激活项目)
+    过程: 每段转写文字实时推送 asr_segment 事件; 转写完成后流式推送 minutes_delta
     返回: {file, duration_s, transcript, minutes}
     """
     from app.services.asr_service import transcribe_audio
-    from app.services.minutes_service import generate_minutes
+    from app.services.minutes_service import generate_minutes_stream
+    from app.services.task_runner import emit_run_event
 
     file_name = args.get("file_name")
     if not file_name:
@@ -42,20 +60,36 @@ async def _builtin_meeting_minutes(db: AsyncSession, args: dict) -> dict:
     project_id = args.get("project_id")
     if project_id in (None, "", 0):
         project_id = await get_active_project_id(db)
-    audio_path = TASK_FILES_ROOT / str(project_id or 0) / file_name
-    if not audio_path.exists():
+    audio_path = _find_task_file(project_id, file_name)
+    if not audio_path:
         return {"error": f"录音文件不存在: {file_name} (项目#{project_id}), 请先在任务中上传"}
 
+    await emit_run_event(session_id, "asr_start", {"file": file_name})
+
+    async def on_segment(seg: dict) -> None:
+        await emit_run_event(session_id, "asr_segment", seg)
+
     try:
-        asr_result = await transcribe_audio(audio_path)
+        asr_result = await transcribe_audio(audio_path, on_segment=on_segment)
     except RuntimeError as e:
         return {"error": f"转录失败: {e}"}
 
     transcript = asr_result["text"]
+    await emit_run_event(session_id, "asr_done", {
+        "file": file_name,
+        "duration_s": asr_result["duration_s"],
+        "segments": len(asr_result.get("segments") or []),
+        "chars": len(transcript),
+    })
+
+    minutes_parts: list[str] = []
     try:
-        minutes = await generate_minutes(transcript)
+        async for delta in generate_minutes_stream(transcript):
+            minutes_parts.append(delta)
+            await emit_run_event(session_id, "minutes_delta", {"content": delta})
     except RuntimeError as e:
         return {"error": f"纪要生成失败: {e}", "file": file_name, "transcript": transcript}
+    minutes = "".join(minutes_parts).strip()
 
     return {
         "file": file_name,
@@ -65,7 +99,7 @@ async def _builtin_meeting_minutes(db: AsyncSession, args: dict) -> dict:
     }
 
 
-# 内置能力注册表: builtin 名 -> async fn(db, args)
+# 内置能力注册表: builtin 名 -> async fn(db, args, session_id=None)
 BUILTIN_REGISTRY = {
     "meeting_minutes": _builtin_meeting_minutes,
 }
@@ -74,8 +108,9 @@ BUILTIN_REGISTRY = {
 class SkillEngine:
     """Skill 执行引擎: 根据 Skill 配置执行工具链/内置能力链"""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, session_id: Optional[int] = None):
         self.db = db
+        self.session_id = session_id
         self.tool_executor = ToolExecutor(db)
 
     async def execute(self, skill: Skill, input_data: dict, prior_results: list | None = None) -> dict:
@@ -117,7 +152,7 @@ class SkillEngine:
                     result = {"error": f"未知内置能力: {builtin_name}"}
                 else:
                     try:
-                        result = await handler(self.db, args)
+                        result = await handler(self.db, args, session_id=self.session_id)
                     except Exception as e:  # noqa: BLE001
                         logger.exception("builtin %s 执行异常", builtin_name)
                         result = {"error": f"{type(e).__name__}: {e}"}

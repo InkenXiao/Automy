@@ -1,4 +1,6 @@
 """会议纪要生成服务 · 基于转录文字调用 LLM 生成结构化纪要"""
+from typing import AsyncGenerator
+
 from openai import AsyncOpenAI
 
 from app.config import settings
@@ -20,6 +22,14 @@ MINUTES_PROMPT = """你是一位高级项目经理, 请根据以下会议录音�
 
 async def generate_minutes(transcript: str) -> str:
     """根据转录文字生成会议纪要; LLM 未配置时抛出 RuntimeError"""
+    parts: list[str] = []
+    async for delta in generate_minutes_stream(transcript):
+        parts.append(delta)
+    return "".join(parts).strip()
+
+
+async def generate_minutes_stream(transcript: str) -> AsyncGenerator[str, None]:
+    """流式生成会议纪要: 逐段产出文本增量, 供执行输出窗口实时显示"""
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("LLM 未配置: 请在 .env 中设置 OPENAI_API_KEY / OPENAI_BASE_URL")
     if not transcript.strip():
@@ -29,11 +39,16 @@ async def generate_minutes(transcript: str) -> str:
         api_key=settings.OPENAI_API_KEY,
         base_url=settings.OPENAI_BASE_URL,
     )
-    resp = await client.chat.completions.create(
+    stream = await client.chat.completions.create(
         model=settings.OPENAI_MODEL,
         messages=[
             {"role": "user", "content": MINUTES_PROMPT.format(transcript=transcript[:30000])}
         ],
-        stream=False,
+        stream=True,
     )
-    return (resp.choices[0].message.content or "").strip()
+    async for chunk in stream:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta

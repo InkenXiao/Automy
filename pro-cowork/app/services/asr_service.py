@@ -4,18 +4,23 @@
 - pydub + ffmpeg 加载任意音频格式, 按 ASR_CHUNK_MS 切片导出 wav
 - 逐片 POST OpenAI 兼容转录接口 (paraformer-large, verbose_json 带 segments)
 - 合并各片 segments 并按全局时间偏移生成 [mm:ss] 时间戳文本
+- on_segment 回调: 每识别出一段即回调, 供任务执行窗口实时输出
 """
 import asyncio
 import math
 import os
 import tempfile
 from pathlib import Path
+from typing import Awaitable, Callable
 
 import httpx
 
 from app.config import settings
 
 MAX_CHUNK_RETRIES = 2  # 单片段最大尝试次数 (首次 + 重试 1 次)
+
+# 分段回调签名: async def on_segment({"index", "ts", "start", "text", "chunk", "chunks"})
+SegmentCallback = Callable[[dict], Awaitable[None]]
 
 
 def _fmt_ts(seconds: float) -> str:
@@ -49,9 +54,13 @@ async def _post_chunk(client: httpx.AsyncClient, wav_path: str, chunk_no: int) -
     raise RuntimeError(f"片段 {chunk_no} 转录失败: {last_err}")
 
 
-async def transcribe_audio(file_path: str | Path) -> dict:
+async def transcribe_audio(
+    file_path: str | Path, on_segment: SegmentCallback | None = None
+) -> dict:
     """将录音文件转录为带时间戳的文字
 
+    on_segment: 每识别出一段文字即回调 {"index","ts","start","text","chunk","chunks"},
+    供执行输出窗口实时分段显示。
     返回 {"text": 带时间戳全文, "segments": [{start, text}], "duration_s": 音频时长}
     失败抛出 RuntimeError (含原因)。
     """
@@ -77,6 +86,7 @@ async def transcribe_audio(file_path: str | Path) -> dict:
     total_chunks = max(1, math.ceil(total_ms / chunk_ms))
 
     segments: list[dict] = []
+    notified_count = 0  # 已回调的分段数 (segments 仅追加, 用计数避免重复)
     async with httpx.AsyncClient() as client:
         for i in range(total_chunks):
             start_ms = i * chunk_ms
@@ -112,6 +122,19 @@ async def transcribe_audio(file_path: str | Path) -> dict:
                 text = (data.get("text") or "").strip()
                 if text:
                     segments.append({"start": start_ms / 1000, "text": text})
+
+            # 实时回调: 本切片识别出的新分段逐条输出
+            if on_segment:
+                for seg in segments[notified_count:]:
+                    notified_count += 1
+                    await on_segment({
+                        "index": notified_count,
+                        "ts": _fmt_ts(seg["start"]),
+                        "start": seg["start"],
+                        "text": seg["text"],
+                        "chunk": i + 1,
+                        "chunks": total_chunks,
+                    })
 
     lines = [f"{_fmt_ts(s['start'])} {s['text']}" for s in segments]
     return {

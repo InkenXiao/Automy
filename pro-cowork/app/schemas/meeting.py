@@ -69,6 +69,8 @@ class MeetingUpdate(BaseModel):
     host: str | None = None
     attendees: str | None = None
     description: str | None = None
+    audio_file: str | None = None  # 原始录音文件名
+    transcript: str | None = None  # 录音转写完整文字
     sort_order: int | None = None
 
 
@@ -84,6 +86,8 @@ class MeetingOut(BaseModel):
     host: str
     attendees: str
     description: str = ""
+    audio_file: str = ""
+    transcript: str = ""
     sort_order: int
     items: list[MeetingItemOut] = []
     model_config = ConfigDict(from_attributes=True)

@@ -220,6 +220,7 @@ const Meeting = {
           <label>参会人员</label>
           <div class="mt-val attendees" contenteditable="true" data-field="attendees" data-placeholder="列出参会人员，用、或逗号分隔">${App.escapeHtml(m.attendees || '')}</div>
         </div>
+        ${this._extrasHtml(m) ? `<div class="meeting-extras meeting-extras--page">${this._extrasHtml(m)}</div>` : ''}
       </div>
     `;
   },
@@ -311,6 +312,53 @@ const Meeting = {
     this.renderRichPanel('meeting', m.id, '📝 会议纪要',
       `${App.escapeHtml(m.title || '')} · ${App.escapeHtml(m.meet_date || '')}`,
       m.description || '', '请输入会议纪要、描述或总结（支持 Markdown）...');
+    this.renderMeetingExtras(m);
+  },
+
+  /** 会议附加信息 HTML: 录音播放(Range 可拖拽) + 转写全文 + 已保存纪要 (折叠展示) */
+  _extrasHtml(m) {
+    if (!m) return '';
+    let html = '';
+    if (m.audio_file) {
+      html += `
+        <div class="meeting-audio">
+          <div class="meeting-audio__title">🎙 会议录音 · ${App.escapeHtml(m.audio_file)}</div>
+          <audio controls preload="metadata" src="/api/meetings/${m.id}/audio"></audio>
+        </div>`;
+    }
+    if (m.transcript) {
+      html += `
+        <details class="meeting-transcript">
+          <summary>🗣 录音转写完整文字 (${m.transcript.length} 字)</summary>
+          <pre>${App.escapeHtml(m.transcript)}</pre>
+        </details>`;
+    }
+    if (m.description) {
+      html += `
+        <details class="meeting-transcript">
+          <summary>📝 已保存的会议纪要 (${m.description.length} 字)</summary>
+          <pre>${App.escapeHtml(m.description)}</pre>
+        </details>`;
+    }
+    return html;
+  },
+
+  /**
+   * 会议附加信息块 (插在纪要编辑器上方):
+   * - 录音播放: <audio> 原生控件, 后端支持 HTTP Range, 进度条可拖拽定位
+   * - 录音转写完整文字 / 已保存纪要: 折叠展示, 与纪要对照查看
+   */
+  renderMeetingExtras(m) {
+    // 先清理右栏旧的附加块, 避免切换会议后残留 (不影响详情页内的附加块)
+    document.querySelectorAll('#detail-panel .meeting-extras').forEach(el => el.remove());
+    const html = this._extrasHtml(m);
+    if (!html) return;
+    const body = document.querySelector('#detail-panel .detail-panel__body');
+    if (!body) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'meeting-extras';
+    wrap.innerHTML = html;
+    body.parentNode.insertBefore(wrap, body);
   },
 
   /** 选中议程项 → 右栏显示内容简介(仅 description, 支持 Markdown) */
@@ -321,6 +369,7 @@ const Meeting = {
     if (!it) return;
     this.state.selectedItem = it;
     this.renderDetail(m);
+    this.renderMeetingExtras(null);  // 查看议程简介时清理会议附加块
     this.renderRichPanel('item', it.id, '📋 议程内容简介',
       `${App.escapeHtml(it.theme || '(未命名)')} · 议程 #${it.id}`,
       it.description || '', '请输入该议程项的内容简介（支持 Markdown）...');
