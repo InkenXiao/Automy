@@ -30,6 +30,7 @@ class WeeklyReport(Base, TimestampMixin, SoftDeleteMixin):
     week_start: Mapped[date] = mapped_column(Date, nullable=True)
     week_end: Mapped[date] = mapped_column(Date, nullable=True)
     overview_summary: Mapped[str] = mapped_column(Text, default="")
+    week_digest: Mapped[str] = mapped_column(Text, default="")  # 周报概括 (AI 生成, 微信汇报版)
     status: Mapped[str] = mapped_column(String(16), default="draft")  # draft/submitted
 
     # 关联项目

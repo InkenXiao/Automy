@@ -302,6 +302,7 @@ const TaskCenter = {
     let lastTrace = null;
     let asrBlock = null;      // 实时转写块 (asr_segment 事件聚合)
     let minutesBlock = null;  // 流式纪要块 (minutes_delta 事件聚合)
+    let digestBlock = null;   // 流式周工作小结块 (digest_delta 事件聚合)
     let intentTrace = null;   // 意图识别块 (start/done 合并更新)
 
     const ensureReply = () => {
@@ -318,7 +319,7 @@ const TaskCenter = {
         if (event.type === 'user') {
           if (replyText) this._lastReply = replyText; // 新一轮开始前冻结上一条完整回复
           replyBody = null; replyText = ''; lastTrace = null;
-          asrBlock = null; minutesBlock = null; intentTrace = null;
+          asrBlock = null; minutesBlock = null; digestBlock = null; intentTrace = null;
           this.appendChatMsg(out, 'user',
             App.escapeHtml(this.displayUserText(event.payload.content)).replace(/\n/g, '<br>'));
         } else if (event.type === 'intent') {
@@ -388,7 +389,7 @@ const TaskCenter = {
           replyBody = null; replyText = '';
           asrBlock = this.appendOutputBlock(out, '🗣', `录音转写文字 · ${event.payload.file || ''} (实时)`, '');
         } else if (event.type === 'asr_segment') {
-          // 每段转写文字实时追加
+          // 每段转写文字实时追加 (内部 pre 与外层窗口同步滚到底部, 聚焦最新文字)
           const seg = event.payload;
           if (!asrBlock) asrBlock = this.appendOutputBlock(out, '🗣', '录音转写文字 (实时)', '');
           const pre = asrBlock.querySelector('pre');
@@ -396,6 +397,7 @@ const TaskCenter = {
           this._lastTranscript += `${seg.ts} ${seg.text}\n`;
           const badge = asrBlock.querySelector('.chat-trace__badge');
           if (badge) badge.textContent = `${seg.index} 段 · 切片 ${seg.chunk}/${seg.chunks}`;
+          pre.scrollTop = pre.scrollHeight;
           out.scrollTop = out.scrollHeight;
         } else if (event.type === 'asr_done') {
           // 转写完成
@@ -415,6 +417,24 @@ const TaskCenter = {
           this._lastMinutes += event.payload.content;
           const badge = minutesBlock.querySelector('.chat-trace__badge');
           if (badge) badge.textContent = `${this._lastMinutes.length} 字`;
+          const mPre = minutesBlock.querySelector('pre');
+          mPre.scrollTop = mPre.scrollHeight;
+          out.scrollTop = out.scrollHeight;
+        } else if (event.type === 'digest_start') {
+          // 周工作小结生成开始: 创建实时概括块
+          replyBody = null; replyText = '';
+          digestBlock = this.appendOutputBlock(out, '📣', `周工作小结 · ${event.payload.title || ''} (生成中…)`, '');
+        } else if (event.type === 'digest_delta') {
+          // 周工作小结流式增量输出 (内部 pre 与外层窗口同步滚到底部)
+          if (!digestBlock) {
+            replyBody = null; replyText = '';
+            digestBlock = this.appendOutputBlock(out, '📣', '周工作小结 (生成中…)', '');
+          }
+          const dPre = digestBlock.querySelector('pre');
+          dPre.textContent += event.payload.content;
+          const dBadge = digestBlock.querySelector('.chat-trace__badge');
+          if (dBadge) dBadge.textContent = `${dPre.textContent.length} 字`;
+          dPre.scrollTop = dPre.scrollHeight;
           out.scrollTop = out.scrollHeight;
         } else if (event.type === 'content') {
           replyText += event.payload.content || '';
@@ -520,6 +540,9 @@ const TaskCenter = {
       <div class="chat-trace__body"><pre>${App.escapeHtml(text || '')}</pre></div>`;
     div.querySelector('.chat-trace__head').onclick = () => div.classList.toggle('open');
     out.appendChild(div);
+    // 建块后同步滚动: 内部 pre 定位到末尾 (回放长文本时聚焦最新), 外层窗口滚到底部
+    const pre = div.querySelector('pre');
+    if (pre) pre.scrollTop = pre.scrollHeight;
     out.scrollTop = out.scrollHeight;
     return div;
   },

@@ -59,6 +59,22 @@ async def init_db():
         await _ensure_meeting_media_columns(conn)
         # 任务分身允许为空 (需求: 创建任务后由意图识别确定分身)
         await _ensure_task_run_agent_nullable(conn)
+        # 周报概括字段 (需求: AI 生成微信汇报版概括, 与周报表关联)
+        await _ensure_weekly_report_digest_column(conn)
+
+
+async def _ensure_weekly_report_digest_column(conn):
+    """weekly_reports 补充 week_digest 字段 (幂等)"""
+    from sqlalchemy import inspect, text
+
+    existing_tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+    if "weekly_reports" not in existing_tables:
+        return
+    cols = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_columns("weekly_reports"))
+    if not any(c["name"] == "week_digest" for c in cols):
+        await conn.execute(
+            text("ALTER TABLE weekly_reports ADD COLUMN week_digest TEXT DEFAULT '' NOT NULL")
+        )
 
 
 async def _ensure_meeting_media_columns(conn):

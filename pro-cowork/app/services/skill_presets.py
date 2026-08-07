@@ -80,6 +80,21 @@ PRESET_SKILLS = [
             ]
         }, ensure_ascii=False),
     },
+    {
+        "name": "项目周工作小结",
+        "description": "汇总本周项目周报与会议内容, 提炼为一段精炼的微信汇报版概括 (含本周重点进展与下周任务安排)",
+        "category": "workflow",
+        "trigger_type": "manual",
+        "config": {"icon": "📣", "color": "#F97316"},
+        "code": json.dumps({
+            "steps": [
+                {"builtin": "weekly_digest", "arguments": {
+                    "report_id": "{{input.report_id}}",
+                    "project_id": "{{input.project_id}}",
+                }},
+            ]
+        }, ensure_ascii=False),
+    },
 ]
 
 

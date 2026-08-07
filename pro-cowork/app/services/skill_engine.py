@@ -99,9 +99,91 @@ async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Opt
     }
 
 
+async def _builtin_weekly_digest(db: AsyncSession, args: dict, session_id: Optional[int] = None) -> dict:
+    """内置能力: 项目周工作小结
+
+    入参: report_id (可选, 默认当前项目最新一份周报), project_id (可选, 默认当前激活项目)
+    过程: 汇总周报(KPI/进展/下周计划/风险)与本周会议纪要, 流式推送 digest_delta
+    返回: {report_id, title, week_range, digest, meetings_used}
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.models.meeting import Meeting
+    from app.models.weekly_report import (
+        WeeklyKpi,
+        WeeklyPlanTask,
+        WeeklyProgressItem,
+        WeeklyReport,
+    )
+    from app.services.digest_service import build_digest_source, generate_week_digest_stream
+    from app.services.task_runner import emit_run_event
+
+    project_id = args.get("project_id")
+    if project_id in (None, "", 0):
+        project_id = await get_active_project_id(db)
+
+    stmt = (
+        select(WeeklyReport)
+        .options(
+            selectinload(WeeklyReport.kpis).selectinload(WeeklyKpi.module),
+            selectinload(WeeklyReport.progress_items).selectinload(WeeklyProgressItem.module),
+            selectinload(WeeklyReport.plan_tasks).selectinload(WeeklyPlanTask.module),
+            selectinload(WeeklyReport.risks),
+        )
+        .where(WeeklyReport.is_delete.is_(False), WeeklyReport.project_id == project_id)
+        .order_by(WeeklyReport.week_start.desc(), WeeklyReport.id.desc())
+    )
+    report_id = args.get("report_id")
+    if report_id not in (None, "", 0):
+        stmt = stmt.where(WeeklyReport.id == int(report_id))
+    result = await db.execute(stmt.limit(1))
+    report = result.scalars().first()
+    if not report:
+        return {"error": "未找到周报, 请先创建周报"}
+
+    # 本周范围内会议 (meet_date 为 'YYYY-MM-DD' 字符串, 可直接比较)
+    meetings = []
+    if report.week_start and report.week_end:
+        m_result = await db.execute(
+            select(Meeting)
+            .where(
+                Meeting.is_delete.is_(False),
+                Meeting.project_id == project_id,
+                Meeting.meet_date >= str(report.week_start),
+                Meeting.meet_date <= str(report.week_end),
+            )
+            .order_by(Meeting.meet_date, Meeting.id)
+        )
+        meetings = list(m_result.scalars().all())
+
+    source = build_digest_source(report, meetings)
+    await emit_run_event(session_id, "digest_start", {
+        "report_id": report.id, "title": report.title, "week_range": report.week_range,
+    })
+
+    digest_parts: list[str] = []
+    try:
+        async for delta in generate_week_digest_stream(source):
+            digest_parts.append(delta)
+            await emit_run_event(session_id, "digest_delta", {"content": delta})
+    except RuntimeError as e:
+        return {"error": f"概括生成失败: {e}", "report_id": report.id}
+    digest = "".join(digest_parts).strip()
+
+    return {
+        "report_id": report.id,
+        "title": report.title,
+        "week_range": report.week_range,
+        "digest": digest,
+        "meetings_used": len(meetings),
+    }
+
+
 # 内置能力注册表: builtin 名 -> async fn(db, args, session_id=None)
 BUILTIN_REGISTRY = {
     "meeting_minutes": _builtin_meeting_minutes,
+    "weekly_digest": _builtin_weekly_digest,
 }
 
 

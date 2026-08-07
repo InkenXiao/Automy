@@ -227,6 +227,7 @@ const WeeklyReport = {
           </div>
           <div class="wr-week-bar-r">
             <button class="btn btn-ghost btn-sm" data-action="export-pdf" data-id="${report.id}">📄 导出PDF</button>
+            <button class="btn btn-ghost btn-sm" data-action="week-digest" data-id="${report.id}" title="调用周工作小结技能, AI 生成微信汇报版概括">📣 周报概括</button>
             <button class="btn btn-ghost btn-sm" data-action="edit-report" data-id="${report.id}">编辑</button>
             <button class="btn btn-ghost btn-sm" data-action="edit-kpi" data-id="${report.id}">编辑模块</button>
             <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${report.id}">删除</button>
@@ -295,6 +296,90 @@ const WeeklyReport = {
     `;
 
     this.bindReportEvents(report);
+  },
+
+  /* ------------------------------------------------------------------
+   * 周报概括: 调用"项目周工作小结"技能, AI 生成微信汇报版概括
+   * 输出到右栏详情看板, 支持编辑后保存到 weekly_reports.week_digest
+   * ---------------------------------------------------------------- */
+  async generateWeekDigest(report) {
+    App.showDetail(`
+      <div class="detail-panel__header">
+        <div class="detail-panel__title">📣 周报概括</div>
+        <div class="detail-panel__meta">${App.escapeHtml(report.title || '')} · 微信汇报版</div>
+      </div>
+      <div class="detail-panel__body">${App.renderLoading('正在调用周工作小结技能, AI 生成中…')}</div>
+    `);
+    try {
+      const skills = await API.getSkills();
+      const skill = (Array.isArray(skills) ? skills : []).find(s => s.name === '项目周工作小结');
+      if (!skill) throw new Error('未找到"项目周工作小结"技能, 请重启服务以播种预置技能');
+      const execution = await API.executeSkill(skill.id, {
+        report_id: report.id,
+        project_id: report.project_id,
+      });
+      const results = (execution.output_data && execution.output_data.results) || [];
+      const stepRes = results
+        .map(r => r && r.result)
+        .find(r => r && typeof r === 'object' && (r.digest || r.error));
+      if (!stepRes || !stepRes.digest) {
+        throw new Error((stepRes && stepRes.error) || '技能未返回概括内容');
+      }
+      this.showDigestPanel(report, stepRes.digest);
+      App.showToast('周报概括已生成, 可编辑后保存', 'success');
+    } catch (err) {
+      App.showDetail(`
+        <div class="detail-panel__header">
+          <div class="detail-panel__title">📣 周报概括</div>
+          <div class="detail-panel__meta">${App.escapeHtml(report.title || '')}</div>
+        </div>
+        <div class="detail-panel__body">${App.renderEmpty('生成失败', err.message, '⚠️')}</div>
+      `);
+      App.showToast(`周报概括生成失败: ${err.message}`, 'error');
+    }
+  },
+
+  /** 右栏看板: 展示 AI 概括 (textarea 可编辑) + 保存/重新生成 */
+  showDigestPanel(report, digest) {
+    App.showDetail(`
+      <div class="detail-panel__header">
+        <div class="detail-panel__title">📣 周报概括</div>
+        <div class="detail-panel__meta">${App.escapeHtml(report.title || '')} · 微信汇报版</div>
+      </div>
+      <div class="detail-panel__body">
+        <div class="detail-section">
+          <div class="detail-section__label">AI 生成概括 (可直接编辑, 用于微信汇报)</div>
+          <div class="form-group" style="margin-top:6px;">
+            <textarea id="wr-digest-text" rows="8" style="width:100%;resize:vertical;">${App.escapeHtml(digest || '')}</textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
+          <button class="btn btn-ghost btn-sm" id="wr-digest-regen">🔄 重新生成</button>
+          <button class="btn btn-primary btn-sm" id="wr-digest-save">💾 保存概括</button>
+        </div>
+      </div>
+    `);
+    const saveBtn = document.getElementById('wr-digest-save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const text = (document.getElementById('wr-digest-text').value || '').trim();
+        saveBtn.disabled = true;
+        try {
+          await API.updateWeeklyReport(report.id, { week_digest: text });
+          report.week_digest = text;
+          if (this.current && String(this.current.id) === String(report.id)) {
+            this.current.week_digest = text;
+          }
+          App.showToast('周报概括已保存', 'success');
+        } catch (err) {
+          App.showToast(`保存失败: ${err.message}`, 'error');
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+    }
+    const regenBtn = document.getElementById('wr-digest-regen');
+    if (regenBtn) regenBtn.addEventListener('click', () => this.generateWeekDigest(report));
   },
 
   /** 导出当前周报详情为 PDF (使用浏览器原生打印, A4 多页, 格式正确, 内容不被裁切) */
@@ -781,6 +866,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
         switch (action) {
           case 'export-pdf':
             this.exportToPdf(report);
+            break;
+          case 'week-digest':
+            this.generateWeekDigest(report);
             break;
           case 'edit-kpi':
             this.editModules(report);

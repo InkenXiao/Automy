@@ -1312,6 +1312,7 @@
 
 .output-block .chat-trace__body pre {
   max-height: 320px;
+  overflow-y: auto; /* 超高内容内部滚动, 配合 JS 自动聚焦最新输出文字 */
 }
 
 .sm-existing {

@@ -160,6 +160,7 @@ class WeeklyReportBase(BaseModel):
     week_start: Optional[date] = None
     week_end: Optional[date] = None
     overview_summary: str = ""
+    week_digest: str = ""  # 周报概括 (AI 生成, 微信汇报版)
     status: str = "draft"
 
 
@@ -175,6 +176,7 @@ class WeeklyReportUpdate(BaseModel):
     week_start: date | None = None
     week_end: date | None = None
     overview_summary: str | None = None
+    week_digest: str | None = None
     status: str | None = None
 
 
