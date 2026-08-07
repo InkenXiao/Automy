@@ -61,6 +61,27 @@ async def init_db():
         await _ensure_task_run_agent_nullable(conn)
         # 周报概括字段 (需求: AI 生成微信汇报版概括, 与周报表关联)
         await _ensure_weekly_report_digest_column(conn)
+        # 项目经理/状态字段 (需求: 项目成员页维护项目经理、起止时间与项目状态)
+        await _ensure_project_staff_columns(conn)
+
+
+async def _ensure_project_staff_columns(conn):
+    """projects 补充 manager / status 字段 (幂等)"""
+    from sqlalchemy import inspect, text
+
+    existing_tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+    if "projects" not in existing_tables:
+        return
+    cols = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_columns("projects"))
+    names = {c["name"] for c in cols}
+    if "manager" not in names:
+        await conn.execute(
+            text("ALTER TABLE projects ADD COLUMN manager VARCHAR(64) DEFAULT '' NOT NULL")
+        )
+    if "status" not in names:
+        await conn.execute(
+            text("ALTER TABLE projects ADD COLUMN status VARCHAR(16) DEFAULT '进行中' NOT NULL")
+        )
 
 
 async def _ensure_weekly_report_digest_column(conn):

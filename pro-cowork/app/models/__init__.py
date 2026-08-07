@@ -3,8 +3,15 @@ from app.models.agent import Agent, AgentMemory, AgentMessage, AgentSession
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 from app.models.meeting import Meeting, MeetingItem
 from app.models.module import Module
+from app.models.personal_report import (
+    PersonalReport,
+    PersonalReportPlanItem,
+    PersonalReportWorkItem,
+)
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
+from app.models.project import Project
+from app.models.project_member import ProjectMember
 from app.models.skill import Skill, SkillExecution
 from app.models.task_run import TaskRun, TaskRunEvent
 from app.models.weekly_report import (
@@ -29,6 +36,10 @@ __all__ = [
     "Module",
     "Phase",
     "Project",
+    "ProjectMember",
+    "PersonalReport",
+    "PersonalReportWorkItem",
+    "PersonalReportPlanItem",
     "ProgressTask",
     "Skill",
     "SkillExecution",

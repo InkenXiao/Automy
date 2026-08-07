@@ -35,6 +35,8 @@ const App = {
     ProgressPlan.init();
     WorkTasks.init();
     Meeting.init();
+    ProjectTeam.init();
+    PersonalReport.init();
     // CoWork 智能体平台模块
     TaskCenter.init();
     CoworkAgents.init();
@@ -82,6 +84,8 @@ const App = {
       'progress-plan': ProgressPlan,
       'work-tasks': WorkTasks,
       'meeting': Meeting,
+      'project-team': ProjectTeam,
+      'personal-report': PersonalReport,
       'tasks': TaskCenter,
       'agents': CoworkAgents,
       'agent-chat': AgentChat,

@@ -153,6 +153,52 @@ const API = {
   },
 
   /* ------------------------------------------------------------------
+     项目成员
+     ------------------------------------------------------------------ */
+  getProjectMembers(projectId) {
+    return this.get(`/project-members/${projectId ? `?project_id=${projectId}` : ''}`);
+  },
+
+  createProjectMember(data) {
+    return this.post('/project-members/', data);
+  },
+
+  updateProjectMember(id, data) {
+    return this.put(`/project-members/${id}`, data);
+  },
+
+  deleteProjectMember(id) {
+    return this.del(`/project-members/${id}`);
+  },
+
+  /* ------------------------------------------------------------------
+     个人周报
+     ------------------------------------------------------------------ */
+  getPersonalReports(params = {}) {
+    const query = Object.entries(params)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&');
+    return this.get(`/personal-reports/${query ? `?${query}` : ''}`);
+  },
+
+  getPersonalReport(id) {
+    return this.get(`/personal-reports/${id}`);
+  },
+
+  createPersonalReport(data) {
+    return this.post('/personal-reports/', data);
+  },
+
+  updatePersonalReport(id, data) {
+    return this.put(`/personal-reports/${id}`, data);
+  },
+
+  deletePersonalReport(id) {
+    return this.del(`/personal-reports/${id}`);
+  },
+
+  /* ------------------------------------------------------------------
      进度计划任务
      ------------------------------------------------------------------ */
   getProgressTasks(params = {}) {

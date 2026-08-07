@@ -17,6 +17,8 @@ class Project(Base, TimestampMixin, SoftDeleteMixin):
     name: Mapped[str] = mapped_column(String(64))  # 项目名, 如 "信投AI2.0"
     title: Mapped[str] = mapped_column(String(256))  # 执行图标题
     based_doc: Mapped[str] = mapped_column(String(256), default="")  # 基于文档
+    manager: Mapped[str] = mapped_column(String(64), default="")  # 项目经理
+    status: Mapped[str] = mapped_column(String(16), default="进行中")  # 项目状态: 进行中/已停止/已完成
     start_date: Mapped[date] = mapped_column(Date)  # 项目开始日期
     end_date: Mapped[date] = mapped_column(Date)  # 项目结束日期
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否当前项目
@@ -40,6 +42,9 @@ class Project(Base, TimestampMixin, SoftDeleteMixin):
     )
     phases: Mapped[List["Phase"]] = relationship(
         "Phase", back_populates="project", lazy="raise"
+    )
+    members: Mapped[List["ProjectMember"]] = relationship(
+        "ProjectMember", back_populates="project", lazy="raise"
     )
 
     def __repr__(self):

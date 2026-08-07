@@ -11,6 +11,8 @@ class ProjectBase(BaseModel):
     name: str
     title: str
     based_doc: str = ""
+    manager: str = ""  # 项目经理
+    status: str = "进行中"  # 项目状态: 进行中/已停止/已完成
     start_date: date
     end_date: date
     is_active: bool = False
@@ -27,6 +29,8 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     title: Optional[str] = None
     based_doc: Optional[str] = None
+    manager: Optional[str] = None
+    status: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     is_active: Optional[bool] = None

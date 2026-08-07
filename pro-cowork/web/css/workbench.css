@@ -2833,3 +2833,103 @@ li:hover > .wr-item-edit { display: block; }
   color: var(--color-text-secondary);
   border-top: 1px solid var(--color-border-light);
 }
+
+/* ------------------------------------------------------------------
+   个人周报 PersonalReport
+   ------------------------------------------------------------------ */
+.pr-selector-bar {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.pr-table-wrap { overflow-x: auto; padding: 0 !important; }
+
+.pr-table {
+  width: 100%;
+  min-width: 1240px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.pr-table th {
+  padding: 8px 6px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--border, var(--color-border));
+  border-right: 1px solid var(--color-border-light);
+  text-align: center;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.pr-table th:last-child { border-right: none; }
+
+.pr-table .pr-day-col { min-width: 108px; }
+.pr-table .pr-day-date {
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.pr-table td {
+  border-bottom: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--color-border-light);
+  padding: 4px;
+  vertical-align: top;
+}
+.pr-table td:last-child { border-right: none; text-align: center; }
+
+.pr-table textarea,
+.pr-table input,
+.pr-table select {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  padding: 4px 6px;
+  resize: vertical;
+}
+
+.pr-table textarea:hover,
+.pr-table input:hover,
+.pr-table select:hover { border-color: var(--color-border); }
+
+.pr-table textarea:focus,
+.pr-table input:focus,
+.pr-table select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+
+.pr-table [data-f="hours"] { text-align: right; }
+
+.pr-total-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.pr-total-bar b {
+  color: var(--color-primary);
+  font-size: 16px;
+  margin: 0 2px;
+}
+
+.pr-footer-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* 项目成员: 当前选中项目行高亮 */
+.wr-list-table tr.pt-row--active td {
+  background: var(--color-primary-lighter);
+}
