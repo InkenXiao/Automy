@@ -15,6 +15,7 @@ from app.models.project_member import ProjectMember
 from app.models.skill import Skill, SkillExecution
 from app.models.task_run import TaskRun, TaskRunEvent
 from app.models.usage_log import LoginLog, OperationLog
+from app.models.user_credential import UserCredential
 from app.models.weekly_report import (
     WeeklyReport,
     WeeklyKpi,
@@ -48,6 +49,7 @@ __all__ = [
     "TaskRunEvent",
     "LoginLog",
     "OperationLog",
+    "UserCredential",
     "WeeklyReport",
     "WeeklyKpi",
     "WeeklyProgressItem",

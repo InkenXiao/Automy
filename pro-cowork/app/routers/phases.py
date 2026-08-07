@@ -1,11 +1,12 @@
 """项目阶段字典路由"""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.deps import get_user_name, resolve_visible_project_id
 from app.models.phase import Phase
 from app.schemas.phase import PhaseCreate, PhaseOut, PhaseUpdate
 from app.utils import resolve_project_id
@@ -15,11 +16,17 @@ router = APIRouter(prefix="/phases", tags=["阶段"])
 
 @router.get("/", response_model=list[PhaseOut])
 async def list_phases(
+    request: Request,
     project_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[PhaseOut]:
-    """获取阶段列表 (支持按 project_id 过滤; 不传则用当前激活项目)"""
-    pid = await resolve_project_id(db, project_id)
+    """获取阶段列表 (支持按 project_id 过滤; 不传则用当前激活项目)
+
+    可见性: 无所属项目者返回空列表
+    """
+    pid = await resolve_visible_project_id(db, get_user_name(request), project_id)
+    if pid is None:
+        return []
     result = await db.execute(
         select(Phase)
         .where(Phase.is_delete.is_(False), Phase.project_id == pid)

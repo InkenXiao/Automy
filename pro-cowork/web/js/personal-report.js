@@ -19,6 +19,8 @@ const PersonalReport = {
   currentWeekStart: '',   // YYYY-MM-DD (周一)
   // 已存在的周报 (null = 未填报)
   currentReport: null,
+  // 非项目经理锁定本人 (人员选择器禁用)
+  lockSelf: false,
   // '/' 任务选择弹层状态 (同一时刻只有一个实例)
   _slash: null,
 
@@ -94,6 +96,20 @@ const PersonalReport = {
     const view = document.getElementById('view-personal-report');
     if (!view) return;
 
+    // 无所属项目: 直接展示空状态 (需求: 看不到内容而不是报错)
+    if (!Auth.projects || Auth.projects.length === 0) {
+      view.innerHTML = `
+        <div class="view__header">
+          <div>
+            <div class="view__title">✍️ 个人周报</div>
+            <div class="view__subtitle">选择人员与周报周期, 填写本周工作内容与下周工作计划</div>
+          </div>
+        </div>
+        ${App.renderEmpty('您不属于任何项目', '加入项目后可填写个人周报', '📭')}
+      `;
+      return;
+    }
+
     view.innerHTML = `
       <div class="view__header">
         <div>
@@ -110,10 +126,10 @@ const PersonalReport = {
       .addEventListener('click', () => this.save());
 
     try {
-      // 并行加载: 全部项目 + 当前激活项目成员
+      // 并行加载: 全部项目 + 当前激活项目 (无所属项目时后端返回 403, 容错为 null)
       const [projects, activeProject] = await Promise.all([
         API.getProjects(),
-        API.getActiveProject(),
+        API.getActiveProject().catch(() => null),
       ]);
       this.projects = (projects || []).filter(p => (p.status || '进行中') !== '已停止');
       const activeId = activeProject ? activeProject.id : null;
@@ -142,6 +158,14 @@ const PersonalReport = {
           const bo = (b.status || '全职') === '全职' ? 0 : 1;
           return ao - bo || a.sort_order - b.sort_order || a.id - b.id;
         });
+
+      // 权限 (需求: 本人周报): 非项目经理仅可查看/填写本人周报, 人员选择器锁定本人
+      this.lockSelf = !Auth.isAnyPm();
+      if (this.lockSelf) {
+        const loginName = Auth.user();
+        this.members = this.members.filter(m => m.name === loginName);
+        this.currentMember = loginName;
+      }
 
       // 默认选择: 保留原选择; 否则当前登录用户; 否则第一个全职成员
       if (!this.currentMember || !this.members.some(m => m.name === this.currentMember)) {
@@ -173,11 +197,13 @@ const PersonalReport = {
     if (!body) return;
 
     if (this.members.length === 0) {
-      body.innerHTML = App.renderEmpty(
-        '当前项目还没有成员',
-        '请先到"项目成员"页面维护项目成员',
-        '👤'
-      );
+      body.innerHTML = this.lockSelf
+        ? App.renderEmpty('您不是当前项目的成员', '切换到您的所属项目后可填写周报', '👤')
+        : App.renderEmpty(
+            '当前项目还没有成员',
+            '请先到"项目成员"页面维护项目成员',
+            '👤'
+          );
       return;
     }
 
@@ -193,8 +219,8 @@ const PersonalReport = {
       <div class="card">
         <div class="card__body pr-selector-bar">
           <div class="form-group" style="margin:0;min-width:160px;">
-            <label>人员</label>
-            <select id="pr-member-select">${memberOpts}</select>
+            <label>人员${this.lockSelf ? ' (仅本人)' : ''}</label>
+            <select id="pr-member-select" ${this.lockSelf ? 'disabled' : ''}>${memberOpts}</select>
           </div>
           <div class="form-group" style="margin:0;min-width:240px;">
             <label>周报周期 (周一 ~ 周日)</label>

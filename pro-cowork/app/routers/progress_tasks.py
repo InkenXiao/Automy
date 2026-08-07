@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
-from app.deps import get_user_name, require_project_manager
+from app.deps import get_user_name, require_project_manager, resolve_visible_project_id
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
 from app.schemas.progress_task import (
@@ -47,13 +47,19 @@ async def _load_progress_task(db: AsyncSession, task_id: int) -> ProgressTask:
 
 @router.get("/", response_model=list[ProgressTaskOut])
 async def list_progress_tasks(
+    request: Request,
     project_id: Optional[int] = None,
     phase_id: Optional[int] = None,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[ProgressTaskOut]:
-    """获取进度计划任务列表 (支持按 project_id / phase_id / status 筛选; project_id 不传则用当前激活项目)"""
-    pid = await resolve_project_id(db, project_id)
+    """获取进度计划任务列表 (支持按 project_id / phase_id / status 筛选; project_id 不传则用当前激活项目)
+
+    可见性: 无所属项目者返回空列表
+    """
+    pid = await resolve_visible_project_id(db, get_user_name(request), project_id)
+    if pid is None:
+        return []
     stmt = select(ProgressTask).options(
         selectinload(ProgressTask.phase),
         with_loader_criteria(Phase, Phase.is_delete.is_(False)),

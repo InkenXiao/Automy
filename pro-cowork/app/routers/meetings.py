@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
-from app.deps import get_user_name, require_fulltime
+from app.deps import get_user_name, require_fulltime, resolve_visible_project_id
 from app.models.meeting import Meeting, MeetingItem
 from app.schemas.meeting import (
     MeetingCreate,
@@ -60,11 +60,17 @@ async def _load_meeting(db: AsyncSession, meeting_id: int) -> Meeting:
 # ---------- 会议主体 ----------
 @router.get("/", response_model=list[MeetingOut])
 async def list_meetings(
+    request: Request,
     project_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[MeetingOut]:
-    """获取会议列表 (支持按 project_id 过滤; 不传则返回当前激活项目的会议)"""
-    pid = await resolve_project_id(db, project_id)
+    """获取会议列表 (支持按 project_id 过滤; 不传则返回当前激活项目的会议)
+
+    可见性: 无所属项目者返回空列表
+    """
+    pid = await resolve_visible_project_id(db, get_user_name(request), project_id)
+    if pid is None:
+        return []
     stmt = (
         select(Meeting)
         .options(

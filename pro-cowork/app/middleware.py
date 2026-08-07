@@ -1,6 +1,7 @@
 """操作日志中间件 · 自动记录 /api 全部写操作 (需求: 使用日志看板)"""
 import logging
 import re
+from urllib.parse import unquote
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -60,7 +61,8 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                     if re.fullmatch(r"\d+", seg):
                         entity_id = int(seg)
                         break
-                user_name = (request.headers.get("x-user-name") or "").strip()
+                # 中文姓名经前端 URL 编码 (header 仅 Latin-1), 此处还原
+                user_name = unquote((request.headers.get("x-user-name") or "").strip())
                 await record_operation(
                     user_name=user_name,
                     method=method,

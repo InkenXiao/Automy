@@ -1,19 +1,20 @@
 """使用日志看板路由 · 登录/操作统计 + 两级下钻 (需求: 使用日志看板)
 
-- GET /stats      按周期统计: 登录人次/人数、各实体写操作计数、LLM 调用与 token
-- GET /details    一级下钻: 某实体类型按 实体ID+动作 聚合的明细
-- GET /operations 二级下钻: 操作记录列表 (created_at 倒序, 限 200 条)
+- GET /stats      按周期统计: 登录人次/人数、各实体写操作计数、LLM 调用与 token (所有人可见)
+- GET /details    一级下钻: 某实体类型按 实体ID+动作 聚合的明细 (非项目经理仅本人数据)
+- GET /operations 二级下钻: 操作记录列表 (created_at 倒序, 限 200 条; 非项目经理仅本人数据)
 
 周期: day=当天 week=当周(周一起) month=当月; 阈值按北京时间 (UTC+8) 计算
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.deps import get_user_name, is_any_project_manager
 from app.models.usage_log import LoginLog, OperationLog
 
 router = APIRouter(prefix="/usage-logs", tags=["使用日志"])
@@ -115,33 +116,43 @@ async def get_stats(period: str = "day", db: AsyncSession = Depends(get_db)) -> 
 
 @router.get("/details")
 async def get_details(
+    request: Request,
     period: str = "day",
     entity_type: str = "",
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """一级下钻: 指定实体类型按 实体ID+动作 聚合 (count + 最近时间 + 操作人数)"""
+    """一级下钻: 指定实体类型按 实体ID+动作 聚合 (count + 最近时间 + 操作人数)
+
+    权限: 项目经理看全部; 其它成员仅本人数据 (强制按登录人过滤)
+    """
     if not entity_type:
         raise HTTPException(status_code=400, detail="缺少 entity_type")
     start = _period_start(period)
 
+    # 非项目经理: 强制仅本人
+    name = get_user_name(request)
+    only_self = not await is_any_project_manager(db, name)
+
     # 登录日志单独下钻: 按登录人聚合
     if entity_type == LOGIN_ENTITY:
-        rows = (
-            await db.execute(
-                select(
-                    LoginLog.user_name,
-                    func.count(LoginLog.id).label("cnt"),
-                    func.max(LoginLog.created_at).label("last_at"),
-                    func.coalesce(func.sum(LoginLog.is_valid.cast(Integer)), 0).label("valid_cnt"),
-                )
-                .where(LoginLog.is_delete.is_(False), LoginLog.created_at >= start)
-                .group_by(LoginLog.user_name)
-                .order_by(func.max(LoginLog.created_at).desc())
+        stmt = (
+            select(
+                LoginLog.user_name,
+                func.count(LoginLog.id).label("cnt"),
+                func.max(LoginLog.created_at).label("last_at"),
+                func.coalesce(func.sum(LoginLog.is_valid.cast(Integer)), 0).label("valid_cnt"),
             )
-        ).all()
+            .where(LoginLog.is_delete.is_(False), LoginLog.created_at >= start)
+            .group_by(LoginLog.user_name)
+            .order_by(func.max(LoginLog.created_at).desc())
+        )
+        if only_self:
+            stmt = stmt.where(LoginLog.user_name == name)
+        rows = (await db.execute(stmt)).all()
         return {
             "period": period,
             "entity_type": entity_type,
+            "only_self": only_self,
             "items": [
                 {
                     "entity_id": None,
@@ -155,28 +166,30 @@ async def get_details(
             ],
         }
 
-    rows = (
-        await db.execute(
-            select(
-                OperationLog.entity_id,
-                OperationLog.action,
-                func.count(OperationLog.id).label("cnt"),
-                func.max(OperationLog.created_at).label("last_at"),
-                func.count(func.distinct(OperationLog.user_name)).label("users"),
-                func.coalesce(func.sum(OperationLog.tokens), 0).label("tokens"),
-            )
-            .where(
-                OperationLog.is_delete.is_(False),
-                OperationLog.created_at >= start,
-                OperationLog.entity_type == entity_type,
-            )
-            .group_by(OperationLog.entity_id, OperationLog.action)
-            .order_by(func.max(OperationLog.created_at).desc())
+    stmt = (
+        select(
+            OperationLog.entity_id,
+            OperationLog.action,
+            func.count(OperationLog.id).label("cnt"),
+            func.max(OperationLog.created_at).label("last_at"),
+            func.count(func.distinct(OperationLog.user_name)).label("users"),
+            func.coalesce(func.sum(OperationLog.tokens), 0).label("tokens"),
         )
-    ).all()
+        .where(
+            OperationLog.is_delete.is_(False),
+            OperationLog.created_at >= start,
+            OperationLog.entity_type == entity_type,
+        )
+        .group_by(OperationLog.entity_id, OperationLog.action)
+        .order_by(func.max(OperationLog.created_at).desc())
+    )
+    if only_self:
+        stmt = stmt.where(OperationLog.user_name == name)
+    rows = (await db.execute(stmt)).all()
     return {
         "period": period,
         "entity_type": entity_type,
+        "only_self": only_self,
         "items": [
             {
                 "entity_id": r.entity_id,
@@ -193,6 +206,7 @@ async def get_details(
 
 @router.get("/operations")
 async def get_operations(
+    request: Request,
     period: str = "day",
     entity_type: str = "",
     entity_id: Optional[int] = None,
@@ -200,8 +214,17 @@ async def get_operations(
     user_name: str = "",
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """二级下钻: 操作记录列表 (created_at 倒序, 限 200 条)"""
+    """二级下钻: 操作记录列表 (created_at 倒序, 限 200 条)
+
+    权限: 项目经理看全部 (可按 user_name 过滤); 其它成员仅本人数据 (user_name 参数被忽略)
+    """
     start = _period_start(period)
+
+    # 非项目经理: 强制仅本人
+    name = get_user_name(request)
+    only_self = not await is_any_project_manager(db, name)
+    if only_self:
+        user_name = name
 
     # 登录日志单独查询
     if entity_type == LOGIN_ENTITY:
@@ -217,6 +240,7 @@ async def get_operations(
         return {
             "period": period,
             "entity_type": entity_type,
+            "only_self": only_self,
             "items": [
                 {
                     "id": r.id,

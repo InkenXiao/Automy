@@ -37,7 +37,7 @@ const API = {
         let errorMessage = `请求失败 (${response.status})`;
         try {
           const errBody = await response.json();
-          errorMessage = errBody.message || errBody.error || errorMessage;
+          errorMessage = errBody.message || errBody.error || errBody.detail || errorMessage;
         } catch (e) {
           // 非 JSON 错误体
         }
@@ -101,14 +101,24 @@ const API = {
   },
 
   /* ------------------------------------------------------------------
-     身份认证 (姓名直登)
+     身份认证 (姓名登录; 已设密码的成员需带密码)
      ------------------------------------------------------------------ */
-  login(name) {
-    return this.post('/auth/login', { name });
+  login(name, password) {
+    const body = { name };
+    if (password) body.password = password;
+    return this.post('/auth/login', body);
   },
 
   getAuthMe(name) {
     return this.get(`/auth/me?name=${encodeURIComponent(name)}`);
+  },
+
+  /** 设置/修改本人密码 (oldPassword 已设密码时必填; newPassword 为空串表示清除密码) */
+  setPassword(oldPassword, newPassword) {
+    return this.post('/auth/password', {
+      old_password: oldPassword || null,
+      new_password: newPassword || '',
+    });
   },
 
   /* ------------------------------------------------------------------

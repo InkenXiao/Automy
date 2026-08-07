@@ -69,3 +69,37 @@ async def require_fulltime(db: AsyncSession, project_id: int, name: str) -> Proj
     if member and (member.status or "全职") == "全职":
         return project
     raise HTTPException(status_code=403, detail="仅项目经理或全职成员可执行此操作")
+
+
+async def is_any_project_manager(db: AsyncSession, name: str) -> bool:
+    """该用户是否任一项目的项目经理 (使用日志下钻等全局只读场景使用)"""
+    if not name:
+        return False
+    result = await db.execute(
+        select(Project.id)
+        .where(Project.is_delete.is_(False), Project.manager == name)
+        .limit(1)
+    )
+    return result.scalars().first() is not None
+
+
+async def resolve_visible_project_id(
+    db: AsyncSession, name: str, project_id: int | None
+) -> int | None:
+    """读取可见性: 解析该用户可见的项目 id (需求: 无所属项目者看不到内容)
+
+    - 未登录 或 无所属项目 → None (调用方应返回空列表)
+    - 指定 project_id 且在其归属内 → 原值; 不在归属内 → None
+    - 未指定 → 激活项目在其归属内则用之, 否则其首个归属项目
+    """
+    if not name:
+        return None
+    ids = await get_user_project_ids(db, name)
+    if not ids:
+        return None
+    if project_id is not None:
+        return project_id if project_id in ids else None
+    from app.utils import get_active_project_id
+
+    active_id = await get_active_project_id(db)
+    return active_id if active_id in ids else ids[0]

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
-from app.deps import get_user_name, require_project_manager
+from app.deps import get_user_name, require_project_manager, resolve_visible_project_id
 from app.models.module import Module
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
@@ -111,11 +111,17 @@ async def _load_plan_task(db: AsyncSession, task_id: int) -> WeeklyPlanTask:
 # ---------- 周报主体 ----------
 @router.get("/", response_model=list[WeeklyReportOut])
 async def list_weekly_reports(
+    request: Request,
     project_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[WeeklyReportOut]:
-    """获取周报列表 (按 week_start 倒序; 支持按 project_id 过滤, 不传则用当前激活项目)"""
-    pid = await resolve_project_id(db, project_id)
+    """获取周报列表 (按 week_start 倒序; 支持按 project_id 过滤, 不传则用当前激活项目)
+
+    可见性: 无所属项目者返回空列表
+    """
+    pid = await resolve_visible_project_id(db, get_user_name(request), project_id)
+    if pid is None:
+        return []
     stmt = (
         select(WeeklyReport)
         .options(

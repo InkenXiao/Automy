@@ -38,10 +38,19 @@ const ProgressPlan = {
 
   /** 切换到此视图时触发 */
   async onShow() {
+    // 无所属项目: 展示空状态, 不请求项目数据 (需求: 看不到内容而不是报错)
+    if (!Auth.projects || Auth.projects.length === 0) {
+      const view = document.getElementById('view-progress-plan');
+      if (view) {
+        view.innerHTML = App.renderEmpty('您不属于任何项目', '加入项目后可查看项目进度计划执行图', '📭');
+      }
+      return;
+    }
     // 确保项目元信息已加载 (后端在无项目时会幂等创建默认项目)
     if (!this.project) {
       await this.ensureProject();
     }
+    if (!this.project) return; // 项目信息加载失败 (如无所属项目), 保持空状态
     if (this.tasks.length === 0) {
       this.loadTasks();
     } else {
@@ -63,7 +72,13 @@ const ProgressPlan = {
       await App.loadPhases();
       this.initTimeline();
     } catch (err) {
-      App.showToast(`加载项目信息失败: ${err.message}`, 'error');
+      // 无所属项目等场景: 置空并展示空状态而非报错
+      this.project = null;
+      App.state.project = null;
+      const view = document.getElementById('view-progress-plan');
+      if (view) {
+        view.innerHTML = App.renderEmpty('暂无可查看的项目', '加入项目后可查看项目进度计划执行图', '📭');
+      }
     }
   },
 
