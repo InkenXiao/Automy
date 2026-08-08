@@ -5,6 +5,102 @@
    ========================================================================== */
 
 /* ------------------------------------------------------------------
+   对话附件公共组件 (ChatAttach)
+   为任意对话输入框提供: ＋上传文件 / Ctrl+V 黏贴图片或文件
+   图片→图像识别技能, PDF→文档解析技能, 录音→会议纪要技能 (后端按扩展名指引)
+   ------------------------------------------------------------------ */
+const ChatAttach = {
+  /**
+   * 挂载附件能力到输入框所在行
+   * @param {HTMLTextAreaElement} textarea 目标输入框
+   * @param {Object} opts { getProjectId: () => number|null }
+   * @returns {{names(): string[], clear(): void, count(): number}}
+   */
+  attach(textarea, opts = {}) {
+    if (!textarea) return { names: () => [], clear: () => {}, count: () => 0 };
+    const row = textarea.parentElement;
+    const files = new Set(); // 已上传的文件名
+
+    // 附件 chips 展示区 (插入到输入行之前)
+    const chipBox = document.createElement('div');
+    chipBox.className = 'attach-chips';
+    chipBox.style.display = 'none';
+    row.parentElement.insertBefore(chipBox, row);
+
+    // ＋ 按钮与隐藏文件框
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cw-btn cw-btn--sm attach-btn';
+    btn.title = '上传附件 (支持 Ctrl+V 黏贴图片/文件)';
+    btn.textContent = '＋';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.style.display = 'none';
+    row.insertBefore(btn, textarea);
+    row.appendChild(fileInput);
+
+    const iconOf = (name) => {
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) return '🖼';
+      if (ext === 'pdf') return '📄';
+      if (['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'].includes(ext)) return '🎙';
+      return '📎';
+    };
+
+    const render = () => {
+      chipBox.style.display = files.size ? '' : 'none';
+      chipBox.innerHTML = Array.from(files).map(name => `
+        <span class="chip chip--file">${iconOf(name)} ${App.escapeHtml(name)}
+          <span class="chip__del" data-attach-del="${App.escapeHtml(name)}" title="移除附件">×</span>
+        </span>`).join('');
+      chipBox.querySelectorAll('[data-attach-del]').forEach(del => {
+        del.onclick = () => { files.delete(del.dataset.attachDel); render(); };
+      });
+    };
+
+    const upload = async (file) => {
+      // 黏贴截图等无名文件: 生成唯一文件名 (保留扩展名)
+      let name = (file.name || '').split(/[\\/]/).pop();
+      if (!name || name === 'image.png' || files.has(name)) {
+        const ext = (name.split('.').pop() || 'png').toLowerCase();
+        const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+        name = `paste_${ts}.${ext}`;
+      }
+      btn.classList.add('attach-btn--uploading');
+      try {
+        const pid = opts.getProjectId ? opts.getProjectId() : null;
+        const res = await API.uploadTaskFile(new File([file], name, { type: file.type }), pid);
+        files.add(res.name || name);
+        render();
+      } catch (err) {
+        App.showToast(`附件上传失败: ${err.message}`, 'error');
+      } finally {
+        btn.classList.remove('attach-btn--uploading');
+      }
+    };
+
+    btn.onclick = () => fileInput.click();
+    fileInput.onchange = async (e) => {
+      for (const f of e.target.files) await upload(f);
+      fileInput.value = '';
+    };
+    textarea.addEventListener('paste', (e) => {
+      const pasted = Array.from((e.clipboardData && e.clipboardData.files) || []);
+      if (!pasted.length) return;
+      e.preventDefault();
+      pasted.forEach(f => upload(f));
+    });
+
+    return {
+      names: () => Array.from(files),
+      clear: () => { files.clear(); render(); },
+      count: () => files.size,
+    };
+  },
+};
+
+/* ------------------------------------------------------------------
    任务视图 (工作台): 项目 × 文件 × 智能体 × 技能 组合执行
    ------------------------------------------------------------------ */
 const TaskCenter = {
@@ -38,7 +134,7 @@ const TaskCenter = {
           <div class="task-card">
             <div class="task-card__title">📋 新建长任务</div>
             <div class="form-field">
-              <label>任务附件 (点击选中作为任务上下文, 支持录音文件生成会议纪要)</label>
+              <label>任务附件</label>
               <div class="chip-box" id="tc-files"></div>
               <div style="margin-top:6px">
                 <button class="cw-btn cw-btn--sm tc-plus" id="tc-upload" title="上传文件">＋ 上传文件</button>
@@ -106,8 +202,17 @@ const TaskCenter = {
     MentionBox.attach(fcInput, {
       getProjectId: () => (this.currentRun && this.currentRun.project_id) || this.currentProjectId(),
     });
+    // 补充区附件: ＋上传 / Ctrl+V 黏贴 (图片/PDF/录音按类型走对应技能)
+    this.fcAttach = ChatAttach.attach(fcInput, {
+      getProjectId: () => (this.currentRun && this.currentRun.project_id) || this.currentProjectId(),
+    });
     this.updateFollowupState();
 
+    // 重新打开页面: 默认清空历史任务附件 (有任务执行中时跳过, 避免删到其在用文件)
+    if (!this.running) {
+      this.selectedFiles.clear();
+      try { await API.clearTaskFiles(this.currentProjectId()); } catch (err) { /* 忽略 */ }
+    }
     await this.loadFiles();
     await this.loadRuns();
   },
@@ -151,7 +256,6 @@ const TaskCenter = {
       del.onclick = async (e) => {
         e.stopPropagation();
         const name = del.dataset.delFile;
-        if (!confirm(`删除文件「${name}」?`)) return;
         try {
           await API.deleteTaskFile(name, this.currentProjectId());
           this.selectedFiles.delete(name);
@@ -221,7 +325,6 @@ const TaskCenter = {
     box.querySelectorAll('[data-del-run]').forEach(del => {
       del.onclick = async (e) => {
         e.stopPropagation();
-        if (!confirm('删除该任务记录?')) return;
         try {
           await API.deleteTaskRun(parseInt(del.dataset.delRun, 10));
           this.loadRuns();
@@ -652,7 +755,7 @@ const TaskCenter = {
     if (hint && !this.currentRunId) {
       hint.placeholder = '请先创建并执行任务, 或在左侧选择历史任务…';
     } else if (hint) {
-      hint.placeholder = '补充任务内容, 继续让 AI 执行当前任务… 支持 @ 项目 / 记录 # 资源 (Enter 发送, Shift+Enter 换行)';
+      hint.placeholder = '补充任务内容, 继续让 AI 执行当前任务… 支持 ＋上传 / Ctrl+V 黏贴附件, @ 项目 / 记录 # 资源 (Enter 发送)';
     }
   },
 
@@ -661,8 +764,9 @@ const TaskCenter = {
     if (this.running || !this.currentRunId) return;
     const inputEl = document.getElementById('fc-input');
     const text = inputEl.value.trim();
-    if (!text) {
-      App.showToast('请填写补充内容', 'warning');
+    const fileNames = this.fcAttach ? this.fcAttach.names() : [];
+    if (!text && !fileNames.length) {
+      App.showToast('请填写补充内容或添加附件', 'warning');
       return;
     }
 
@@ -673,9 +777,10 @@ const TaskCenter = {
     try {
       await API.continueTaskRun(this.currentRunId, {
         input_text: text,
-        file_names: [],
+        file_names: fileNames,
         skill_ids: [],
       });
+      if (this.fcAttach) this.fcAttach.clear();
       // 后台已启动: 重放事件流 (含历史轮次与本轮实时事件)
       const run = await API.getTaskRun(this.currentRunId);
       this.renderRunEvents(run);
@@ -854,7 +959,7 @@ const CoworkAgents = {
       <div class="cw-page">
         <div class="cw-page__header">
           <div>
-            <div class="cw-page__title">智能体</div>
+            <div class="cw-page__title">数字分身</div>
             <div class="cw-page__subtitle">具备感知、记忆、决策、交互、执行五大能力的项目管理智能体</div>
           </div>
           <button class="cw-btn cw-btn--primary" id="agent-create-btn">+ 新建智能体</button>
@@ -926,7 +1031,6 @@ const CoworkAgents = {
       };
       card.querySelector('[data-action="delete"]').onclick = async (e) => {
         e.stopPropagation();
-        if (!confirm(`确定删除智能体「${agent.name}」?`)) return;
         try {
           await API.deleteAgent(id);
           App.showToast('已删除', 'success');
@@ -1462,6 +1566,10 @@ const AgentChat = {
         App.showToast(`已选择项目「${p.name}」, / 可引用其会议/周报/里程碑/周任务`, 'success');
       },
     });
+    // 对话附件: ＋上传 / Ctrl+V 黏贴 (未 @项目 时落到当前激活项目附件目录)
+    this.chatAttach = ChatAttach.attach(textarea, {
+      getProjectId: () => this.mentionProjectId,
+    });
   },
 
   async loadSessions() {
@@ -1607,14 +1715,16 @@ const AgentChat = {
     if (this.sending) return;
     const textarea = document.getElementById('chat-textarea');
     const message = (textarea.value || '').trim();
-    if (!message) return;
+    const fileNames = this.chatAttach ? this.chatAttach.names() : [];
+    if (!message && !fileNames.length) return;
     if (!this.session) {
       App.showToast('请先点击左上角「+ 新会话」创建会话', 'warning');
       return;
     }
 
     textarea.value = '';
-    this.appendMessage('user', message);
+    const marks = fileNames.map(f => `【附件 ${f}】`).join(' ');
+    this.appendMessage('user', message + (marks ? `\n\n${marks}` : ''));
     const replyBody = this.appendMessage('assistant', '');
     let replyText = '';
     let lastTrace = null;
@@ -1624,7 +1734,7 @@ const AgentChat = {
 
     try {
       await API.stream(`/agents/${this.agent.id}/chat`, {
-        message, session_id: this.session.id,
+        message, session_id: this.session.id, file_names: fileNames,
       }, (event) => {
         if (event.type === 'content') {
           replyText += event.content;
@@ -1652,6 +1762,7 @@ const AgentChat = {
           replyBody.innerHTML = App.renderMarkdown(replyText);
         }
       });
+      if (this.chatAttach) this.chatAttach.clear();
     } catch (err) {
       replyText += `\n\n⚠️ 请求失败: ${err.message}`;
       replyBody.innerHTML = App.renderMarkdown(replyText);
@@ -1881,6 +1992,8 @@ const CoworkBuilder = {
     });
     // 调试输入框: @ 项目 / 记录 # 资源
     MentionBox.attach(debugInput, {});
+    // 调试附件: ＋上传 / Ctrl+V 黏贴
+    this.debugAttach = ChatAttach.attach(debugInput, {});
     // Emoji / 主题色选择器
     Pickers.bind(el);
     this.updateCtxBadge();
@@ -1940,7 +2053,8 @@ const CoworkBuilder = {
     const input = document.getElementById('debug-input');
     const output = document.getElementById('debug-output');
     const message = (input.value || '').trim();
-    if (!message) return;
+    const fileNames = this.debugAttach ? this.debugAttach.names() : [];
+    if (!message && !fileNames.length) return;
 
     this.debugging = true;
     const runBtn = document.getElementById('debug-run');
@@ -1950,17 +2064,19 @@ const CoworkBuilder = {
     // 清除占位提示, 追加本轮用户输入块
     const placeholder = output.querySelector('.debug-hint');
     if (placeholder) placeholder.remove();
+    const marks = fileNames.map(f => `【附件 ${f}】`).join(' ');
     const roundDiv = document.createElement('div');
     roundDiv.className = 'debug-round';
     roundDiv.innerHTML = `
-      <div class="debug-round__user">${App.escapeHtml(message)}</div>
+      <div class="debug-round__user">${App.escapeHtml(message + (marks ? `\n${marks}` : ''))}</div>
       <div class="debug-round__body"><div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div></div>`;
     output.appendChild(roundDiv);
     output.scrollTop = output.scrollHeight;
     const body = roundDiv.querySelector('.debug-round__body');
 
     try {
-      const res = await API.debugAgent(this.editing.id, message, this.debugSessionId);
+      const res = await API.debugAgent(this.editing.id, message, this.debugSessionId, fileNames);
+      if (this.debugAttach) this.debugAttach.clear();
       if (res.session_id) {
         this.debugSessionId = res.session_id;
         this.updateCtxBadge();
@@ -2089,7 +2205,6 @@ const CoworkSkills = {
       card.querySelector('[data-action="copy"]').onclick = () => SkillBuilder.openCopy(skill);
       card.querySelector('[data-action="edit"]').onclick = () => SkillBuilder.openEdit(skill);
       card.querySelector('[data-action="delete"]').onclick = async () => {
-        if (!confirm(`确定删除技能「${skill.name}」?`)) return;
         try {
           await API.deleteSkill(id);
           App.showToast('已删除', 'success');
@@ -2552,6 +2667,8 @@ const CoworkMemories = {
       }
     });
     MentionBox.attach(testInput, {});
+    // 测试附件: ＋上传 / Ctrl+V 黏贴
+    this.testAttach = ChatAttach.attach(testInput, {});
     this.updateTestBadge();
     await this.renderList();
   },
@@ -2575,7 +2692,8 @@ const CoworkMemories = {
     const input = document.getElementById('mem-test-input');
     const output = document.getElementById('mem-test-output');
     const message = (input.value || '').trim();
-    if (!message) return;
+    const fileNames = this.testAttach ? this.testAttach.names() : [];
+    if (!message && !fileNames.length) return;
 
     this.testing = true;
     const runBtn = document.getElementById('mem-test-run');
@@ -2584,16 +2702,18 @@ const CoworkMemories = {
 
     const placeholder = output.querySelector('.debug-hint');
     if (placeholder) placeholder.remove();
+    const marks = fileNames.map(f => `【附件 ${f}】`).join(' ');
     const roundDiv = document.createElement('div');
     roundDiv.className = 'debug-round';
     roundDiv.innerHTML = `
-      <div class="debug-round__user">${App.escapeHtml(message)}</div>
+      <div class="debug-round__user">${App.escapeHtml(message + (marks ? `\n${marks}` : ''))}</div>
       <div class="debug-round__body"><div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div></div>`;
     output.appendChild(roundDiv);
     const body = roundDiv.querySelector('.debug-round__body');
 
     try {
-      const res = await API.debugAgent(agentId, message, this.testSessionId);
+      const res = await API.debugAgent(agentId, message, this.testSessionId, fileNames);
+      if (this.testAttach) this.testAttach.clear();
       if (res.session_id) {
         this.testSessionId = res.session_id;
         this.updateTestBadge();

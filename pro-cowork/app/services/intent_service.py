@@ -10,18 +10,27 @@ import json
 import logging
 import re
 
-from openai import AsyncOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.agent import Agent
 from app.models.project import Project
 from app.models.skill import Skill
+from app.services import llm
+from app.services.file_prompt import AUDIO_EXTS, IMAGE_EXTS, PDF_EXTS
 
 logger = logging.getLogger(__name__)
 
-_AUDIO_EXTS = (".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".wma", ".opus")
+_AUDIO_EXTS = tuple(AUDIO_EXTS)
+_IMAGE_EXTS = tuple(IMAGE_EXTS)
+_DOC_EXTS = tuple(PDF_EXTS)
+
+# 附件类型 → 自动关联的技能名称关键词 (按文件名后缀匹配)
+_FILE_SKILL_MAP = (
+    (_AUDIO_EXTS, "会议纪要"),
+    (_IMAGE_EXTS, "图像识别"),
+    (_DOC_EXTS, "文档解析"),
+)
 
 INTENT_PROMPT = """你是任务分流助手。根据用户的任务描述与附件, 从给定列表中选择最合适的项目、数字分身和技能。
 
@@ -111,23 +120,25 @@ async def recognize_intent(
                 return True
         return False
 
-    # 录音文件 → 自动关联"会议纪要生成"技能
-    def _apply_audio_skill():
-        if any((f or "").lower().endswith(_AUDIO_EXTS) for f in file_names or []):
-            for s in skills:
-                if "会议纪要" in (s.name or "") and s.id not in result["skill_ids"]:
-                    result["skill_ids"].append(s.id)
+    # 附件类型 → 自动关联对应技能 (录音→会议纪要, 图片→图像识别, PDF→文档解析)
+    def _apply_file_skills():
+        names = [(f or "").lower() for f in file_names or []]
+        for exts, keyword in _FILE_SKILL_MAP:
+            if any(n.endswith(exts) for n in names):
+                for s in skills:
+                    if keyword in (s.name or "") and s.id not in result["skill_ids"]:
+                        result["skill_ids"].append(s.id)
 
-    if not settings.OPENAI_API_KEY:
+    client = llm.small_client()  # 意图识别: 轻量快推模型
+    if not client:
         _heuristic()
-        _apply_audio_skill()
+        _apply_file_skills()
         return result
 
     # ---- LLM 意图识别 ----
     try:
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL)
         resp = await client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
+            model=llm.small_model(),
             messages=[{"role": "user", "content": INTENT_PROMPT.format(
                 projects="\n".join(
                     f"- id={p.id} {p.name}{' (当前项目)' if p.id == current_pid else ''}"
@@ -155,7 +166,7 @@ async def recognize_intent(
         # LLM 不可用/输出无效 → 启发式
         if not _heuristic():
             result["reason"] = "未能自动识别合适的数字分身"
-        _apply_audio_skill()
+        _apply_file_skills()
         return result
 
     pid = data.get("project_id")
@@ -168,5 +179,5 @@ async def recognize_intent(
     if isinstance(sids, list):
         result["skill_ids"] = [s for s in sids if isinstance(s, int) and s in skill_map]
     result["reason"] = str(data.get("reason") or "")
-    _apply_audio_skill()
+    _apply_file_skills()
     return result

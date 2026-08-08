@@ -11,11 +11,10 @@ import logging
 import time
 from typing import Any, AsyncGenerator, List, Optional
 
-from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.agent import Agent, AgentMemory, AgentMessage, AgentSession
+from app.services import llm
 from app.services.agent_context import build_project_snapshot
 from app.services.agent_tools import TOOL_DEFINITIONS, ToolExecutor
 
@@ -25,16 +24,12 @@ MAX_TOOL_ROUNDS = 5
 
 
 class AgentEngine:
-    """Agent 运行时引擎"""
+    """Agent 运行时引擎 (主推理模型 MAIN_*)"""
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.client = None
-        if settings.OPENAI_API_KEY:
-            self.client = AsyncOpenAI(
-                api_key=settings.OPENAI_API_KEY,
-                base_url=settings.OPENAI_BASE_URL,
-            )
+        self.client = llm.main_client()
+        self.model = llm.main_model()
 
     # ---------- 交互: 结构化事件流 ----------
 
@@ -56,7 +51,7 @@ class AgentEngine:
         if not self.client:
             yield {
                 "type": "content",
-                "content": "⚠️ LLM 未配置。请在 .env 中设置 OPENAI_API_KEY 和 OPENAI_BASE_URL 后重启服务。",
+                "content": "⚠️ 主推理模型未配置。请在 .env 中设置 MAIN_API_URL / MAIN_API_KEY / MAIN_MODEL 后重启服务。",
             }
             return
 
@@ -70,7 +65,7 @@ class AgentEngine:
                 yield {"type": "model_call", "stage": "start", "round": round_num + 1}
                 round_start = time.time()
                 stream = await self.client.chat.completions.create(
-                    model=settings.OPENAI_MODEL,
+                    model=self.model,
                     messages=messages,
                     tools=tools if tools else None,
                     stream=True,
@@ -169,7 +164,7 @@ class AgentEngine:
 
             await record_llm_usage(
                 user_name, "数字分身", total_tokens_all,
-                f"{agent.name} · {settings.OPENAI_MODEL}",
+                f"{agent.name} · {self.model}",
             )
 
     # ---------- 调试: 非流式 + 结构化 Trace ----------
@@ -187,8 +182,8 @@ class AgentEngine:
             return {
                 "reply": "",
                 "trace": [],
-                "error": "LLM 未配置, 请设置 OPENAI_API_KEY / OPENAI_BASE_URL",
-                "model": settings.OPENAI_MODEL,
+                "error": "主推理模型未配置, 请设置 MAIN_API_URL / MAIN_API_KEY / MAIN_MODEL",
+                "model": self.model,
             }
 
         tool_executor = ToolExecutor(self.db, agent_id=agent.id, session_id=None)
@@ -202,14 +197,14 @@ class AgentEngine:
             round_trace: dict[str, Any] = {"round": round_num + 1, "content": "", "tool_calls": []}
             try:
                 resp = await self.client.chat.completions.create(
-                    model=settings.OPENAI_MODEL,
+                    model=self.model,
                     messages=messages,
                     tools=tools if tools else None,
                     stream=False,
                 )
             except Exception as e:
                 logger.error(f"Agent debug error (round {round_num}): {e}")
-                return {"reply": reply, "trace": trace, "error": str(e), "model": settings.OPENAI_MODEL}
+                return {"reply": reply, "trace": trace, "error": str(e), "model": self.model}
 
             if resp.usage:
                 total_tokens_all += resp.usage.total_tokens or 0
@@ -266,10 +261,10 @@ class AgentEngine:
 
             await record_llm_usage(
                 user_name, "数字分身", total_tokens_all,
-                f"{agent.name} · debug · {settings.OPENAI_MODEL}",
+                f"{agent.name} · debug · {self.model}",
             )
 
-        return {"reply": reply, "trace": trace, "model": settings.OPENAI_MODEL}
+        return {"reply": reply, "trace": trace, "model": self.model}
 
     # ---------- 内部: 消息构建 ----------
 

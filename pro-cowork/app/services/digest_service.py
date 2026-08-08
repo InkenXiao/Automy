@@ -1,9 +1,7 @@
-"""项目周工作小结服务 · 汇总周报与本周会议, 调用 LLM 提炼微信汇报版概括"""
+"""项目周工作小结服务 · 汇总周报与本周会议, 调用轻量快推模型 (SMALL_*) 提炼微信汇报版概括"""
 from typing import AsyncGenerator
 
-from openai import AsyncOpenAI
-
-from app.config import settings
+from app.services import llm
 
 DIGEST_PROMPT = """你是一位项目经理助理, 请将以下项目周报与本周会议内容提炼为一段"微信汇报版"周工作小结。
 
@@ -69,17 +67,14 @@ def build_digest_source(report, meetings) -> str:
 
 async def generate_week_digest_stream(source: str, user_name: str = "system") -> AsyncGenerator[str, None]:
     """流式生成周工作小结: 逐段产出文本增量, 供执行输出窗口实时显示; 流尾记录 token 消耗"""
-    if not settings.OPENAI_API_KEY:
-        raise RuntimeError("LLM 未配置: 请在 .env 中设置 OPENAI_API_KEY / OPENAI_BASE_URL")
+    client = llm.small_client()  # 概括/润色类任务: 轻量快推模型
+    if not client:
+        raise RuntimeError("轻量模型未配置: 请在 .env 中设置 SMALL_API_URL / SMALL_API_KEY / SMALL_MODEL")
     if not source.strip():
         raise RuntimeError("周报内容为空, 无法生成周工作小结")
 
-    client = AsyncOpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL,
-    )
     stream = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
+        model=llm.small_model(),
         messages=[
             {"role": "user", "content": DIGEST_PROMPT.format(source=source[:20000])}
         ],
@@ -98,4 +93,4 @@ async def generate_week_digest_stream(source: str, user_name: str = "system") ->
     # 流尾: 落库 token 消耗 (异常静默)
     from app.services.log_service import record_llm_usage
 
-    await record_llm_usage(user_name, "周报概括", total_tokens, settings.OPENAI_MODEL)
+    await record_llm_usage(user_name, "周报概括", total_tokens, llm.small_model())

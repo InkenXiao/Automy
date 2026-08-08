@@ -180,10 +180,89 @@ async def _builtin_weekly_digest(db: AsyncSession, args: dict, session_id: Optio
     }
 
 
+async def _builtin_image_recognition(db: AsyncSession, args: dict, session_id: Optional[int] = None, user_name: str = "system") -> dict:
+    """内置能力: 图像识别 (视觉多模态模型)
+
+    入参: file_name (任务附件中的图片文件名), project_id (可选), question (可选, 识别侧重点)
+    返回: {file, text, model, engine}
+    """
+    from app.services.task_runner import emit_run_event
+    from app.services.vision_service import recognize_image
+
+    file_name = args.get("file_name")
+    if not file_name:
+        return {"error": "缺少参数 file_name (图片文件名)"}
+    file_name = Path(str(file_name)).name  # 防目录穿越
+
+    project_id = args.get("project_id")
+    if project_id in (None, "", 0):
+        project_id = await get_active_project_id(db)
+    image_path = _find_task_file(project_id, file_name)
+    if not image_path:
+        return {"error": f"图片文件不存在: {file_name} (项目#{project_id}), 请先上传"}
+
+    await emit_run_event(session_id, "vision_start", {"file": file_name})
+    try:
+        result = await recognize_image(
+            image_path, question=str(args.get("question") or ""), user_name=user_name
+        )
+    except RuntimeError as e:
+        return {"error": f"图像识别失败: {e}"}
+    await emit_run_event(session_id, "vision_done", {
+        "file": file_name, "chars": len(result["text"]),
+    })
+    return {
+        "file": file_name,
+        "text": result["text"],
+        "model": result["model"],
+        "engine": "vision",
+    }
+
+
+async def _builtin_doc_parsing(db: AsyncSession, args: dict, session_id: Optional[int] = None, user_name: str = "system") -> dict:
+    """内置能力: PDF 文档解析 (PyMuPDF 文本层 → mineru → paddleocr)
+
+    入参: file_name (任务附件中的 PDF 文件名), project_id (可选)
+    返回: {file, text, pages, engine}
+    """
+    from app.services.doc_parse_service import parse_pdf
+    from app.services.task_runner import emit_run_event
+
+    file_name = args.get("file_name")
+    if not file_name:
+        return {"error": "缺少参数 file_name (PDF 文件名)"}
+    file_name = Path(str(file_name)).name  # 防目录穿越
+
+    project_id = args.get("project_id")
+    if project_id in (None, "", 0):
+        project_id = await get_active_project_id(db)
+    pdf_path = _find_task_file(project_id, file_name)
+    if not pdf_path:
+        return {"error": f"PDF 文件不存在: {file_name} (项目#{project_id}), 请先上传"}
+
+    await emit_run_event(session_id, "doc_parse_start", {"file": file_name})
+    try:
+        result = await parse_pdf(pdf_path)
+    except RuntimeError as e:
+        return {"error": f"文档解析失败: {e}"}
+    await emit_run_event(session_id, "doc_parse_done", {
+        "file": file_name, "pages": result["pages"], "chars": len(result["text"]),
+        "engine": result["engine"],
+    })
+    return {
+        "file": file_name,
+        "text": result["text"],
+        "pages": result["pages"],
+        "engine": result["engine"],
+    }
+
+
 # 内置能力注册表: builtin 名 -> async fn(db, args, session_id=None, user_name="system")
 BUILTIN_REGISTRY = {
     "meeting_minutes": _builtin_meeting_minutes,
     "weekly_digest": _builtin_weekly_digest,
+    "image_recognition": _builtin_image_recognition,
+    "doc_parsing": _builtin_doc_parsing,
 }
 
 

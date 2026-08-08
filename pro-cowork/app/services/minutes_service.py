@@ -1,9 +1,7 @@
-"""会议纪要生成服务 · 基于转录文字调用 LLM 生成结构化纪要"""
+"""会议纪要生成服务 · 基于转录文字调用主推理模型生成结构化纪要"""
 from typing import AsyncGenerator
 
-from openai import AsyncOpenAI
-
-from app.config import settings
+from app.services import llm
 
 MINUTES_PROMPT = """你是一位高级项目经理, 请根据以下会议录音转写文字整理会议纪要。
 
@@ -30,17 +28,14 @@ async def generate_minutes(transcript: str) -> str:
 
 async def generate_minutes_stream(transcript: str, user_name: str = "system") -> AsyncGenerator[str, None]:
     """流式生成会议纪要: 逐段产出文本增量, 供执行输出窗口实时显示; 流尾记录 token 消耗"""
-    if not settings.OPENAI_API_KEY:
-        raise RuntimeError("LLM 未配置: 请在 .env 中设置 OPENAI_API_KEY / OPENAI_BASE_URL")
+    client = llm.main_client()  # 纪要生成: 主推理模型
+    if not client:
+        raise RuntimeError("主推理模型未配置: 请在 .env 中设置 MAIN_API_URL / MAIN_API_KEY / MAIN_MODEL")
     if not transcript.strip():
         raise RuntimeError("转录文字为空, 无法生成会议纪要")
 
-    client = AsyncOpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL,
-    )
     stream = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
+        model=llm.main_model(),
         messages=[
             {"role": "user", "content": MINUTES_PROMPT.format(transcript=transcript[:30000])}
         ],
@@ -59,4 +54,4 @@ async def generate_minutes_stream(transcript: str, user_name: str = "system") ->
     # 流尾: 落库 token 消耗 (异常静默)
     from app.services.log_service import record_llm_usage
 
-    await record_llm_usage(user_name, "会议纪要", total_tokens, settings.OPENAI_MODEL)
+    await record_llm_usage(user_name, "会议纪要", total_tokens, llm.main_model())

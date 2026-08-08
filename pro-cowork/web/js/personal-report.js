@@ -669,7 +669,6 @@ const PersonalReport = {
   /** 删除当前周报 */
   async removeReport() {
     if (!this.currentReport) return;
-    if (!confirm(`确认删除 ${this.currentMember} ${this.weekLabel(this.currentWeekStart)} 的周报?`)) return;
     try {
       await API.deletePersonalReport(this.currentReport.id);
       this.currentReport = null;

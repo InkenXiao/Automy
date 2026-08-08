@@ -250,7 +250,6 @@ const WorkTasks = {
         e.stopPropagation();
         if (!App.can.fulltime()) return;  // 非全职成员只读
         const id = btn.getAttribute('data-id');
-        if (!confirm('确认删除该任务?')) return;
         try {
           await API.deleteWorkTask(id);
           App.showToast('已删除', 'success');

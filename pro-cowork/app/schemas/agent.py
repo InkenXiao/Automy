@@ -75,6 +75,7 @@ class MessageOut(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[int] = None
+    file_names: list[str] = []  # 附件文件名 (任务附件目录中已上传的文件)
 
 
 class MemoryCreate(BaseModel):

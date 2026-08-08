@@ -95,6 +95,37 @@ PRESET_SKILLS = [
             ]
         }, ensure_ascii=False),
     },
+    {
+        "name": "图像识别",
+        "description": "解析上传的图片附件: 调用视觉多模态模型识别图片内容 (文字/表格/图表/界面截图)",
+        "category": "workflow",
+        "trigger_type": "manual",
+        "config": {"icon": "🖼️", "color": "#06B6D4"},
+        "code": json.dumps({
+            "steps": [
+                {"builtin": "image_recognition", "arguments": {
+                    "file_name": "{{input.file_name}}",
+                    "project_id": "{{input.project_id}}",
+                    "question": "{{input.question}}",
+                }},
+            ]
+        }, ensure_ascii=False),
+    },
+    {
+        "name": "文档解析",
+        "description": "解析上传的 PDF 附件: 文本层直抽 (PyMuPDF), 扫描件走 mineru / paddleocr OCR, 输出结构化文本",
+        "category": "workflow",
+        "trigger_type": "manual",
+        "config": {"icon": "📄", "color": "#3B82F6"},
+        "code": json.dumps({
+            "steps": [
+                {"builtin": "doc_parsing", "arguments": {
+                    "file_name": "{{input.file_name}}",
+                    "project_id": "{{input.project_id}}",
+                }},
+            ]
+        }, ensure_ascii=False),
+    },
 ]
 
 

@@ -1123,6 +1123,33 @@
 }
 
 /* ------------------------------------------------------------------
+   对话附件 (ChatAttach): + 上传 / Ctrl+V 黏贴
+   ------------------------------------------------------------------ */
+.attach-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.attach-chips .chip {
+  cursor: default;
+}
+
+.attach-btn {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.attach-btn--uploading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------
    Emoji / 主题色 可视化选择器
    ------------------------------------------------------------------ */
 .pick-field {

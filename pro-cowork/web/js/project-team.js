@@ -163,10 +163,9 @@ const ProjectTeam = {
     });
   },
 
-  /** 停止 / 恢复项目 */
+  /** 停止 / 恢复项目 (可逆操作, 直接执行无需确认) */
   async setProjectStatus(project, status) {
     const label = status === '已停止' ? '停止' : '恢复';
-    if (!confirm(`确认${label}项目"${project.name}"?`)) return;
     try {
       await API.updateProject(project.id, { status });
       project.status = status;
@@ -351,7 +350,6 @@ const ProjectTeam = {
           this.showMemberForm(member);
         } else if (action === 'leave-member' || action === 'rejoin-member') {
           const status = action === 'leave-member' ? '退出' : '全职';
-          if (action === 'leave-member' && !confirm('确认将该成员标记为退出?')) return;
           try {
             await API.updateProjectMember(id, { status });
             member.status = status;
@@ -361,7 +359,6 @@ const ProjectTeam = {
             App.showToast(`状态更新失败: ${err.message}`, 'error');
           }
         } else if (action === 'delete-member') {
-          if (!confirm(`确认删除成员"${member.name}"?`)) return;
           try {
             await API.deleteProjectMember(id);
             this.members = this.members.filter(m => String(m.id) !== String(id));

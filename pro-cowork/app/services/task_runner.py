@@ -217,7 +217,7 @@ class TaskRunner:
         message = await _build_prompt(
             db, run.project_id, run.input_text, run.file_names or [], run.skill_ids or []
         )
-        session = AgentSession(agent_id=run.agent_id, title=run.title[:50])
+        session = AgentSession(agent_id=run.agent_id, title=run.title[:50], status="task")
         db.add(session)
         await db.flush()
         await db.refresh(session)

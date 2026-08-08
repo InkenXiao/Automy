@@ -626,7 +626,6 @@ const Meeting = {
   },
 
   async deleteMeeting(id) {
-    if (!confirm('确认删除该会议?删除后不可恢复。')) return;
     try {
       await API.deleteMeeting(id);
       App.showToast('已删除', 'success');

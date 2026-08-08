@@ -160,6 +160,17 @@ async def get_messages(session_id: int, db: AsyncSession = Depends(get_db)) -> l
 
 # ---------- 对话 (SSE 流式, 结构化事件) ----------
 
+def _merge_attachments(message: str, file_names: list[str], project_id: Optional[int]) -> str:
+    """将附件 (图片/PDF/音频/文本) 合并进用户消息: 技能调用指引或内联文本内容"""
+    if not file_names:
+        return message
+    from app.services.file_prompt import build_file_prompt_parts, safe_filename
+
+    parts = [message] if message else []
+    parts.extend(build_file_prompt_parts(project_id, [safe_filename(f) for f in file_names]))
+    return "\n\n".join(parts)
+
+
 @router.post("/{agent_id}/chat")
 async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(get_db)):
     """发送消息并流式返回 Agent 回复
@@ -187,13 +198,23 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
         await db.flush()
         await db.refresh(session)
 
-    # 保存用户消息
-    user_msg = AgentMessage(session_id=session.id, role="user", content=payload.message)
+    # 当前激活项目 (记忆按项目隔离 + 附件定位)
+    active_pid = await get_active_project_id(db)
+
+    # 附件合并: 展示版 (仅文件名标记) 落库; 完整版 (含技能指引/文件内容) 送入模型
+    file_names = payload.file_names or []
+    display_message = payload.message
+    if file_names:
+        marks = " ".join(f"【附件 {f}】" for f in file_names)
+        display_message = f"{payload.message}\n\n{marks}" if payload.message else marks
+    full_message = _merge_attachments(payload.message, file_names, active_pid)
+    if not full_message:
+        raise HTTPException(status_code=400, detail="消息内容为空")
+
+    # 保存用户消息 (展示版)
+    user_msg = AgentMessage(session_id=session.id, role="user", content=display_message)
     db.add(user_msg)
     await db.flush()
-
-    # 当前激活项目 (记忆按项目隔离)
-    active_pid = await get_active_project_id(db)
 
     # 记忆规则触发: 用户显式要求记住 → 自动沉淀为 preference 记忆
     if MEMORY_TRIGGER.search(payload.message):
@@ -207,13 +228,15 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
         ))
         await db.flush()
 
-    # 加载历史消息
+    # 加载历史消息 (排除刚保存的当前用户消息, 避免与 user_message 重复入 prompt)
     result = await db.execute(
         select(AgentMessage)
         .where(AgentMessage.session_id == session.id, AgentMessage.is_delete.is_(False))
         .order_by(AgentMessage.id)
     )
     history = result.scalars().all()
+    if history and history[-1].id == user_msg.id:
+        history = history[:-1]
 
     # 加载记忆: 当前激活项目的记忆 + 未关联项目的通用记忆
     mem_result = await db.execute(
@@ -236,7 +259,7 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
     async def event_stream():
         reply_parts: list[str] = []
         try:
-            async for event in engine.chat(agent, session, history, memories, payload.message):
+            async for event in engine.chat(agent, session, history, memories, full_message):
                 etype = event.get("type")
                 if etype == "content":
                     reply_parts.append(event["content"])
@@ -317,12 +340,22 @@ async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = De
     )
     history = msg_result.scalars().all()
 
-    # 用户消息落库
-    db.add(AgentMessage(session_id=session.id, role="user", content=payload.message))
+    # 附件合并: 展示版落库, 完整版 (含技能指引/文件内容) 送入模型
+    file_names = payload.file_names or []
+    display_message = payload.message
+    if file_names:
+        marks = " ".join(f"【附件 {f}】" for f in file_names)
+        display_message = f"{payload.message}\n\n{marks}" if payload.message else marks
+    full_message = _merge_attachments(payload.message, file_names, active_pid)
+    if not full_message:
+        raise HTTPException(status_code=400, detail="消息内容为空")
+
+    # 用户消息落库 (展示版)
+    db.add(AgentMessage(session_id=session.id, role="user", content=display_message))
     await db.flush()
 
     engine = AgentEngine(db)
-    result = await engine.chat_with_trace(agent, history, memories, payload.message)
+    result = await engine.chat_with_trace(agent, history, memories, full_message)
 
     # 助手回复落库 (供下轮上下文)
     if result.get("reply"):

@@ -1427,7 +1427,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
       if (!delBtn) return;
       const modId = delBtn.getAttribute('data-mod-id');
       if (!modId) return;
-      if (!confirm('确认删除该模块? 关联的 KPI/进展/计划将失去模块关联')) return;
       try {
         await API.deleteModule(modId);
         App.showToast('模块已删除', 'success');
@@ -1474,7 +1473,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
 
   /** 删除周报 */
   async deleteReport(id) {
-    if (!confirm('确认删除该周报? 此操作不可撤销。')) return;
     try {
       await API.deleteWeeklyReport(id);
       App.showToast('已删除', 'success');
@@ -1756,7 +1754,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
 
   /** 删除下周任务 */
   async deletePlanTask(reportId, taskId) {
-    if (!confirm('确认删除该任务?')) return;
     try {
       await API.deletePlanTask(reportId, taskId);
       App.showToast('已删除', 'success');
@@ -2009,7 +2006,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
 
   /** 删除本周进展项 */
   async deleteProgressItem(reportId, itemId) {
-    if (!confirm('确认删除该进展项?')) return;
     try {
       await API.deleteProgressItem(reportId, itemId);
       App.showToast('已删除', 'success');
@@ -2109,7 +2105,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
 
   /** 删除风险 */
   async deleteRisk(reportId, riskId) {
-    if (!confirm('确认删除该风险?')) return;
     try {
       await API.deleteRisk(reportId, riskId);
       App.showToast('已删除', 'success');

@@ -462,8 +462,10 @@ const API = {
   },
 
   /** Agent 调试 (非流式, 返回 {reply, trace, memories, session_id}; session_id 用于上下文记忆) */
-  debugAgent(agentId, message, sessionId) {
-    return this.post(`/agents/${agentId}/debug`, { message, session_id: sessionId || null });
+  debugAgent(agentId, message, sessionId, fileNames = []) {
+    return this.post(`/agents/${agentId}/debug`, {
+      message, session_id: sessionId || null, file_names: fileNames,
+    });
   },
 
   /* 智能体记忆 */
@@ -591,6 +593,12 @@ const API = {
   deleteTaskFile(filename, projectId) {
     const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
     return this.del(`/task-runs/files/${encodeURIComponent(filename)}${qs}`);
+  },
+
+  /** 清空项目全部任务附件 */
+  clearTaskFiles(projectId) {
+    const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+    return this.del(`/task-runs/files${qs}`);
   },
 
   /* ------------------------------------------------------------------

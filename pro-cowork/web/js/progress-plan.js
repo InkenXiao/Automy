@@ -1171,7 +1171,6 @@ const ProgressPlan = {
       if (!delBtn) return;
       const phaseId = delBtn.getAttribute('data-phase-id');
       if (!phaseId) return;
-      if (!confirm('确认删除该阶段? 关联的任务将变为"未分阶段"')) return;
       try {
         await API.deletePhase(phaseId);
         App.showToast('阶段已删除', 'success');
@@ -1587,7 +1586,6 @@ const ProgressPlan = {
       const deleteBtn = modal.querySelector('#pp-delete-btn');
       if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
-          if (!confirm('确认删除该任务?删除后不可恢复。')) return;
           try {
             await API.deleteProgressTask(id);
             App.showToast('任务已删除', 'success');

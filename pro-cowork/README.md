@@ -2,10 +2,13 @@
 
 > 由 pro-site 升级而来的项目管理智能体工作平台,基于 FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL。在完整保留「进度计划、项目会议、项目周报、每周工作任务」四大协同模块的基础上,新增「构建、调试、执行 Agent、Skill」平台能力,内置项目进度管理、项目会议管理、项目周报编写、周工作计划制作四大智能体,每个智能体具备感知、记忆、决策、交互、执行五大能力。
 >
-> - 界面导航分为三组:**工作台**(任务/智能体/技能)、**项目台**(进度计划/项目会议/项目周报/每周任务)、**设计台**(智能体设计/技能设计/记忆维护)。
-> - **工作台任务**: 选择 项目 × 文件 × 智能体 × 技能 组合创建任务并流式执行;执行输出与 AI 对话窗口上下布局,可在同一任务会话中持续补充内容(可追加文件/技能)驱动 AI 继续执行。
+> - 界面导航分为三组:**工作台**(任务/智能体/技能)、**项目台**(进度计划/项目会议/项目周报/每周任务/项目成员/个人周报/操作日志)、**设计台**(智能体设计/技能设计/记忆维护)。
+> - **登录认证**: 登录页 + 修改密码; 登录/操作日志统一落库 (`login_logs` / `operation_logs`), 提供操作日志看板与 LLM token 消耗统计。
+> - **工作台任务**: 描述任务即自动意图识别 (项目/数字分身/技能), 未命中时执行窗口内交互式选择; 执行输出与补充对话上下布局, 可在同一任务会话中持续补充内容 (可追加文件/技能) 驱动 AI 继续执行。
+> - **多模态附件**: 所有 AI 对话窗口 (任务补充区/数字分身对话/构建器调试/记忆测试) 统一支持「＋上传文件」与「Ctrl+V 黏贴图片/文件」; 图片走**图像识别**技能 (视觉多模态模型), PDF 走**文档解析**技能 (PyMuPDF 文本层 → mineru → paddleocr 逐级降级), 录音走**会议纪要生成**技能 (ASR 转写 + 纪要流式生成)。
 > - **记忆按项目隔离**: `agent_memories.project_id` 关联项目,每个项目拥有独立记忆空间,对话/任务执行时自动注入当前项目记忆 + 通用记忆。
-> - 与 pro-site **共用 XIN 数据库**,12 张业务表结构零变更,数据实时互通;智能体相关 7 张新表(agents/agent_sessions/agent_messages/agent_memories/skills/skill_executions/task_runs)仅增量添加。
+> - **权限控制**: 项目经理可维护项目成员与查看全部操作日志; 非经理仅查看/填写本人周报与本人操作日志; 未分配项目的用户在项目类视图中不可见业务数据。
+> - 与 pro-site **共用 XIN 数据库**,12 张业务表结构零变更,数据实时互通;智能体相关新表仅增量添加。
 > - 本服务运行在 **8091** 端口(pro-site 为 8088,互不影响)。
 
 ---
@@ -45,55 +48,68 @@ pro-cowork/
 ├── README.md                   # 本文件
 ├── venv/                       # 本地虚拟环境 (venv/bin/python)
 ├── xintou_weekly_reports_2026-07-22.json   # 周报种子 JSON 数据
+├── data/task_files/<project_id>/           # 任务附件落盘目录 (按项目隔离)
 └── app/                        # FastAPI 后端应用
     ├── __init__.py
     ├── main.py                 # FastAPI 入口: lifespan/CORS/路由注册/静态文件挂载
-    ├── config.py               # pydantic-settings 读取 .env, 构建 database_url
+    ├── config.py               # pydantic-settings 读取 .env (PG/系统/八通道模型配置)
     ├── database.py             # 异步引擎/会话工厂/Base/get_db/init_db
+    ├── deps.py                 # 登录态/角色依赖 (HTTP 头中文名 latin-1 编码处理)
+    ├── middleware.py           # 操作日志中间件 (写操作自动落 operation_logs)
+    ├── utils.py                # get_active_project_id 等公共工具
     ├── seed.py                 # 种子脚本: 模块/阶段/进度计划任务
     ├── seed_weekly_reports.py  # 种子脚本: 从 SQLite 解析周报写入 PG
     ├── seed_weekly_from_json.py# 种子脚本: 从 JSON 同步周报
     ├── models/                 # SQLAlchemy ORM 模型
-    │   ├── __init__.py         # 模型汇总导出 (注意: Project 仅在 __all__, 未 import)
     │   ├── base.py             # Base + TimestampMixin (created_at/updated_at)
-    │   ├── project.py          # projects 表: 项目元信息
-    │   ├── module.py           # modules 表: 项目模块字典
-    │   ├── phase.py            # phases 表: 项目阶段字典
-    │   ├── progress_task.py    # progress_tasks 表: 进度计划任务
-    │   ├── meeting.py          # meetings / meeting_items 表: 会议与议程项
-    │   ├── weekly_report.py    # weekly_reports 及 4 张子表
-    │   └── work_task.py        # weekly_work_tasks 表: 每周工作任务
+    │   ├── project.py          # projects 表: 项目元信息 (含 manager/status)
+    │   ├── project_member.py   # project_members 表: 项目成员
+    │   ├── module.py / phase.py / progress_task.py / meeting.py / weekly_report.py / work_task.py
+    │   ├── agent.py            # agents/agent_sessions/agent_messages/agent_memories
+    │   ├── skill.py            # skills/skill_executions
+    │   ├── task_run.py         # task_runs/task_run_events (执行事件持久化, SSE 重放)
+    │   ├── personal_report.py  # personal_reports + 工作内容/下周计划子表
+    │   ├── user_credential.py  # user_credentials 登录账号
+    │   └── usage_log.py        # login_logs / operation_logs
     ├── routers/                # API 路由 (统一前缀 /api)
-    │   ├── __init__.py
-    │   ├── projects.py         # 项目元信息 (含 /active 幂等创建默认项目)
-    │   ├── modules.py          # 模块字典 CRUD
-    │   ├── phases.py           # 阶段字典只读
-    │   ├── progress_tasks.py   # 进度计划任务 CRUD + 状态切换
-    │   ├── meetings.py         # 会议 + 议程项子资源
-    │   ├── weekly_reports.py   # 周报 + KPI/进展/下周任务/风险 子资源
-    │   └── work_tasks.py       # 每周工作任务 + 从周报批量生成
+    │   ├── auth.py             # 登录/改密/成员身份确认
+    │   ├── projects.py / modules.py / phases.py / progress_tasks.py / meetings.py
+    │   ├── weekly_reports.py / work_tasks.py
+    │   ├── project_members.py  # 项目成员维护
+    │   ├── personal_reports.py # 个人周报 (含 Excel 导出)
+    │   ├── usage_logs.py       # 操作日志看板 + token 统计
+    │   ├── agents.py           # 智能体 CRUD/会话/对话(SSE)/调试(Trace)/记忆
+    │   ├── skills.py           # 技能 CRUD/试运行/执行记录
+    │   └── task_runs.py        # 工作台任务 + 事件流 SSE + 附件上传/清空
+    ├── services/               # 业务服务层
+    │   ├── llm.py              # ★模型客户端工厂: MAIN/SMALL/CODER/EMBEDDING/RERANKER/VISION 六通道
+    │   ├── agent_engine.py     # function calling 主循环 (MAIN 模型)
+    │   ├── agent_tools.py      # 17+ 业务工具定义与执行
+    │   ├── agent_context.py    # 项目快照感知注入
+    │   ├── agent_presets.py    # 四大预置智能体播种
+    │   ├── intent_service.py   # 意图识别 (SMALL 模型: 项目/分身/技能自动选择)
+    │   ├── skill_engine.py     # 技能工作流引擎 (内置能力: 会议纪要/周小结/图像识别/文档解析)
+    │   ├── skill_presets.py    # 预置技能播种
+    │   ├── task_runner.py      # 任务后台执行器 (事件总线 + 持久化)
+    │   ├── minutes_service.py  # 会议纪要流式生成 (MAIN 模型)
+    │   ├── digest_service.py   # 周工作小结概括 (SMALL 模型)
+    │   ├── asr_service.py      # 录音转写 (ASR_API_URL, 分片上传, 分段回调)
+    │   ├── vision_service.py   # 图像识别 (VISION 视觉多模态模型, base64 内联)
+    │   ├── doc_parse_service.py# PDF 文档解析 (PyMuPDF → mineru → paddleocr 逐级降级)
+    │   ├── file_prompt.py      # ★附件→提示词公共模块 (按扩展名指引技能/内联文本)
+    │   ├── excel_export.py     # 周报 Excel 导出
+    │   └── log_service.py      # 操作日志/LLM token 统一落库
     └── schemas/                # Pydantic v2 模型 (Create/Update/Out)
-        ├── __init__.py
-        ├── project.py
-        ├── module.py
-        ├── phase.py
-        ├── progress_task.py
-        ├── meeting.py
-        ├── weekly_report.py
-        └── work_task.py
 └── web/                        # 前端静态资源 (由 FastAPI StaticFiles 挂载到 /)
-    ├── index.html              # 单页入口, 左侧导航 + 主区 + 右侧关联面板
-    ├── css/
-    │   └── workbench.css       # 工作台样式
-    ├── js/
-    │   ├── api.js              # 统一 fetch 封装, baseUrl=/api
-    │   ├── app.js              # 视图切换/周次选择器入口
-    │   ├── progress-plan.js    # 进度计划执行图视图
-    │   ├── meeting.js          # 项目会议视图
-    │   ├── weekly-report.js    # 周报视图
-    │   └── work-tasks.js       # 每周工作任务视图
-    └── images/
-        └── XIN.png             # 站点 LOGO
+    ├── index.html              # 单页入口 (登录页 + 左侧导航 + 主区)
+    ├── css/                    # workbench.css / cowork.css / auth.css 等
+    └── js/
+        ├── api.js              # 统一 fetch 封装, baseUrl=/api
+        ├── app.js / auth.js    # 视图切换 / 登录与改密
+        ├── cowork.js           # ★智能体平台前端 (任务/对话/构建器/技能/记忆 + ChatAttach 附件公共组件)
+        ├── progress-plan.js / meeting.js / weekly-report.js / work-tasks.js
+        ├── project-team.js     # 项目成员视图
+        └── personal-report.js  # 个人周报视图
 ```
 
 ---
@@ -292,15 +308,51 @@ docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql
 | GET | `/api/task-runs/{run_id}/messages` | 任务会话消息列表 (对话回放) |
 | POST | `/api/task-runs/{run_id}/run` | 执行任务 (SSE: content/tool_call/tool_result/done/error) |
 | POST | `/api/task-runs/{run_id}/continue` | ★继续对话: 补充内容+追加文件/技能, 在原会话中继续执行 (SSE), 结果追加到 result_text |
-| POST | `/api/task-runs/files/upload?project_id=N` | 上传任务附件 (multipart, 按项目分目录, ≤5MB) |
+| GET | `/api/task-runs/{run_id}/events?after_seq=N` | ★任务事件流 (SSE): 重放持久化事件 + 实时 tail, 支持断线续看与续跑轮次回放 |
+| POST | `/api/task-runs/files/upload?project_id=N` | 上传任务附件 (multipart, 按项目分目录, ≤200MB 支持录音文件) |
 | GET | `/api/task-runs/files/list?project_id=N` | 列出项目附件 |
 | DELETE | `/api/task-runs/files/{filename}?project_id=N` | 删除附件 |
+| DELETE | `/api/task-runs/files?project_id=N` | 清空项目全部附件 (重开新建任务页时默认调用) |
+
+### 6.9 认证与成员（`/api/auth`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/auth/login` | 登录 (成员姓名 + 密码; 首次登录未设密码时引导设置) |
+| POST | `/api/auth/change-password` | 修改密码 |
+| GET | `/api/auth/members` | 成员身份确认列表 (登录页选择姓名) |
+
+### 6.10 项目成员（`/api/project-members`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/project-members/?project_id=N` | 项目成员列表 |
+| POST | `/api/project-members/` | 添加成员 (姓名/角色岗位/入组时间) |
+| PUT | `/api/project-members/{id}` | 更新成员 (含 在职/退出 状态) |
+| DELETE | `/api/project-members/{id}` | 移除成员 (逻辑删除) |
+
+### 6.11 个人周报（`/api/personal-reports`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/personal-reports/?week_start=...&user_name=...` | 列表 (非项目经理仅见本人) |
+| POST | `/api/personal-reports/` | 新建 (工作内容行 + 下周计划, 实时汇总工时) |
+| PUT | `/api/personal-reports/{id}` | 更新 |
+| DELETE | `/api/personal-reports/{id}` | 删除 (逻辑删除) |
+| GET | `/api/personal-reports/{id}/export` | 导出 Excel (与参考格式一致) |
+
+### 6.12 使用日志（`/api/usage-logs`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/usage-logs/operations` | 操作日志看板 (非经理仅见本人操作) |
+| GET | `/api/usage-logs/llm-stats` | LLM token 消耗统计 (全员可见统计) |
 
 ---
 
 ## 七、配置说明
 
-配置由 `app/config.py` 通过 `pydantic-settings` 从 `pro-cowork/.env` 读取。**当前后端实际只消费 PostgreSQL 与系统配置两组变量**；其余变量为整体平台预留（Redis / Milvus / Neo4j / MinIO 等），本工程未引用。
+配置由 `app/config.py` 通过 `pydantic-settings` 从 `pro-cowork/.env` 读取。**实际消费三组变量：PostgreSQL、系统配置、八通道模型配置**；其余变量为整体平台预留（Redis / Milvus / Neo4j / MinIO 等），本工程未引用。
 
 > 下方仅列变量名与含义，**不包含任何真实密码值**。
 
@@ -324,7 +376,24 @@ docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql
 | `LOG_FORMAT` | 日志格式（`json`） |
 | `ENVIRONMENT` | 运行环境标识（`development`） |
 
-### 7.3 平台预留变量（本工程未引用，仅 .env 占位）
+### 7.3 模型配置（八通道, 按用途分离）
+
+所有模型调用统一经 `app/services/llm.py` 客户端工厂按用途取配置 (除 ASR/TTS 为直连 HTTP), 均为 OpenAI 兼容协议。未配置的通道对应能力降级提示, 不影响其余功能。
+
+| 通道前缀 | 用途 | 消费方 |
+|----------|------|--------|
+| `MAIN_API_URL/KEY/MODEL` | **主推理模型**: 智能体对话 function calling 主循环、会议纪要生成 | `agent_engine.py` / `minutes_service.py` |
+| `SMALL_API_URL/KEY/MODEL` | **轻量快推模型**: 意图识别、内容润色、周工作小结概括; 未配置时回退 MAIN | `intent_service.py` / `digest_service.py` |
+| `CODER_API_URL/KEY/MODEL` | **代码生成模型** (预留: AI coding) | `llm.coder_client()` |
+| `EMBEDDING_API_URL/KEY/MODEL` | **向量抽取模型** (知识库构建) | `llm.embedding_client()` |
+| `RERANKER_API_URL/KEY/MODEL` | **结果重排模型** (RAG 重排) | `llm.reranker_client()` |
+| `VISION_API_URL/KEY/MODEL` | **视觉多模态模型**: 图片附件内容识别 | `vision_service.py` (图像识别技能) |
+| `ASR_API_URL/KEY/MODEL` + `ASR_CHUNK_MS` | **语音转文字**: 录音分片转写 | `asr_service.py` (会议纪要技能前置) |
+| `TTS_API_URL/KEY/MODEL` + `TTS_CHUNK_MS` | **文字合成语音** (预留) | — |
+
+> 当前部署经 new-api 网关 (model-api 容器, `:8000`) 按模型名路由: `LLM`→智科 vLLM 主推理, `VLM`→视觉模型, `EMBEDDING`/`RERANKER`→向量/重排; ASR 直连 `192.168.1.13:18888` (paraformer-large)。
+
+### 7.4 平台预留变量（本工程未引用，仅 .env 占位）
 
 | 分组 | 变量名 |
 |------|--------|
@@ -335,7 +404,6 @@ docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql
 | ClickHouse | `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` |
 | MySQL | `MYSQL_ROOT_PASSWORD` / `MYSQL_DATABASE` / `MYSQL_USER` / `MYSQL_PASSWORD` |
 | MongoDB | `MONGO_INITDB_ROOT_USERNAME` / `MONGO_INITDB_ROOT_PASSWORD` / `MONGO_INITDB_DATABASE` |
-| 模型推理 | `MODEL_VLLM_URL` / `MODEL_NAME` / `MODEL_API_KEY` / `LEGACY_API_BASE` / `LEGACY_API_KEY` |
 
 ---
 
@@ -408,9 +476,14 @@ pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 openai>=1.30.0
 python-multipart>=0.0.9
+httpx>=0.27.0
+pydub>=0.25.1
+openpyxl>=3.1.0
+PyMuPDF>=1.24.0
 ```
 
 > 注：`app/seed_weekly_reports.py` 使用了 `beautifulsoup4`（`from bs4 import BeautifulSoup`），但该依赖**未在 `requirements.txt` 中声明**，运行该种子脚本前需手动 `pip install beautifulsoup4`。
+> PDF 扫描件 OCR 为可选增强: 需要时手动 `pip install magic-pdf[full]` (mineru) 或 `pip install paddlepaddle paddleocr`; 未安装时扫描件解析给出降级提示。
 
 ---
 
@@ -467,28 +540,43 @@ python-multipart>=0.0.9
 
 ### 11.3 新增数据表 (仅增量, 业务表零变更)
 
-`agents` / `agent_sessions` / `agent_messages` / `agent_memories` / `skills` / `skill_executions` / `task_runs`,建表见 `scripts/pro-cowork.sql` (幂等),开发期由 `init_db()` 自动创建。
+智能体平台: `agents` / `agent_sessions` / `agent_messages` / `agent_memories` / `skills` / `skill_executions` / `task_runs` / `task_run_events`; 认证与协作: `user_credentials` / `project_members` / `personal_reports` + 2 张子表 / `login_logs` / `operation_logs`。建表见 `scripts/pro-cowork.sql` (幂等),开发期由 `init_db()` 自动创建。
 
 - `agent_memories.project_id`: 记忆按项目隔离, 对话/调试/任务执行时注入「当前项目记忆 + 通用记忆(project_id 为空)」;存量记忆已幂等回填到首个项目
 - `task_runs`: 工作台任务记录 (project_id/agent_id/skill_ids/file_names/status/result_text/session_id), 附件落盘 `data/task_files/<project_id>/`
+- `task_run_events`: 任务执行事件持久化 (seq 递增), 支持 SSE 重放/断线续看/续跑多轮次回放
+- 全平台删除均为**逻辑删除** (`is_delete`), 前端删除操作不再弹确认框
 
 ### 11.4 工作台任务 (TaskRun)
 
-任务页 (工作台→任务) 支持「项目 × 文件 × 智能体 × 技能」组合执行:
+任务页 (工作台→任务) 支持「描述即任务」的自动执行:
 
-1. 左侧创建任务: 选择项目(文件按项目隔离)/智能体, 多选技能 chips, 上传并勾选附件, 填写任务描述;
-2. 右侧上方「执行输出」窗口流式渲染 AI 回复与工具调用轨迹 (可折叠);
-3. 右侧下方「补充对话区」: 在原任务会话中继续补充内容, 可通过「📎 文件」「⚡ 技能」追加附件与技能, Enter 发送, AI 携带完整会话上下文继续执行, 结果追加落库;
-4. 点击历史任务可回放完整对话记录并继续追问。
+1. 左侧创建任务: 上传并勾选附件, 填写任务描述; **意图识别** (SMALL 模型) 自动选择 项目/数字分身/技能, 未命中时执行窗口内弹出交互式选择面板, 选择结果记入分身长期记忆;
+2. 右侧上方「执行输出」窗口流式渲染: 意图识别过程、AI 回复、工具调用轨迹 (可折叠)、录音转写文字、流式会议纪要、周工作小结;
+3. 右侧下方「补充对话区」: 在原任务会话中继续补充内容, 支持「＋上传 / Ctrl+V 黏贴」追加附件 (图片→图像识别, PDF→文档解析, 录音→会议纪要), Enter 发送, AI 携带完整会话上下文继续执行, 结果在同一输出窗口继续流式输出;
+4. 重新打开页面默认清空历史附件 (任务执行中时跳过); 点击历史任务可回放完整执行过程并继续追问。
 
-### 11.5 新增 API 一览
+### 11.5 多模态附件处理 (公共能力)
 
-- `/api/agents`: CRUD + `/{id}/sessions` 会话管理 + `/{id}/chat` (SSE) + `/{id}/debug` (Trace) + `/{id}/memories` 记忆管理 (支持 `?project_id=` 过滤)
+前端 `ChatAttach` 公共组件 (`web/js/cowork.js`) 为所有 AI 对话窗口 (任务补充区/数字分身对话/构建器调试/记忆测试) 统一提供「＋上传文件」与「Ctrl+V 黏贴图片/文件」; 后端 `app/services/file_prompt.py` 按扩展名将附件转为提示词指引, 由 Agent 经 `run_skill` 调用对应内置能力:
+
+| 附件类型 | 内置能力 | 处理链路 |
+|----------|----------|----------|
+| 图片 (png/jpg/...) | `image_recognition` 图像识别 | `vision_service.py` → VISION 视觉多模态模型 (base64 内联) |
+| PDF | `doc_parsing` 文档解析 | `doc_parse_service.py` → PyMuPDF 文本层直抽, 扫描件逐级降级 mineru → paddleocr |
+| 录音 (mp3/m4a/...) | `meeting_minutes` 会议纪要 | `asr_service.py` 分片转写 → `minutes_service.py` MAIN 模型流式生成纪要 |
+| 文本类 (txt/md/...) | — | 直接读取内容内联进提示词 |
+
+### 11.6 新增 API 一览
+
+- `/api/auth`: 登录/改密/成员身份确认
+- `/api/agents`: CRUD + `/{id}/sessions` 会话管理 + `/{id}/chat` (SSE, 支持 file_names 附件) + `/{id}/debug` (Trace) + `/{id}/memories` 记忆管理 (支持 `?project_id=` 过滤)
 - `/api/skills`: CRUD + `/{id}/execute` 试运行 + `/{id}/executions` 执行记录
-- `/api/task-runs`: 工作台任务 CRUD + `/{id}/run` (SSE) + `/{id}/continue` (SSE 续聊) + `/{id}/messages` + 附件上传/列表/删除
+- `/api/task-runs`: 工作台任务 CRUD + `/{id}/run` + `/{id}/continue` (续聊) + `/{id}/events` (SSE 事件流) + `/{id}/messages` + 附件上传/列表/删除/清空
+- `/api/project-members`: 项目成员维护
+- `/api/personal-reports`: 个人周报 + Excel 导出
+- `/api/usage-logs`: 操作日志看板 + LLM token 统计
 
-### 11.6 LLM 配置
+### 11.7 LLM 配置
 
-`.env` 中配置 `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` (OpenAI 兼容协议, 支持 DeepSeek/通义千问/vLLM 等);未配置时 Agent 回复降级提示, 其余功能不受影响。
-
-> 当前部署经 new-api 网关 (model-api 容器, `:8000`) 路由至智科 vLLM (`192.168.1.13:10001`);信投-LLM (`192.168.1.161`) 渠道已禁用 (离线)。
+模型调用按用途分八通道配置, 详见 **7.3 模型配置**; 统一入口 `app/services/llm.py`。未配置主推理模型时 Agent 回复降级提示, 其余功能不受影响。

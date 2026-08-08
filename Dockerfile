@@ -1,9 +1,8 @@
 # ============================================================
-# XIN-AI 五合一容器镜像 (开发模式: 源码挂载, 改代码无需 rebuild)
+# XIN-AI 四合一容器镜像 (开发模式: 源码挂载, 改代码无需 rebuild)
 #   xin-site  : 8087  (Vite dev 热更新)
 #   pro-site  : 8088  (FastAPI + uvicorn --reload)
 #   abs-site  : 8089  (FastAPI + uvicorn --reload)
-#   xin-cowork: 8090  (Vite dev 热更新)
 #   pro-cowork: 8091  (FastAPI + uvicorn --reload, 智能体平台)
 #
 # 镜像只安装运行时和依赖, 源码通过 docker-compose 卷挂载
@@ -67,14 +66,11 @@ ENV PATH="/app/venv/bin:$PATH"
 COPY xin-site/package.json xin-site/package-lock.json* /app/xin-site/
 RUN cd /app/xin-site && npm install
 
-COPY xin-cowork/package.json xin-cowork/package-lock.json* /app/xin-cowork/
-RUN cd /app/xin-cowork && npm install
-
 # ---------- 3. 入口脚本 ----------
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-EXPOSE 8087 8088 8089 8090 8091
+EXPOSE 8087 8088 8089 8091
 RUN mkdir -p /app/logs
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

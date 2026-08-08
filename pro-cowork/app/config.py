@@ -23,16 +23,47 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
 
-    # LLM 配置
-    OPENAI_API_KEY: str = ""
-    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    # 主推理模型 (智能体对话/会议纪要等主力生成)
+    MAIN_API_URL: str = ""
+    MAIN_API_KEY: str = ""
+    MAIN_MODEL: str = ""
+
+    # 轻量快推模型 (意图识别/内容润色/概括等快速任务)
+    SMALL_API_URL: str = ""
+    SMALL_API_KEY: str = ""
+    SMALL_MODEL: str = ""
+
+    # 代码生成模型 (预留: AI coding)
+    CODER_API_URL: str = ""
+    CODER_API_KEY: str = ""
+    CODER_MODEL: str = ""
+
+    # 向量抽取模型 (知识库构建)
+    EMBEDDING_API_URL: str = ""
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_MODEL: str = ""
+
+    # 结果重排模型 (RAG 重排)
+    RERANKER_API_URL: str = ""
+    RERANKER_API_KEY: str = ""
+    RERANKER_MODEL: str = ""
+
+    # 视觉多模态模型 (图片内容识别)
+    VISION_API_URL: str = ""
+    VISION_API_KEY: str = ""
+    VISION_MODEL: str = ""
 
     # ASR 语音识别配置 (录音转文字)
     ASR_API_URL: str = ""
     ASR_API_KEY: str = ""
     ASR_MODEL: str = "paraformer-large"
     ASR_CHUNK_MS: int = 120000
+
+    # TTS 语音合成配置 (文字合成语音)
+    TTS_API_URL: str = ""
+    TTS_API_KEY: str = ""
+    TTS_MODEL: str = ""
+    TTS_CHUNK_MS: int = 10000
 
     @property
     def database_url(self) -> str:

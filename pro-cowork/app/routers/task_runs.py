@@ -27,8 +27,6 @@ router = APIRouter(prefix="/task-runs", tags=["工作台任务"])
 # 任务附件存储目录: pro-cowork/data/task_files/<project_id>/<filename>
 UPLOAD_ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "task_files"
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB (支持录音文件)
-MAX_FILE_CONTENT_CHARS = 20000     # 注入提示词的文件内容上限
-AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".wma", ".opus"}
 
 
 def _safe_filename(name: str) -> str:
@@ -40,22 +38,6 @@ def _project_upload_dir(project_id: Optional[int]) -> Path:
     d = UPLOAD_ROOT / str(project_id or 0)
     d.mkdir(parents=True, exist_ok=True)
     return d
-
-
-def _is_audio(filename: str) -> bool:
-    return Path(filename).suffix.lower() in AUDIO_EXTS
-
-
-def _read_file(project_id: Optional[int], filename: str) -> str:
-    path = _project_upload_dir(project_id) / _safe_filename(filename)
-    if not path.exists():
-        return ""
-    if _is_audio(filename):
-        return ""  # 音频不注入文本内容, 由技能读取文件处理
-    try:
-        return path.read_text(encoding="utf-8", errors="ignore")[:MAX_FILE_CONTENT_CHARS]
-    except Exception:
-        return ""
 
 
 # ---------- 任务附件 ----------
@@ -89,6 +71,21 @@ async def list_files(
         for f in sorted(d.iterdir())
         if f.is_file()
     ]
+
+
+@router.delete("/files")
+async def clear_files(
+    project_id: Optional[int] = None, db: AsyncSession = Depends(get_db)
+):
+    """清空项目全部任务附件 (需求: 重新打开新建长任务页时默认清空历史文件)"""
+    pid = project_id or await get_active_project_id(db)
+    d = _project_upload_dir(pid)
+    removed = 0
+    for f in d.iterdir():
+        if f.is_file():
+            f.unlink()
+            removed += 1
+    return {"ok": True, "removed": removed}
 
 
 @router.delete("/files/{filename}")
@@ -195,23 +192,14 @@ async def _build_prompt(
     file_names: list[str],
     skill_ids: list[int],
 ) -> str:
-    """组装任务提示词: 任务描述 + 附件内容 + 指定技能"""
+    """组装任务提示词: 任务描述 + 附件内容/技能指引 + 指定技能"""
     from app.models.skill import Skill
+    from app.services.file_prompt import build_file_prompt_parts
 
     prompt_parts: list[str] = []
     if input_text:
         prompt_parts.append(input_text)
-    for fname in file_names or []:
-        if _is_audio(fname):
-            prompt_parts.append(
-                f"【录音文件 {fname}】音频附件, 请通过 run_skill 调用「会议纪要生成」技能处理 "
-                f"(input_data: {{\"file_name\": \"{fname}\", \"project_id\": {project_id or 0}}}), "
-                f"并将转写文字与生成的会议纪要完整展示"
-            )
-            continue
-        content = _read_file(project_id, fname)
-        if content:
-            prompt_parts.append(f"【附件 {fname}】\n{content}")
+    prompt_parts.extend(build_file_prompt_parts(project_id, file_names))
     if skill_ids:
         skill_result = await db.execute(select(Skill).where(Skill.id.in_(skill_ids)))
         skills = skill_result.scalars().all()
@@ -261,8 +249,8 @@ async def run_task(run_id: int, db: AsyncSession = Depends(get_db)):
 
     session_id = None
     if run.agent_id is not None:
-        # ---- 创建执行会话 (run 模式总是新会话) ----
-        session = AgentSession(agent_id=run.agent_id, title=run.title[:50])
+        # ---- 创建执行会话 (run 模式总是新会话; status=task 与分身会话列表隔离, 防误删致续跑失败) ----
+        session = AgentSession(agent_id=run.agent_id, title=run.title[:50], status="task")
         db.add(session)
         await db.flush()
         await db.refresh(session)
@@ -383,10 +371,12 @@ async def stream_task_events(
     async def event_stream():
         last_seq = after_seq
         try:
-            for ev in backlog:
+            # continue 续跑后历史中存在上一轮 done 事件: 仅当 done 为 backlog 最后一条
+            # 且无实时订阅时才结束流, 否则继续回放/tail 后续轮次事件
+            for idx, ev in enumerate(backlog):
                 last_seq = ev.seq
                 yield _fmt_event(ev.seq, ev.type, ev.name, ev.payload)
-                if ev.type == "done":
+                if ev.type == "done" and queue is None and idx == len(backlog) - 1:
                     return
             if queue is None:
                 return
