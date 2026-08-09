@@ -10,15 +10,17 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.deps import get_user_name
 from app.models.agent import Agent, AgentMessage, AgentSession
 from app.models.task_run import TaskRun, TaskRunEvent
 from app.schemas.task_run import TaskRunChoice, TaskRunContinue, TaskRunCreate, TaskRunOut
+from app.services import minio_service
 from app.services.task_runner import task_runner
 from app.utils import get_active_project_id
 
@@ -42,13 +44,26 @@ def _project_upload_dir(project_id: Optional[int]) -> Path:
 
 # ---------- 任务附件 ----------
 
+# 内联预览 Content-Type 映射 (聊天窗图片/语音直接渲染播放, 其余下载)
+_INLINE_CONTENT_TYPES = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
+    ".m4a": "audio/mp4", ".mp3": "audio/mpeg", ".wav": "audio/wav",
+    ".ogg": "audio/ogg", ".webm": "audio/webm", ".flac": "audio/flac",
+    ".mp4": "video/mp4", ".pdf": "application/pdf",
+    ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
+}
+
+
 @router.post("/files/upload")
 async def upload_file(
+    request: Request,
     project_id: Optional[int] = None,
+    agent_name: Optional[str] = None,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
-    """上传任务附件 (按项目分目录存储, 支持录音文件)"""
+    """上传任务附件 (本地按项目分目录存储, 并同步归档 MinIO: {分身}/{成员}/{yyyymm}/)"""
     pid = project_id or await get_active_project_id(db)
     name = _safe_filename(file.filename or "unnamed")
     content = await file.read()
@@ -56,7 +71,42 @@ async def upload_file(
         raise HTTPException(status_code=400, detail="文件过大 (限制 200MB)")
     path = _project_upload_dir(pid) / name
     path.write_bytes(content)
-    return {"ok": True, "name": name, "size": len(content)}
+
+    member = get_user_name(request)
+    minio_key = await minio_service.upload_bytes(
+        name, content,
+        content_type=file.content_type or "application/octet-stream",
+        agent_name=agent_name or "",
+        member_name=member,
+    )
+    return {"ok": True, "name": name, "size": len(content), "minio_key": minio_key}
+
+
+@router.get("/files/{filename}/raw")
+async def get_file_raw(filename: str, download: bool = False):
+    """附件内容访问: 聊天消息中图片/语音/视频内联渲染, download=true 强制下载
+
+    文件名全局唯一 (时间戳/日期前缀), 跨项目目录查找首个匹配。
+    本地未命中时从 MinIO 归档回源到 _cache 目录 (工作台页打开会清空项目附件目录,
+    聊天历史附件由此保证可回看/播放); _cache 不在清空范围内。
+    """
+    name = _safe_filename(filename)
+    for d in sorted(UPLOAD_ROOT.iterdir()) if UPLOAD_ROOT.exists() else []:
+        if d.is_dir():
+            path = d / name
+            if path.is_file():
+                media_type = _INLINE_CONTENT_TYPES.get(path.suffix.lower())
+                if download or not media_type:
+                    return FileResponse(path, filename=name)
+                return FileResponse(path, media_type=media_type)
+    # 本地未找到: MinIO 回源 (聊天历史附件在附件目录被清空后仍可访问)
+    cache = UPLOAD_ROOT / "_cache" / name
+    if await minio_service.restore_by_filename(name, cache) and cache.is_file():
+        media_type = _INLINE_CONTENT_TYPES.get(cache.suffix.lower())
+        if download or not media_type:
+            return FileResponse(cache, filename=name)
+        return FileResponse(cache, media_type=media_type)
+    raise HTTPException(status_code=404, detail="文件不存在")
 
 
 @router.get("/files/list")

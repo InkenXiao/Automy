@@ -70,7 +70,8 @@ const ChatAttach = {
       btn.classList.add('attach-btn--uploading');
       try {
         const pid = opts.getProjectId ? opts.getProjectId() : null;
-        const res = await API.uploadTaskFile(new File([file], name, { type: file.type }), pid);
+        const agentName = opts.getAgentName ? opts.getAgentName() : '';
+        const res = await API.uploadTaskFile(new File([file], name, { type: file.type }), pid, agentName);
         files.add(res.name || name);
         render();
       } catch (err) {
@@ -97,6 +98,92 @@ const ChatAttach = {
       clear: () => { files.clear(); render(); },
       count: () => files.size,
     };
+  },
+
+  /* ---------------- 消息附件渲染 (历史会话点击查看图片/播放语音/下载文件) ---------------- */
+
+  /** 附件访问地址 (后端跨项目目录按文件名查找; download=true 强制下载) */
+  fileUrl(name, download = false) {
+    return `/api/task-runs/files/${encodeURIComponent(name)}/raw${download ? '?download=true' : ''}`;
+  },
+
+  /** 按扩展名分类: image / audio / video / pdf / file */
+  fileKind(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) return 'image';
+    if (['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'webm'].includes(ext)) return 'audio';
+    if (['mp4', 'mov'].includes(ext)) return 'video';
+    if (ext === 'pdf') return 'pdf';
+    return 'file';
+  },
+
+  /** 从消息内容提取全部附件标记文件名 (【附件 x】【图片文件 x】【录音文件 x】【PDF文件 x】) */
+  extractFiles(content) {
+    const files = [];
+    const re = /【(?:附件|图片文件|录音文件|PDF文件)\s*([^】\n]+?)\s*】/g;
+    let m;
+    while ((m = re.exec(content || '')) !== null) files.push(m[1]);
+    return [...new Set(files)];
+  },
+
+  /** 对话消息解析: 去掉附件标记 (含同行技能指引文字), 返回 { text, files } */
+  parseMessage(content) {
+    const files = this.extractFiles(content);
+    const text = (content || '')
+      .replace(/【(?:图片文件|录音文件|PDF文件)\s*[^】\n]+?】[^\n]*/g, '')
+      .replace(/【附件\s*[^】\n]+?】/g, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return { text, files };
+  },
+
+  /** 任务提示词解析: 首段为任务描述, 其后为附件/技能段; 返回 { text, files, hasSkill } */
+  parseTaskUser(content) {
+    const files = this.extractFiles(content);
+    const idx = (content || '').indexOf('\n\n【');
+    let text = idx === -1 ? (content || '') : content.slice(0, idx);
+    if (idx === 0) text = '';
+    return {
+      text: text.trim(),
+      files,
+      hasSkill: (content || '').includes('【指定技能】'),
+    };
+  },
+
+  /** 单个附件的展示 HTML: 图片缩略图 / 语音播放器 / 视频播放器 / 其余下载链接 */
+  fileChipHtml(name) {
+    const esc = App.escapeHtml(name);
+    const url = this.fileUrl(name);
+    const dl = this.fileUrl(name, true);
+    const kind = this.fileKind(name);
+    if (kind === 'image') {
+      return `<span class="msg-file msg-file--image">
+        <img src="${url}" alt="${esc}" loading="lazy" onclick="window.open('${url}','_blank')" title="点击查看大图">
+        <span class="msg-file__bar"><span class="msg-file__name">${esc}</span><a href="${dl}" title="下载">⬇</a></span>
+      </span>`;
+    }
+    if (kind === 'audio') {
+      return `<span class="msg-file msg-file--audio">
+        <audio controls preload="none" src="${url}"></audio>
+        <span class="msg-file__bar"><span class="msg-file__name">🎙 ${esc}</span><a href="${dl}" title="下载">⬇</a></span>
+      </span>`;
+    }
+    if (kind === 'video') {
+      return `<span class="msg-file msg-file--video">
+        <video controls preload="none" src="${url}"></video>
+        <span class="msg-file__bar"><span class="msg-file__name">${esc}</span><a href="${dl}" title="下载">⬇</a></span>
+      </span>`;
+    }
+    const icon = kind === 'pdf' ? '📄' : '📎';
+    const open = kind === 'pdf' ? `<a href="${url}" target="_blank" title="打开预览">👁</a>` : '';
+    return `<span class="msg-file msg-file--file">${icon}<span class="msg-file__name" title="${esc}">${esc}</span>${open}<a href="${dl}" title="下载">⬇</a></span>`;
+  },
+
+  /** 附件列表整体 HTML (无附件返回空串) */
+  filesHtml(files) {
+    if (!files || !files.length) return '';
+    return `<div class="msg-attach">${files.map(f => this.fileChipHtml(f)).join('')}</div>`;
   },
 };
 
@@ -203,8 +290,14 @@ const TaskCenter = {
       getProjectId: () => (this.currentRun && this.currentRun.project_id) || this.currentProjectId(),
     });
     // 补充区附件: ＋上传 / Ctrl+V 黏贴 (图片/PDF/录音按类型走对应技能)
+    // MinIO 归档分身段: 当前任务已指定分身则用之, 否则 "通用"
     this.fcAttach = ChatAttach.attach(fcInput, {
       getProjectId: () => (this.currentRun && this.currentRun.project_id) || this.currentProjectId(),
+      getAgentName: () => {
+        const run = this.currentRun;
+        if (!run || !run.agent_id) return '';
+        return (this.agents.find(a => a.id === run.agent_id) || {}).name || '';
+      },
     });
     this.updateFollowupState();
 
@@ -335,17 +428,12 @@ const TaskCenter = {
     });
   },
 
-  /** 用户消息显示文本: 组装消息含【附件】【指定技能】段, 截取首段并标注 */
-  displayUserText(content) {
-    if (!content) return '(附件任务)';
-    const idx = content.indexOf('\n\n【');
-    if (idx === -1) return content;
-    const head = content.slice(0, idx) || '(附件任务)';
-    const extras = [];
-    const fileMatch = content.match(/【附件 ([^】]+)】/g);
-    if (fileMatch) extras.push(fileMatch.map(t => t.replace(/【附件 |】/g, '📄')).join(' '));
-    if (content.includes('【指定技能】')) extras.push('⚡ 已指定技能');
-    return extras.length ? `${head}\n(${extras.join(' · ')})` : head;
+  /** 用户消息显示 HTML: 任务提示词取首段描述, 附件渲染为可点击查看/播放的卡片 */
+  displayUserHtml(content) {
+    const { text, files, hasSkill } = ChatAttach.parseTaskUser(content);
+    let html = App.escapeHtml(text || '(附件任务)').replace(/\n/g, '<br>');
+    if (hasSkill) html += '<div class="msg-skill-note">⚡ 已指定技能</div>';
+    return html + ChatAttach.filesHtml(files);
   },
 
   /** 追加一条对话气泡到输出窗口 */
@@ -423,8 +511,7 @@ const TaskCenter = {
           if (replyText) this._lastReply = replyText; // 新一轮开始前冻结上一条完整回复
           replyBody = null; replyText = ''; lastTrace = null;
           asrBlock = null; minutesBlock = null; digestBlock = null; intentTrace = null;
-          this.appendChatMsg(out, 'user',
-            App.escapeHtml(this.displayUserText(event.payload.content)).replace(/\n/g, '<br>'));
+          this.appendChatMsg(out, 'user', this.displayUserHtml(event.payload.content));
         } else if (event.type === 'intent') {
           // 意图识别过程: 项目/数字分身/技能 自动识别结果 (start/done 合并为同一块)
           replyBody = null; replyText = ''; lastTrace = null;
@@ -1569,6 +1656,7 @@ const AgentChat = {
     // 对话附件: ＋上传 / Ctrl+V 黏贴 (未 @项目 时落到当前激活项目附件目录)
     this.chatAttach = ChatAttach.attach(textarea, {
       getProjectId: () => this.mentionProjectId,
+      getAgentName: () => (this.agent && this.agent.name) || '',
     });
   },
 
@@ -1675,7 +1763,14 @@ const AgentChat = {
     const div = document.createElement('div');
     div.className = `chat-msg chat-msg--${role === 'user' ? 'user' : 'assistant'}`;
     const icon = role === 'user' ? '👤' : ((this.agent.config || {}).icon || '🤖');
-    const body = role === 'assistant' ? App.renderMarkdown(content) : App.escapeHtml(content);
+    // 用户消息: 附件标记解析为可点击查看图片/播放语音/下载文件的卡片
+    let body;
+    if (role === 'assistant') {
+      body = App.renderMarkdown(content);
+    } else {
+      const parsed = ChatAttach.parseMessage(content);
+      body = App.escapeHtml(parsed.text).replace(/\n/g, '<br>') + ChatAttach.filesHtml(parsed.files);
+    }
     div.innerHTML = `
       <div class="chat-msg__avatar">${icon}</div>
       <div class="chat-msg__body">${body}</div>`;
@@ -1992,8 +2087,10 @@ const CoworkBuilder = {
     });
     // 调试输入框: @ 项目 / 记录 # 资源
     MentionBox.attach(debugInput, {});
-    // 调试附件: ＋上传 / Ctrl+V 黏贴
-    this.debugAttach = ChatAttach.attach(debugInput, {});
+    // 调试附件: ＋上传 / Ctrl+V 黏贴 (归档到当前编辑分身段下)
+    this.debugAttach = ChatAttach.attach(debugInput, {
+      getAgentName: () => (this.editing && this.editing.name) || '',
+    });
     // Emoji / 主题色选择器
     Pickers.bind(el);
     this.updateCtxBadge();
@@ -2065,10 +2162,11 @@ const CoworkBuilder = {
     const placeholder = output.querySelector('.debug-hint');
     if (placeholder) placeholder.remove();
     const marks = fileNames.map(f => `【附件 ${f}】`).join(' ');
+    const parsedUser = ChatAttach.parseMessage(message + (marks ? `\n${marks}` : ''));
     const roundDiv = document.createElement('div');
     roundDiv.className = 'debug-round';
     roundDiv.innerHTML = `
-      <div class="debug-round__user">${App.escapeHtml(message + (marks ? `\n${marks}` : ''))}</div>
+      <div class="debug-round__user">${App.escapeHtml(parsedUser.text).replace(/\n/g, '<br>')}${ChatAttach.filesHtml(parsedUser.files)}</div>
       <div class="debug-round__body"><div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div></div>`;
     output.appendChild(roundDiv);
     output.scrollTop = output.scrollHeight;
@@ -2667,8 +2765,13 @@ const CoworkMemories = {
       }
     });
     MentionBox.attach(testInput, {});
-    // 测试附件: ＋上传 / Ctrl+V 黏贴
-    this.testAttach = ChatAttach.attach(testInput, {});
+    // 测试附件: ＋上传 / Ctrl+V 黏贴 (归档到筛选器选中分身段下)
+    this.testAttach = ChatAttach.attach(testInput, {
+      getAgentName: () => {
+        const id = parseInt((document.getElementById('mem-agent-filter') || {}).value, 10);
+        return ((this.agents || []).find(a => a.id === id) || {}).name || '';
+      },
+    });
     this.updateTestBadge();
     await this.renderList();
   },
@@ -2703,10 +2806,11 @@ const CoworkMemories = {
     const placeholder = output.querySelector('.debug-hint');
     if (placeholder) placeholder.remove();
     const marks = fileNames.map(f => `【附件 ${f}】`).join(' ');
+    const parsedUser = ChatAttach.parseMessage(message + (marks ? `\n${marks}` : ''));
     const roundDiv = document.createElement('div');
     roundDiv.className = 'debug-round';
     roundDiv.innerHTML = `
-      <div class="debug-round__user">${App.escapeHtml(message + (marks ? `\n${marks}` : ''))}</div>
+      <div class="debug-round__user">${App.escapeHtml(parsedUser.text).replace(/\n/g, '<br>')}${ChatAttach.filesHtml(parsedUser.files)}</div>
       <div class="debug-round__body"><div style="font-size:12px;color:var(--color-text-tertiary)">执行中…</div></div>`;
     output.appendChild(roundDiv);
     const body = roundDiv.querySelector('.debug-round__body');

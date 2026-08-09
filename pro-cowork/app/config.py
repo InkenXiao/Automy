@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     # mineru 算力网关 (扫描件 PDF 深度布局分析; 宿主机 mineru 容器, 留空则跳过该级)
     MINERU_API_URL: str = ""
 
+    # MinIO 对象存储 (上传文件同步归档; 路径: {分身}/{成员}/{yyyymm}/{文件名})
+    MINIO_ENDPOINT: str = ""
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""
+    MINIO_BUCKET: str = "xuanpu"
+    MINIO_SECURE: bool = False
+    MINIO_REGION: str = "cn-north-1"  # 服务端 MINIO_REGION 配置, 签名区域不匹配会报 AuthorizationHeaderMalformed
+
     @property
     def database_url(self) -> str:
         """构建 SQLAlchemy async DATABASE_URL (postgresql+asyncpg://)"""

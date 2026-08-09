@@ -568,13 +568,21 @@ const API = {
     return this.post(`/task-runs/${id}/continue`, payload);
   },
 
-  /** 上传任务附件 (multipart) */
-  async uploadTaskFile(file, projectId) {
+  /** 上传任务附件 (multipart); agentName 用于 MinIO 归档路径 {分身}/{成员}/{yyyymm}/ */
+  async uploadTaskFile(file, projectId, agentName) {
     const formData = new FormData();
     formData.append('file', file);
-    const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+    const params = [];
+    if (projectId) params.push(`project_id=${encodeURIComponent(projectId)}`);
+    if (agentName) params.push(`agent_name=${encodeURIComponent(agentName)}`);
+    const qs = params.length ? `?${params.join('&')}` : '';
+    // 与 request() 一致注入登录人身份头 (MinIO 归档路径成员段; 中文需 URL 编码)
+    const headers = {};
+    const userName = (localStorage.getItem('cowork_user') || '').trim();
+    if (userName) headers['X-User-Name'] = encodeURIComponent(userName);
     const response = await fetch(`${this.baseUrl}/task-runs/files/upload${qs}`, {
       method: 'POST',
+      headers,
       body: formData,
     });
     if (!response.ok) {

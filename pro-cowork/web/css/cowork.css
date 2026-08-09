@@ -1150,6 +1150,90 @@
 }
 
 /* ------------------------------------------------------------------
+   消息内附件卡片 (历史会话点击查看图片 / 播放语音 / 下载文件)
+   ------------------------------------------------------------------ */
+.msg-attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.msg-file {
+  display: inline-flex;
+  flex-direction: column;
+  max-width: 300px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-bg-secondary, #f9fafb);
+  font-size: 12px;
+}
+
+.msg-file--image img {
+  max-width: 300px;
+  max-height: 200px;
+  object-fit: cover;
+  cursor: zoom-in;
+  display: block;
+}
+
+.msg-file--video video {
+  max-width: 300px;
+  max-height: 200px;
+  display: block;
+}
+
+.msg-file--audio {
+  padding: 8px 10px 4px;
+}
+
+.msg-file--audio audio {
+  width: 260px;
+  height: 32px;
+  display: block;
+}
+
+.msg-file__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+}
+
+.msg-file__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.msg-file--file {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  max-width: 260px;
+}
+
+.msg-file a {
+  color: var(--color-primary, #f97316);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.msg-file a:hover {
+  text-decoration: underline;
+}
+
+.msg-skill-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+/* ------------------------------------------------------------------
    Emoji / 主题色 可视化选择器
    ------------------------------------------------------------------ */
 .pick-field {
