@@ -5,7 +5,7 @@
 > - 界面导航分为三组:**工作台**(任务/智能体/技能)、**项目台**(进度计划/项目会议/项目周报/每周任务/项目成员/个人周报/操作日志)、**设计台**(智能体设计/技能设计/记忆维护)。
 > - **登录认证**: 登录页 + 修改密码; 登录/操作日志统一落库 (`login_logs` / `operation_logs`), 提供操作日志看板与 LLM token 消耗统计。
 > - **工作台任务**: 描述任务即自动意图识别 (项目/数字分身/技能), 未命中时执行窗口内交互式选择; 执行输出与补充对话上下布局, 可在同一任务会话中持续补充内容 (可追加文件/技能) 驱动 AI 继续执行。
-> - **多模态附件**: 所有 AI 对话窗口 (任务补充区/数字分身对话/构建器调试/记忆测试) 统一支持「＋上传文件」与「Ctrl+V 黏贴图片/文件」; 图片走**图像识别**技能 (视觉多模态模型), PDF 走**文档解析**技能 (PyMuPDF 文本层 → mineru → paddleocr 逐级降级), 录音走**会议纪要生成**技能 (ASR 转写 + 纪要流式生成)。
+> - **多模态附件**: 所有 AI 对话窗口 (任务补充区/数字分身对话/构建器调试/记忆测试) 统一支持「＋上传文件」与「Ctrl+V 黏贴图片/文件」; 图片走**图像识别**技能 (视觉多模态模型), PDF 走**文档解析**技能 (PyMuPDF 文本层 → mineru 算力网关 → paddleocr 逐级降级), 录音走**会议纪要生成**技能 (ASR 转写 + 纪要流式生成)。
 > - **记忆按项目隔离**: `agent_memories.project_id` 关联项目,每个项目拥有独立记忆空间,对话/任务执行时自动注入当前项目记忆 + 通用记忆。
 > - **权限控制**: 项目经理可维护项目成员与查看全部操作日志; 非经理仅查看/填写本人周报与本人操作日志; 未分配项目的用户在项目类视图中不可见业务数据。
 > - 与 pro-site **共用 XIN 数据库**,12 张业务表结构零变更,数据实时互通;智能体相关新表仅增量添加。
@@ -95,7 +95,7 @@ pro-cowork/
     │   ├── digest_service.py   # 周工作小结概括 (SMALL 模型)
     │   ├── asr_service.py      # 录音转写 (ASR_API_URL, 分片上传, 分段回调)
     │   ├── vision_service.py   # 图像识别 (VISION 视觉多模态模型, base64 内联)
-    │   ├── doc_parse_service.py# PDF 文档解析 (PyMuPDF → mineru → paddleocr 逐级降级)
+    │   ├── doc_parse_service.py# PDF 文档解析 (PyMuPDF → mineru 算力网关 → paddleocr 逐级降级)
     │   ├── file_prompt.py      # ★附件→提示词公共模块 (按扩展名指引技能/内联文本)
     │   ├── excel_export.py     # 周报 Excel 导出
     │   └── log_service.py      # 操作日志/LLM token 统一落库
@@ -483,7 +483,7 @@ PyMuPDF>=1.24.0
 ```
 
 > 注：`app/seed_weekly_reports.py` 使用了 `beautifulsoup4`（`from bs4 import BeautifulSoup`），但该依赖**未在 `requirements.txt` 中声明**，运行该种子脚本前需手动 `pip install beautifulsoup4`。
-> PDF 扫描件 OCR 为可选增强: 需要时手动 `pip install magic-pdf[full]` (mineru) 或 `pip install paddlepaddle paddleocr`; 未安装时扫描件解析给出降级提示。
+> PDF 扫描件解析为可选增强: 优先调用 mineru 算力网关 (HTTP, 由 `.env` 的 `MINERU_API_URL` 配置, 宿主机 mineru 容器提供 MinerU 深度布局分析); 网关未配置时可本地 `pip install paddlepaddle paddleocr` 兜底; 均不可用时扫描件解析给出降级提示。
 
 ---
 
@@ -563,7 +563,7 @@ PyMuPDF>=1.24.0
 | 附件类型 | 内置能力 | 处理链路 |
 |----------|----------|----------|
 | 图片 (png/jpg/...) | `image_recognition` 图像识别 | `vision_service.py` → VISION 视觉多模态模型 (base64 内联) |
-| PDF | `doc_parsing` 文档解析 | `doc_parse_service.py` → PyMuPDF 文本层直抽, 扫描件逐级降级 mineru → paddleocr |
+| PDF | `doc_parsing` 文档解析 | `doc_parse_service.py` → PyMuPDF 文本层直抽, 扫描件逐级降级: mineru 算力网关 (HTTP, `MINERU_API_URL`) → paddleocr |
 | 录音 (mp3/m4a/...) | `meeting_minutes` 会议纪要 | `asr_service.py` 分片转写 → `minutes_service.py` MAIN 模型流式生成纪要 |
 | 文本类 (txt/md/...) | — | 直接读取内容内联进提示词 |
 

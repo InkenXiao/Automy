@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     TTS_MODEL: str = ""
     TTS_CHUNK_MS: int = 10000
 
+    # mineru 算力网关 (扫描件 PDF 深度布局分析; 宿主机 mineru 容器, 留空则跳过该级)
+    MINERU_API_URL: str = ""
+
     @property
     def database_url(self) -> str:
         """构建 SQLAlchemy async DATABASE_URL (postgresql+asyncpg://)"""
