@@ -216,13 +216,21 @@ input, textarea, select { font-family: inherit; font-size: 14px; }
   color: #c05a00;
 }
 
+.sidebar__week-selector input[type="week"]::-webkit-datetime-edit-year-field,
+.sidebar__week-selector input[type="week"]::-webkit-datetime-edit-week-field {
+  color: #c05a00;
+}
+
 .sidebar__week-selector input[type="week"]::-webkit-inner-spin-button {
   display: none;
 }
 
 .sidebar__week-selector input[type="week"]::-webkit-calendar-picker-indicator {
-  opacity: 0.6;
+  opacity: 1;
   cursor: pointer;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FF8C00'%3E%3Cpath d='M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 6h14v2H5V6z'/%3E%3C/svg%3E") center/contain no-repeat;
+  width: 18px;
+  height: 18px;
 }
 
 .sidebar__footer {
