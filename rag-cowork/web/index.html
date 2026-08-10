@@ -45,6 +45,15 @@
   .btn-primary:hover { filter: brightness(1.1); }
   .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
   .kb-tree { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+
+  /* 侧栏左下角用户区 (与 pro/mcp 一致) */
+  .side-user { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border-top: 1px solid var(--line); background: var(--panel); font-size: 13px; color: var(--dim); }
+  .side-user__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
+  .side-user__btn { flex: none; background: var(--panel2); border: 1px solid var(--line); color: var(--dim);
+    border-radius: 7px; padding: 4px 11px; font-size: 11px; cursor: pointer; transition: all .15s ease; }
+  .side-user__btn:hover { color: var(--accent); border-color: var(--accent); }
+  .side-user__btn.danger:hover { color: var(--err); border-color: var(--err); }
   .kb-group { margin-top: 8px; }
   .kb-group-title { font-size: 11px; color: var(--dim); padding: 4px 8px; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
   .kb-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;
@@ -210,11 +219,6 @@
   <div class="logo">R</div>
   <h1>玄圃 · 知识工坊</h1>
   <div class="spacer"></div>
-  <div class="user-badge">
-    <span>当前用户 <b id="user-name"></b></span>
-    <button class="link-btn" id="btn-password">设置密码</button>
-    <button class="link-btn" id="btn-logout">退出</button>
-  </div>
 </div>
 
 <div class="main">
@@ -225,6 +229,11 @@
       <button class="btn-primary" id="btn-create-kb">+ 新建</button>
     </div>
     <div class="kb-tree" id="kb-tree"></div>
+    <div class="side-user">
+      <span class="side-user__name" id="user-name-label">👤 <b id="user-name"></b></span>
+      <button class="side-user__btn" id="btn-password" title="设置/修改本人登录密码">密码</button>
+      <button class="side-user__btn danger" id="btn-logout" title="退出登录">退出</button>
+    </div>
   </div>
 
   <!-- 中: 文件列表 -->
