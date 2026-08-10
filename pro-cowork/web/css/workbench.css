@@ -198,17 +198,26 @@ input, textarea, select { font-family: inherit; font-size: 14px; }
   width: 100%;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 140, 0, 0.28);
-  background: #ffffff;
-  color: #4a3a2a;
+  border: 1px solid rgba(255, 140, 0, 0.32);
+  background: #fff5ea;
+  color: #c05a00;
   font-size: 13px;
+  font-weight: 600;
   outline: none;
 }
 
 .sidebar__week-selector input[type="week"]:focus {
   border-color: var(--color-primary);
-  background: #fff8f0;
-  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.14);
+  background: #ffefdd;
+  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.16);
+}
+
+.sidebar__week-selector input[type="week"]::-webkit-datetime-edit {
+  color: #c05a00;
+}
+
+.sidebar__week-selector input[type="week"]::-webkit-inner-spin-button {
+  display: none;
 }
 
 .sidebar__week-selector input[type="week"]::-webkit-calendar-picker-indicator {
