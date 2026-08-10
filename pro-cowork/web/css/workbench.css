@@ -138,9 +138,13 @@ input, textarea, select { font-family: inherit; font-size: 14px; }
 
 .brand__text {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.2px;
-  color: #7a2d00;
+  background: var(--color-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .sidebar__nav {
