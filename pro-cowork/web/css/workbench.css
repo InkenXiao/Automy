@@ -194,43 +194,6 @@ input, textarea, select { font-family: inherit; font-size: 14px; }
   margin-bottom: 8px;
 }
 
-.week-custom {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.week-custom select {
-  flex: 1;
-  min-width: 0;
-  padding: 8px 6px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 140, 0, 0.32);
-  background: #fff5ea;
-  color: #c05a00;
-  font-size: 13px;
-  font-weight: 600;
-  outline: none;
-  cursor: pointer;
-}
-
-.week-custom select:hover {
-  border-color: rgba(255, 140, 0, 0.5);
-}
-
-.week-custom select:focus {
-  border-color: var(--color-primary);
-  background: #ffefdd;
-  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.16);
-}
-
-.week-custom .week-sep {
-  color: #c05a00;
-  font-size: 12px;
-  font-weight: 600;
-  flex: none;
-}
-
 .sidebar__week-selector input[type="week"] {
   width: 100%;
   padding: 8px 10px;

@@ -135,25 +135,10 @@ const App = {
     this.clearDetail();
   },
 
-  /** 初始化周选择器, 默认当前周 (自定义年份+周次下拉, 趋势色) */
+  /** 初始化周选择器, 默认当前周 */
   initWeekPicker() {
     const picker = document.getElementById('week-picker');
     if (!picker) return;
-
-    const yearSel = document.getElementById('week-year');
-    const weekSel = document.getElementById('week-num');
-
-    // 统一应用周次: 同步隐藏载体 + 通知当前视图
-    const applyWeek = (weekStr) => {
-      picker.value = weekStr;
-      this.state.currentWeek = weekStr;
-      const view = this.state.currentView;
-      if (view === 'weekly-report' && typeof WeeklyReport.onWeekChange === 'function') {
-        WeeklyReport.onWeekChange(weekStr);
-      } else if (view === 'work-tasks' && typeof WorkTasks.onWeekChange === 'function') {
-        WorkTasks.onWeekChange(weekStr);
-      }
-    };
 
     const now = new Date();
     const year = now.getFullYear();
@@ -161,32 +146,19 @@ const App = {
     const days = Math.floor((now - firstDay) / 86400000);
     const week = Math.ceil((days + firstDay.getDay() + 1) / 7);
     const currentWeek = `${year}-W${String(week).padStart(2, '0')}`;
-
-    // 填充年份 (近4年)
-    for (let y = year - 2; y <= year + 1; y++) {
-      const opt = document.createElement('option');
-      opt.value = y;
-      opt.textContent = `${y}`;
-      yearSel.appendChild(opt);
-    }
-    yearSel.value = year;
-
-    // 填充周次 (1-53)
-    for (let w = 1; w <= 53; w++) {
-      const opt = document.createElement('option');
-      opt.value = String(w).padStart(2, '0');
-      opt.textContent = `${w}`;
-      weekSel.appendChild(opt);
-    }
-    weekSel.value = String(week).padStart(2, '0');
-
     picker.value = currentWeek;
     this.state.currentWeek = currentWeek;
 
-    const sync = () => applyWeek(`${yearSel.value}-W${weekSel.value}`);
-    yearSel.addEventListener('change', sync);
-    weekSel.addEventListener('change', sync);
-    picker.addEventListener('change', () => applyWeek(picker.value));
+    picker.addEventListener('change', () => {
+      this.state.currentWeek = picker.value;
+      // 通知当前视图周次变化
+      const view = this.state.currentView;
+      if (view === 'weekly-report' && typeof WeeklyReport.onWeekChange === 'function') {
+        WeeklyReport.onWeekChange(picker.value);
+      } else if (view === 'work-tasks' && typeof WorkTasks.onWeekChange === 'function') {
+        WorkTasks.onWeekChange(picker.value);
+      }
+    });
   },
 
   /** 加载模块列表到全局状态 */
