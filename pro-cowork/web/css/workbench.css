@@ -126,7 +126,13 @@ input, textarea, select { font-family: inherit; font-size: 14px; }
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  object-fit: cover;
+  background: var(--color-gradient);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
   box-shadow: var(--shadow-primary);
 }
 
