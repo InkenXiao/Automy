@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>玄圃 · 智创 统一入口</title>
+<link rel="icon" type="image/png" href="images/XIN.png">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    color: #e2e8f0;
+    overflow-x: hidden;
+    background: #030712;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* 动态星空画布 */
+  #stars {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* 酷炫极光 / 霓虹氛围晕影 */
+  .aurora-container {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .aurora {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.35;
+  }
+
+  .aurora-1 {
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle, #f97316 0%, #ea580c 100%);
+    top: -200px;
+    left: 5%;
+    animation: float1 18s ease-in-out infinite alternate;
+  }
+
+  .aurora-2 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, #10b981 0%, #059669 100%);
+    bottom: -220px;
+    right: 10%;
+    animation: float2 22s ease-in-out infinite alternate;
+  }
+
+  .aurora-3 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #8b5cf6 0%, #6366f1 100%);
+    top: 35%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: float1 25s ease-in-out infinite alternate-reverse;
+  }
+
+  @keyframes float1 {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(80px, 60px) scale(1.15); }
+  }
+
+  @keyframes float2 {
+    0% { transform: translate(0, 0) scale(1.1); }
+    100% { transform: translate(-90px, -50px) scale(0.9); }
+  }
+
+  /* 网格背景科技线 */
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: 0;
+    pointer-events: none;
+    mask-image: radial-gradient(circle at 50% 50%, black 40%, transparent 80%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, black 40%, transparent 80%);
+  }
+
+  /* 主包裹区 */
+  .wrap {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 40px 20px;
+    width: 100%;
+    max-width: 1200px;
+  }
+
+  /* 顶部 Logo 与标语 */
+  .brand {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 10px;
+    color: #f97316;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    text-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+    animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  h1 {
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    margin-bottom: 14px;
+    background: linear-gradient(135deg, #ffffff 0%, #fdba74 40%, #f97316 70%, #ec4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 4px 20px rgba(249, 115, 22, 0.25));
+    animation: fadeUp 0.8s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .slogan {
+    font-size: 15px;
+    color: #94a3b8;
+    letter-spacing: 4px;
+    margin-bottom: 56px;
+    font-weight: 400;
+    animation: fadeUp 0.8s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* 卡片容器 */
+  .cards {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  /* 卡片通用样式 (玻璃拟态 + 科技光泽) */
+  .card {
+    position: relative;
+    width: 320px;
+    padding: 40px 32px 36px;
+    border-radius: 24px;
+    cursor: pointer;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    text-align: left;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card:nth-child(1) { animation-delay: 0.3s; }
+  .card:nth-child(2) { animation-delay: 0.42s; }
+  .card:nth-child(3) { animation-delay: 0.54s; }
+
+  /* 鼠标跟随渐变光芒 overlay */
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    background: radial-gradient(400px circle at var(--mx, 50%) var(--my, 50%), var(--glow), transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Hover 效果 */
+  .card:hover {
+    transform: translateY(-12px) scale(1.02);
+    border-color: var(--c1-alpha);
+    box-shadow: 
+      0 20px 40px -15px var(--glow2),
+      0 0 0 1px var(--c1-alpha);
+  }
+
+  .card:hover::before {
+    opacity: 1;
+  }
+
+  /* 卡片顶部端口标签 */
+  .card .port {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: var(--c1);
+    background: var(--c1-soft);
+    border: 1px solid var(--c1-alpha);
+    border-radius: 99px;
+    padding: 4px 12px;
+    z-index: 2;
+    transition: all 0.3s ease;
+  }
+
+  .card:hover .port {
+    background: var(--c1);
+    color: #fff;
+    box-shadow: 0 0 12px var(--c1);
+  }
+
+  /* 图标区域 */
+  .card .icon-box {
+    position: relative;
+    width: 68px;
+    height: 68px;
+    margin-bottom: 28px;
+    z-index: 2;
+  }
+
+  .card .icon {
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--c1), var(--c2));
+    box-shadow: 0 10px 25px -5px var(--glow2);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .card:hover .icon {
+    transform: rotate(6deg) scale(1.08);
+  }
+
+  /* 标题与描述 */
+  .card h2 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    color: #f8fafc;
+    z-index: 2;
+  }
+
+  .card .en {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: var(--c1);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    z-index: 2;
+  }
+
+  .card p {
+    font-size: 13.5px;
+    color: #94a3b8;
+    line-height: 1.8;
+    z-index: 2;
+    flex-grow: 1;
+    margin-bottom: 24px;
+  }
+
+  /* 进入按钮 */
+  .card .enter {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 2;
+    letter-spacing: 1px;
+    transition: color 0.3s ease;
+  }
+
+  .card .enter .arrow {
+    transition: transform 0.3s ease;
+    display: inline-block;
+  }
+
+  .card:hover .enter .arrow {
+    transform: translateX(8px);
+  }
+
+  /* 核心需求：项目调整为橙色系主题 */
+  /* 1. 项目 Agent - 炫彩活力燃橙色系 */
+  .card-pro {
+    --c1: #ff6b00;
+    --c2: #ff9100;
+    --c1-alpha: rgba(255, 107, 0, 0.4);
+    --c1-soft: rgba(255, 107, 0, 0.12);
+    --glow: rgba(255, 120, 0, 0.25);
+    --glow2: rgba(255, 107, 0, 0.45);
+  }
+
+  /* 2. 知识库 Knowledge - 极光翡翠碧绿 */
+  .card-rag {
+    --c1: #10b981;
+    --c2: #059669;
+    --c1-alpha: rgba(16, 185, 129, 0.4);
+    --c1-soft: rgba(16, 185, 129, 0.12);
+    --glow: rgba(16, 185, 129, 0.22);
+    --glow2: rgba(16, 185, 129, 0.4);
+  }
+
+  /* 3. 连接 MCP Gateway - 梦幻电光紫粉 */
+  .card-mcp {
+    --c1: #a855f7;
+    --c2: #ec4899;
+    --c1-alpha: rgba(168, 85, 247, 0.4);
+    --c1-soft: rgba(168, 85, 247, 0.12);
+    --glow: rgba(168, 85, 247, 0.25);
+    --glow2: rgba(168, 85, 247, 0.45);
+  }
+
+  /* 页脚 */
+  .foot {
+    margin-top: 64px;
+    font-size: 12px;
+    color: #475569;
+    letter-spacing: 3px;
+    animation: fadeUp 1s 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 1080px) {
+    .cards { gap: 24px; }
+    .card { width: 300px; }
+    h1 { font-size: 40px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<div class="aurora-container">
+  <div class="aurora aurora-1"></div>
+  <div class="aurora aurora-2"></div>
+  <div class="aurora aurora-3"></div>
+</div>
+
+<div class="grid-overlay"></div>
+
+<div class="wrap">
+  <div class="brand">XIN · AI PLATFORM</div>
+  <h1>玄圃 · 智创</h1>
+  <div class="slogan">智 能 协 作 · 知 识 驱 动 · 接 口 互 联</div>
+
+  <div class="cards">
+    <!-- 项目：橙色系风格 -->
+    <div class="card card-pro" data-port="8091">
+      <span class="port">:8091</span>
+      <div class="icon-box">
+        <div class="icon">P</div>
+      </div>
+      <h2>项目</h2>
+      <div class="en">Project Agent</div>
+      <p>项目管理智能体工作平台：多智能体协作、任务编排、会议纪要、周报生成与项目知识沉淀。</p>
+      <div class="enter">进入系统 <span class="arrow">→</span></div>
+    </div>
+
+    <!-- 知识库 -->
+    <div class="card card-rag" data-port="8092">
+      <span class="port">:8092</span>
+      <div class="icon-box">
+        <div class="icon">R</div>
+      </div>
+      <h2>知识</h2>
+      <div class="en">Knowledge Base</div>
+      <p>知识库平台：五级知识库体系，多模态文档解析入库，向量 + 图谱混合检索，RAG 智能问答。</p>
+      <div class="enter">进入系统 <span class="arrow">→</span></div>
+    </div>
+
+    <!-- MCP 接口 -->
+    <div class="card card-mcp" data-port="8094">
+      <span class="port">:8094</span>
+      <div class="icon-box">
+        <div class="icon">M</div>
+      </div>
+      <h2>联接</h2>
+      <div class="en">MCP Gateway</div>
+      <p>MCP 接口平台：服务注册、工具同步、在线测试台与调用统计，统一管理对外 MCP 能力。</p>
+      <div class="enter">进入系统 <span class="arrow">→</span></div>
+    </div>
+  </div>
+
+  <div class="foot">XIN · 玄圃 · 智枢技链</div>
+</div>
+
+<script>
+// 1. 卡片交互：光斑跟随 + 点击跳转
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('click', () => {
+    const port = card.dataset.port;
+    window.location.href = `${location.protocol}//${location.hostname}:${port}/`;
+  });
+
+  card.addEventListener('mousemove', e => {
+    const rect = card.getBoundingClientRect();
+    card.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
+    card.style.setProperty('--my', (e.clientY - rect.top) + 'px');
+  });
+});
+
+// 2. 动态星空 Canvas（微动闪烁 + 偶发划过流星）
+const canvas = document.getElementById('stars');
+const ctx = canvas.getContext('2d');
+
+let stars = [];
+let meteors = [];
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  initStars();
+}
+
+function initStars() {
+  stars = [];
+  const count = Math.floor((canvas.width * canvas.height) / 7000);
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      radius: Math.random() * 1.5 + 0.3,
+      alpha: Math.random(),
+      speed: Math.random() * 0.15 + 0.05,
+      twinkleSpeed: Math.random() * 0.02 + 0.005
+    });
+  }
+}
+
+function createMeteor() {
+  if (Math.random() < 0.015) {
+    meteors.push({
+      x: Math.random() * canvas.width * 1.5 - canvas.width * 0.2,
+      y: -50,
+      length: Math.random() * 80 + 50,
+      speed: Math.random() * 8 + 4,
+      angle: 45,
+      alpha: 1
+    });
+  }
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 绘制星空与闪烁效果
+  stars.forEach(star => {
+    star.y -= star.speed;
+    if (star.y < 0) {
+      star.y = canvas.height;
+      star.x = Math.random() * canvas.width;
+    }
+
+    star.alpha += star.twinkleSpeed;
+    if (star.alpha > 1 || star.alpha < 0.2) {
+      star.twinkleSpeed = -star.twinkleSpeed;
+    }
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${Math.abs(star.alpha)})`;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // 绘制与更新流星
+  createMeteor();
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i];
+    const endX = m.x - m.length * Math.cos(m.angle * Math.PI / 180);
+    const endY = m.y + m.length * Math.sin(m.angle * Math.PI / 180);
+
+    const grad = ctx.createLinearGradient(m.x, m.y, endX, endY);
+    grad.addColorStop(0, `rgba(255, 255, 255, ${m.alpha})`);
+    grad.addColorStop(0.3, `rgba(255, 165, 0, ${m.alpha * 0.8})`);
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(m.x, m.y);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+
+    m.x += m.speed * Math.cos(m.angle * Math.PI / 180);
+    m.y += m.speed * Math.sin(m.angle * Math.PI / 180);
+    m.alpha -= 0.008;
+
+    if (m.alpha <= 0 || m.y > canvas.height + 100) {
+      meteors.splice(i, 1);
+    }
+  }
+
+  requestAnimationFrame(render);
+}
+
+window.addEventListener('resize', resize);
+resize();
+render();
+</script>
+</body>
+</html>

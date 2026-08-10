@@ -19,11 +19,11 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class WeeklyReport(Base, TimestampMixin, SoftDeleteMixin):
     """项目周报"""
 
-    __tablename__ = "weekly_reports"
+    __tablename__ = "pro_weekly_reports"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("pro_projects.id", ondelete="CASCADE"), nullable=False, index=True
     )  # ★所属项目ID
     title: Mapped[str] = mapped_column(String(128), default="")
     week_range: Mapped[str] = mapped_column(String(32), default="")  # '07.01 — 07.07'
@@ -56,14 +56,14 @@ class WeeklyReport(Base, TimestampMixin, SoftDeleteMixin):
 class WeeklyKpi(Base, SoftDeleteMixin):
     """周报-本周概览 KPI (每模块一条)"""
 
-    __tablename__ = "weekly_kpis"
+    __tablename__ = "pro_weekly_kpis"
     __table_args__ = (UniqueConstraint("report_id", "module_id", name="uq_kpi_report_module"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     report_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("weekly_reports.id", ondelete="CASCADE")
+        Integer, ForeignKey("pro_weekly_reports.id", ondelete="CASCADE")
     )
-    module_id: Mapped[int] = mapped_column(Integer, ForeignKey("modules.id"))
+    module_id: Mapped[int] = mapped_column(Integer, ForeignKey("pro_modules.id"))
     progress_pct: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
     status: Mapped[str] = mapped_column(String(8), default="正常")  # 正常/关注/风险
 
@@ -74,13 +74,13 @@ class WeeklyKpi(Base, SoftDeleteMixin):
 class WeeklyProgressItem(Base, SoftDeleteMixin):
     """周报-本周进展 (每模块多条)"""
 
-    __tablename__ = "weekly_progress_items"
+    __tablename__ = "pro_weekly_progress_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     report_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("weekly_reports.id", ondelete="CASCADE")
+        Integer, ForeignKey("pro_weekly_reports.id", ondelete="CASCADE")
     )
-    module_id: Mapped[int] = mapped_column(Integer, ForeignKey("modules.id"))
+    module_id: Mapped[int] = mapped_column(Integer, ForeignKey("pro_modules.id"))
     content: Mapped[str] = mapped_column(String(512), default="")  # 事项标题
     detail: Mapped[str] = mapped_column(Text, default="")  # 补充说明
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
@@ -94,15 +94,15 @@ class WeeklyProgressItem(Base, SoftDeleteMixin):
 class WeeklyPlanTask(Base, TimestampMixin, SoftDeleteMixin):
     """周报-下周任务 ★核心关联表 (可关联 progress_tasks)"""
 
-    __tablename__ = "weekly_plan_tasks"
+    __tablename__ = "pro_weekly_plan_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     report_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("weekly_reports.id", ondelete="CASCADE")
+        Integer, ForeignKey("pro_weekly_reports.id", ondelete="CASCADE")
     )
-    module_id: Mapped[int] = mapped_column(Integer, ForeignKey("modules.id"))
+    module_id: Mapped[int] = mapped_column(Integer, ForeignKey("pro_modules.id"))
     progress_task_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("progress_tasks.id"), nullable=True
+        Integer, ForeignKey("pro_progress_tasks.id"), nullable=True
     )  # ★关联进度计划任务(可空)
     name: Mapped[str] = mapped_column(String(512))  # 任务/事项名称
     is_key: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否重点
@@ -131,11 +131,11 @@ class WeeklyPlanTask(Base, TimestampMixin, SoftDeleteMixin):
 class WeeklyRisk(Base, SoftDeleteMixin):
     """周报-风险与应对"""
 
-    __tablename__ = "weekly_risks"
+    __tablename__ = "pro_weekly_risks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     report_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("weekly_reports.id", ondelete="CASCADE")
+        Integer, ForeignKey("pro_weekly_reports.id", ondelete="CASCADE")
     )
     seq: Mapped[str] = mapped_column(String(4), default="R1")  # 'R1','R2'
     title: Mapped[str] = mapped_column(String(256), default="")

@@ -39,6 +39,7 @@ class TaskRunOut(BaseModel):
     file_names: list
     status: str
     result_text: str
+    user_name: str = ""
     session_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime

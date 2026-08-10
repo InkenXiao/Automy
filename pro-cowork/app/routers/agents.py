@@ -1,14 +1,16 @@
 """Agent 路由 · CRUD + 会话 + 对话(SSE) + 调试(Trace) + 记忆"""
+import asyncio
 import json
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.deps import get_user_name
 from app.models.agent import Agent, AgentMemory, AgentMessage, AgentSession
 from app.utils import get_active_project_id
 from app.schemas.agent import (
@@ -172,10 +174,19 @@ def _merge_attachments(message: str, file_names: list[str], project_id: Optional
 
 
 @router.post("/{agent_id}/chat")
-async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(get_db)):
+async def chat(agent_id: int, payload: ChatRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """发送消息并流式返回 Agent 回复
 
+    附件确定性流水线 (有附件时):
+    1. 小模型意图识别 (intent 事件)
+    2. 语音/图片/PDF 先调对应能力解析: ASR 实时分段转写 (asr_start/asr_segment/asr_done)、
+       图像识别 (vision_start/vision_done)、文档解析 (doc_parse_start/doc_parse_done)
+    3. 全部解析完成后将结果注入提示词, 调用主模型流式生成
+
     SSE 事件类型:
+    - intent: 意图识别 {"type","stage","content"/"project_id","skill_ids","reason"}
+    - asr_start/asr_segment/asr_done: 语音转写过程
+    - vision_start/vision_done, doc_parse_start/doc_parse_done: 图片/文档解析过程
     - content: 文本增量 {"type","content","session_id"}
     - tool_call: 工具调用 {"type","name","arguments"}
     - tool_result: 工具结果 {"type","name","result","duration_ms"}
@@ -200,15 +211,15 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
 
     # 当前激活项目 (记忆按项目隔离 + 附件定位)
     active_pid = await get_active_project_id(db)
+    user_name = get_user_name(request)
 
-    # 附件合并: 展示版 (仅文件名标记) 落库; 完整版 (含技能指引/文件内容) 送入模型
-    file_names = payload.file_names or []
+    # 附件: 展示版 (仅文件名标记) 落库; 完整版 (预处理解析结果/文件内容) 在流内构建
+    file_names = [f for f in (payload.file_names or []) if f]
     display_message = payload.message
     if file_names:
         marks = " ".join(f"【附件 {f}】" for f in file_names)
         display_message = f"{payload.message}\n\n{marks}" if payload.message else marks
-    full_message = _merge_attachments(payload.message, file_names, active_pid)
-    if not full_message:
+    if not display_message:
         raise HTTPException(status_code=400, detail="消息内容为空")
 
     # 保存用户消息 (展示版)
@@ -256,10 +267,63 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
 
     engine = AgentEngine(db)
 
+    def _sse(data: dict) -> str:
+        return f"data: {json.dumps(data, ensure_ascii=False, default=str)}\n\n"
+
     async def event_stream():
+        from app.services.attachment_service import preprocess_attachments
+        from app.services.file_prompt import build_file_prompt_parts
+        from app.services.intent_service import recognize_intent
+
         reply_parts: list[str] = []
         try:
-            async for event in engine.chat(agent, session, history, memories, full_message):
+            # ---- 1. 小模型意图识别 (有附件时先识别, 前端展示识别过程) ----
+            full_message = payload.message
+            if file_names:
+                yield _sse({"type": "intent", "stage": "start",
+                            "content": "正在进行意图识别与附件解析…"})
+                try:
+                    intent = await recognize_intent(db, payload.message, file_names, active_pid)
+                except Exception as e:  # noqa: BLE001
+                    intent = {"project_id": active_pid, "skill_ids": [],
+                              "reason": f"意图识别异常: {str(e)[:200]}"}
+                yield _sse({"type": "intent", "stage": "done",
+                            "project_id": intent.get("project_id"),
+                            "skill_ids": intent.get("skill_ids") or [],
+                            "reason": intent.get("reason") or ""})
+
+                # ---- 2. 附件确定性预处理 (语音实时转写/图片识别/文档解析) ----
+                queue: asyncio.Queue = asyncio.Queue()
+
+                async def _emit(etype: str, data: dict) -> None:
+                    await queue.put((etype, data))
+
+                pre_task = asyncio.create_task(
+                    preprocess_attachments(active_pid, file_names, _emit, user_name)
+                )
+                while True:
+                    if pre_task.done() and queue.empty():
+                        break
+                    try:
+                        etype, data = await asyncio.wait_for(queue.get(), timeout=0.2)
+                        yield _sse({"type": etype, **data})
+                    except asyncio.TimeoutError:
+                        continue
+                attach_parts = pre_task.result()
+
+                # ---- 3. 组装完整提示词: 用户消息 + office/text 内联 + 预处理解析结果 ----
+                prompt_parts = [payload.message] if payload.message else []
+                prompt_parts.extend(
+                    build_file_prompt_parts(active_pid, file_names, skill_guidance=False)
+                )
+                prompt_parts.extend(attach_parts)
+                full_message = "\n\n".join(prompt_parts)
+
+            if not full_message:
+                yield _sse({"type": "error", "content": "消息内容为空"})
+                return
+
+            async for event in engine.chat(agent, session, history, memories, full_message, user_name=user_name):
                 etype = event.get("type")
                 if etype == "content":
                     reply_parts.append(event["content"])
@@ -287,7 +351,7 @@ async def chat(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(g
 # ---------- 调试 (非流式 Trace + 上下文会话) ----------
 
 @router.post("/{agent_id}/debug")
-async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = Depends(get_db)):
+async def debug_agent(agent_id: int, payload: ChatRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """调试模式: 非流式执行一轮对话, 返回结构化执行轨迹
 
     上下文记忆:
@@ -313,6 +377,7 @@ async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = De
         )
         db.add(session)
         await db.flush()
+        await db.commit()  # 显式提交: get_db 的最终提交在响应发出后, 紧随的下一轮调试会因读不到会话而 404
         await db.refresh(session)
 
     # 加载记忆 (与正式对话一致): 当前激活项目 + 通用记忆
@@ -352,17 +417,17 @@ async def debug_agent(agent_id: int, payload: ChatRequest, db: AsyncSession = De
 
     # 用户消息落库 (展示版)
     db.add(AgentMessage(session_id=session.id, role="user", content=display_message))
-    await db.flush()
+    await db.commit()  # 显式提交: 保证紧随的下一轮调试能读到本轮历史
 
     engine = AgentEngine(db)
-    result = await engine.chat_with_trace(agent, history, memories, full_message)
+    result = await engine.chat_with_trace(agent, history, memories, full_message, user_name=get_user_name(request))
 
     # 助手回复落库 (供下轮上下文)
     if result.get("reply"):
         db.add(AgentMessage(
             session_id=session.id, role="assistant", content=result["reply"]
         ))
-        await db.flush()
+        await db.commit()  # 显式提交: 保证紧随的下一轮调试能读到本轮回复
 
     result["session_id"] = session.id
     result["memories"] = [

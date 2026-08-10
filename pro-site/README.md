@@ -50,13 +50,13 @@ pro-site/
     ├── models/                 # SQLAlchemy ORM 模型
     │   ├── __init__.py         # 模型汇总导出 (注意: Project 仅在 __all__, 未 import)
     │   ├── base.py             # Base + TimestampMixin (created_at/updated_at)
-    │   ├── project.py          # projects 表: 项目元信息
-    │   ├── module.py           # modules 表: 项目模块字典
-    │   ├── phase.py            # phases 表: 项目阶段字典
-    │   ├── progress_task.py    # progress_tasks 表: 进度计划任务
-    │   ├── meeting.py          # meetings / meeting_items 表: 会议与议程项
-    │   ├── weekly_report.py    # weekly_reports 及 4 张子表
-    │   └── work_task.py        # weekly_work_tasks 表: 每周工作任务
+    │   ├── project.py          # pro_projects 表: 项目元信息
+    │   ├── module.py           # pro_modules 表: 项目模块字典
+    │   ├── phase.py            # pro_phases 表: 项目阶段字典
+    │   ├── progress_task.py    # pro_progress_tasks 表: 进度计划任务
+    │   ├── meeting.py          # pro_meetings / pro_meeting_items 表: 会议与议程项
+    │   ├── weekly_report.py    # pro_weekly_reports 及 4 张子表
+    │   └── work_task.py        # pro_weekly_work_tasks 表: 每周工作任务
     ├── routers/                # API 路由 (统一前缀 /api)
     │   ├── __init__.py
     │   ├── projects.py         # 项目元信息 (含 /active 幂等创建默认项目)
@@ -114,20 +114,20 @@ pro-site/
 
 | 模型类 | 表名 | 文件 | 关键字段 |
 |--------|------|------|----------|
-| `Project` | `projects` | `app/models/project.py` | `id`, `name`, `title`, `based_doc`, `start_date`, `end_date`, `is_active`, `sort_order` |
-| `Module` | `modules` | `app/models/module.py` | `id`, **`project_id`(FK→projects)**, `idx`, `tag`, `title`, `owner`, `color`, `color_bg`, `sort_order` |
-| `Phase` | `phases` | `app/models/phase.py` | `id`, **`project_id`(FK→projects)**, `name`, `subtitle`, `description`, `start_date`, `end_date` |
-| `ProgressTask` | `progress_tasks` | `app/models/progress_task.py` | `id`, **`project_id`(FK→projects)**, `task_uid`(unique), `name`, `phase_id`(FK→phases), `start_date`, `end_date`, `status`, `full_desc`, `owner`, `is_milestone` |
-| `Meeting` | `meetings` | `app/models/meeting.py` | `id`, **`project_id`(FK→projects)**, `title`, `meet_date`, `meet_time`, `place`, `host`, `attendees`, `description`, `sort_order` |
-| `MeetingItem` | `meeting_items` | `app/models/meeting.py` | `id`, `meeting_id`(FK→meetings, CASCADE), `item_time`, `theme`, `speaker`, `duration`, `note`, `description`, `sort_order` |
-| `WeeklyReport` | `weekly_reports` | `app/models/weekly_report.py` | `id`, **`project_id`(FK→projects)**, `title`, `week_range`, `week_start`, `week_end`, `overview_summary`, `status`(draft/submitted) |
-| `WeeklyKpi` | `weekly_kpis` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_pct`, `status`；唯一约束 `uq_kpi_report_module(report_id, module_id)` |
-| `WeeklyProgressItem` | `weekly_progress_items` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `content`, `detail`, `sort_order` |
-| `WeeklyPlanTask` | `weekly_plan_tasks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_task_id`(FK→progress_tasks, 可空), `name`, `is_key`, `owner`, `plan_period`, `status`, `remark`, `sort_order` |
-| `WeeklyRisk` | `weekly_risks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `seq`, `title`, `coordination`, `urgency`, `sort_order` |
-| `WeeklyWorkTask` | `weekly_work_tasks` | `app/models/work_task.py` | `id`, **`project_id`(FK→projects)**, `week_start`, `week_end`, `plan_task_id`(FK→weekly_plan_tasks, 可空), `name`, `module_id`(FK, 可空), `owner`, `is_temporary`, `priority`, `status`, `planned_hours`, `actual_hours`, `remark`, `sort_order` |
+| `Project` | `pro_projects` | `app/models/project.py` | `id`, `name`, `title`, `based_doc`, `start_date`, `end_date`, `is_active`, `sort_order` |
+| `Module` | `pro_modules` | `app/models/module.py` | `id`, **`project_id`(FK→pro_projects)**, `idx`, `tag`, `title`, `owner`, `color`, `color_bg`, `sort_order` |
+| `Phase` | `pro_phases` | `app/models/phase.py` | `id`, **`project_id`(FK→pro_projects)**, `name`, `subtitle`, `description`, `start_date`, `end_date` |
+| `ProgressTask` | `pro_progress_tasks` | `app/models/progress_task.py` | `id`, **`project_id`(FK→pro_projects)**, `task_uid`(unique), `name`, `phase_id`(FK→pro_phases), `start_date`, `end_date`, `status`, `full_desc`, `owner`, `is_milestone` |
+| `Meeting` | `pro_meetings` | `app/models/meeting.py` | `id`, **`project_id`(FK→pro_projects)**, `title`, `meet_date`, `meet_time`, `place`, `host`, `attendees`, `description`, `sort_order` |
+| `MeetingItem` | `pro_meeting_items` | `app/models/meeting.py` | `id`, `meeting_id`(FK→pro_meetings, CASCADE), `item_time`, `theme`, `speaker`, `duration`, `note`, `description`, `sort_order` |
+| `WeeklyReport` | `pro_weekly_reports` | `app/models/weekly_report.py` | `id`, **`project_id`(FK→pro_projects)**, `title`, `week_range`, `week_start`, `week_end`, `overview_summary`, `status`(draft/submitted) |
+| `WeeklyKpi` | `pro_weekly_kpis` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_pct`, `status`；唯一约束 `uq_kpi_report_module(report_id, module_id)` |
+| `WeeklyProgressItem` | `pro_weekly_progress_items` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `content`, `detail`, `sort_order` |
+| `WeeklyPlanTask` | `pro_weekly_plan_tasks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_task_id`(FK→pro_progress_tasks, 可空), `name`, `is_key`, `owner`, `plan_period`, `status`, `remark`, `sort_order` |
+| `WeeklyRisk` | `pro_weekly_risks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `seq`, `title`, `coordination`, `urgency`, `sort_order` |
+| `WeeklyWorkTask` | `pro_weekly_work_tasks` | `app/models/work_task.py` | `id`, **`project_id`(FK→pro_projects)**, `week_start`, `week_end`, `plan_task_id`(FK→pro_weekly_plan_tasks, 可空), `name`, `module_id`(FK, 可空), `owner`, `is_temporary`, `priority`, `status`, `planned_hours`, `actual_hours`, `remark`, `sort_order` |
 
-> ★ **多项目隔离**：`modules` / `phases` / `progress_tasks` / `meetings` / `weekly_reports` / `weekly_work_tasks` 6 张顶级业务表均含 `project_id` 外键（关联 `projects.id`，ON DELETE CASCADE）。子表（`meeting_items` / `weekly_kpis` / `weekly_progress_items` / `weekly_plan_tasks` / `weekly_risks`）通过父表的 `project_id` 间接隔离，无需冗余字段。所有 list 接口支持 `?project_id=N` 查询参数，不传时默认用当前激活项目（`is_active=true`）。
+> ★ **多项目隔离**：`pro_modules` / `pro_phases` / `pro_progress_tasks` / `pro_meetings` / `pro_weekly_reports` / `pro_weekly_work_tasks` 6 张顶级业务表均含 `project_id` 外键（关联 `pro_projects.id`，ON DELETE CASCADE）。子表（`pro_meeting_items` / `pro_weekly_kpis` / `pro_weekly_progress_items` / `pro_weekly_plan_tasks` / `pro_weekly_risks`）通过父表的 `project_id` 间接隔离，无需冗余字段。所有 list 接口支持 `?project_id=N` 查询参数，不传时默认用当前激活项目（`is_active=true`）。
 
 > 除 `WeeklyKpi` / `WeeklyProgressItem` / `WeeklyRisk` 外，其余模型均混入 `TimestampMixin`，自动维护 `created_at` / `updated_at`（带时区）。
 

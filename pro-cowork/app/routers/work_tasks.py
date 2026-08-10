@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
-from app.deps import get_user_name, require_fulltime, resolve_visible_project_id
+from app.deps import get_user_name, is_manager_of_project, require_fulltime, resolve_visible_project_id
 from app.models.module import Module
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
@@ -62,13 +62,16 @@ async def list_work_tasks(
     request: Request,
     project_id: Optional[int] = None,
     week_start: Optional[date] = None,
+    home_scope: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[WeeklyWorkTaskOut]:
     """获取每周工作任务列表 (支持按 project_id / week_start 筛选; project_id 不传则用当前激活项目)
 
-    可见性: 无所属项目者返回空列表
+    可见性: 无所属项目者返回空列表;
+    home_scope=true (首页看板) 时非项目经理仅看指派给自己的任务
     """
-    pid = await resolve_visible_project_id(db, get_user_name(request), project_id)
+    name = get_user_name(request)
+    pid = await resolve_visible_project_id(db, name, project_id)
     if pid is None:
         return []
     stmt = select(WeeklyWorkTask).options(
@@ -85,6 +88,8 @@ async def list_work_tasks(
     stmt = stmt.where(WeeklyWorkTask.project_id == pid)
     if week_start is not None:
         stmt = stmt.where(WeeklyWorkTask.week_start == week_start)
+    if home_scope and not await is_manager_of_project(db, pid, name):
+        stmt = stmt.where(WeeklyWorkTask.owner == name)
     stmt = stmt.where(WeeklyWorkTask.is_delete.is_(False))
     stmt = stmt.order_by(WeeklyWorkTask.sort_order, WeeklyWorkTask.id)
     result = await db.execute(stmt)

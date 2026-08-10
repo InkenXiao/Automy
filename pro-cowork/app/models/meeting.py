@@ -10,22 +10,24 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class Meeting(Base, TimestampMixin, SoftDeleteMixin):
     """会议主记录"""
 
-    __tablename__ = "meetings"
+    __tablename__ = "pro_meetings"
+    __table_args__ = {"comment": "项目会议表 (会议主记录, 含录音转写)"}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
-    )  # ★所属项目ID
-    title: Mapped[str] = mapped_column(String(256), default="项目周例会")  # 会议主题
-    meet_date: Mapped[str] = mapped_column(String(32), default="")  # 日期, 如 '2026-07-21'
-    meet_time: Mapped[str] = mapped_column(String(32), default="")  # 时间, 如 '09:00-10:00'
-    place: Mapped[str] = mapped_column(String(128), default="")  # 地点
-    host: Mapped[str] = mapped_column(String(64), default="")  # 主持人
-    attendees: Mapped[str] = mapped_column(Text, default="")  # 参会人员 (逗号分隔)
-    description: Mapped[str] = mapped_column(Text, default="")  # 会议描述/纪要
-    audio_file: Mapped[str] = mapped_column(String(256), default="")  # 原始录音文件名 (任务附件目录内)
-    transcript: Mapped[str] = mapped_column(Text, default="")  # 录音转写完整文字 (带时间戳)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+        Integer, ForeignKey("pro_projects.id", ondelete="CASCADE"), nullable=False, index=True,
+        comment="所属项目ID (FK→pro_projects.id)"
+    )
+    title: Mapped[str] = mapped_column(String(256), default="项目周例会", comment="会议主题")
+    meet_date: Mapped[str] = mapped_column(String(32), default="", comment="会议日期, 如 '2026-07-21'")
+    meet_time: Mapped[str] = mapped_column(String(32), default="", comment="会议时间, 如 '09:00-10:00'")
+    place: Mapped[str] = mapped_column(String(128), default="", comment="会议地点")
+    host: Mapped[str] = mapped_column(String(64), default="", comment="主持人")
+    attendees: Mapped[str] = mapped_column(Text, default="", comment="参会人员 (逗号分隔)")
+    description: Mapped[str] = mapped_column(Text, default="", comment="会议描述/纪要")
+    audio_file: Mapped[str] = mapped_column(String(256), default="", comment="原始录音文件名 (任务附件目录内)")
+    transcript: Mapped[str] = mapped_column(Text, default="", comment="录音转写完整文字 (带时间戳)")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, comment="排序序号")
 
     # 关联项目
     project: Mapped["Project"] = relationship("Project", back_populates="meetings")
@@ -41,19 +43,20 @@ class Meeting(Base, TimestampMixin, SoftDeleteMixin):
 class MeetingItem(Base, TimestampMixin, SoftDeleteMixin):
     """会议议程项"""
 
-    __tablename__ = "meeting_items"
+    __tablename__ = "pro_meeting_items"
+    __table_args__ = {"comment": "会议议程项表"}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
     meeting_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("meetings.id", ondelete="CASCADE")
+        Integer, ForeignKey("pro_meetings.id", ondelete="CASCADE"), comment="所属会议ID (FK→pro_meetings.id)"
     )
-    item_time: Mapped[str] = mapped_column(String(32), default="")  # 时间段, 如 '09:00-09:10'
-    theme: Mapped[str] = mapped_column(String(256), default="")  # 议程主题
-    speaker: Mapped[str] = mapped_column(String(64), default="")  # 汇报人
-    duration: Mapped[str] = mapped_column(String(32), default="")  # 时长, 如 '10分钟'
-    note: Mapped[str] = mapped_column(Text, default="")  # 备注
-    description: Mapped[str] = mapped_column(Text, default="")  # 议程内容简介
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    item_time: Mapped[str] = mapped_column(String(32), default="", comment="时间段, 如 '09:00-09:10'")
+    theme: Mapped[str] = mapped_column(String(256), default="", comment="议程主题")
+    speaker: Mapped[str] = mapped_column(String(64), default="", comment="汇报人")
+    duration: Mapped[str] = mapped_column(String(32), default="", comment="时长, 如 '10分钟'")
+    note: Mapped[str] = mapped_column(Text, default="", comment="备注")
+    description: Mapped[str] = mapped_column(Text, default="", comment="议程内容简介")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, comment="排序序号")
 
     # 关联会议
     meeting: Mapped["Meeting"] = relationship("Meeting", back_populates="items")

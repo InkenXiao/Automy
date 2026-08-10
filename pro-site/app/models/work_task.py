@@ -11,20 +11,20 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class WeeklyWorkTask(Base, TimestampMixin, SoftDeleteMixin):
     """每周工作任务安排 ★核心关联表"""
 
-    __tablename__ = "weekly_work_tasks"
+    __tablename__ = "pro_weekly_work_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("pro_projects.id", ondelete="CASCADE"), nullable=False, index=True
     )  # ★所属项目ID
     week_start: Mapped[date] = mapped_column(Date)
     week_end: Mapped[date] = mapped_column(Date)
     plan_task_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("weekly_plan_tasks.id"), nullable=True
+        Integer, ForeignKey("pro_weekly_plan_tasks.id"), nullable=True
     )  # ★关联周报下周任务(可空)
     name: Mapped[str] = mapped_column(String(512))  # 任务名称
     module_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("modules.id"), nullable=True
+        Integer, ForeignKey("pro_modules.id"), nullable=True
     )
     owner: Mapped[str] = mapped_column(String(64), default="")
     is_temporary: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否临时任务

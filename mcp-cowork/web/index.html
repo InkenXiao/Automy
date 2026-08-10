@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>玄圃 · 智链</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #f5f7fa; --panel: #ffffff; --panel2: #f8fafc; --line: rgba(100,116,139,.18);
+    --txt: #2d3748; --dim: #64748b; --accent: #8b5cf6; --accent2: #ec4899;
+    --ok: #10b981; --warn: #f59e0b; --err: #ef4444;
+  }
+  body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--txt); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  button { font-family: inherit; }
+
+  .topbar { height: 54px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 18px;
+    background: #ffffff; border-bottom: 1px solid var(--line); box-shadow: 0 1px 3px rgba(15,23,42,.05); }
+  .topbar .logo { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg,#8b5cf6,#f472b6);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
+  .topbar h1 { font-size: 16px; letter-spacing: 1px; background: linear-gradient(90deg,#8b5cf6,#ec4899);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .topbar .spacer { flex: 1; }
+  .user-badge { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 10px; }
+  .user-badge b { color: var(--txt); }
+  .link-btn { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; cursor: pointer; }
+  .link-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .main { flex: 1; display: grid; grid-template-columns: 280px 1fr 400px; min-height: 0; }
+  .col { min-height: 0; overflow-y: auto; }
+  .col-srv { border-right: 1px solid var(--line); background: var(--panel); }
+  .col-test { padding: 16px 20px; background: var(--bg); }
+  .col-stat { border-left: 1px solid var(--line); background: var(--panel); padding: 14px 16px; }
+
+  .srv-head { padding: 14px 14px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .srv-head .title { font-size: 13px; font-weight: 600; color: var(--dim); letter-spacing: 1px; }
+  .side-tabs { display: flex; gap: 4px; background: #f1f5f9; border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+  .side-tab { background: none; border: none; color: var(--dim); font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+  .side-tab.active { background: #ffffff; color: var(--accent); box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+  .im-badge { font-size: 10px; padding: 1px 8px; border-radius: 99px; flex: none; }
+  .im-badge.feishu { background: rgba(59,130,246,.12); color: #2563eb; }
+  .im-badge.wecom { background: rgba(16,185,129,.12); color: #059669; }
+  .im-badge.dingtalk { background: rgba(14,165,233,.12); color: #0284c7; }
+  .im-badge.email { background: rgba(245,158,11,.14); color: #d97706; }
+  .im-badge.oa { background: rgba(139,92,246,.12); color: #8b5cf6; }
+  .im-badge.obsidian { background: rgba(124,58,237,.12); color: #7c3aed; }
+  .im-card.off { opacity: .55; }
+  .im-card .test-ok { color: var(--ok); font-size: 10px; }
+  .im-card .test-bad { color: var(--err); font-size: 10px; }
+  .btn-primary { background: linear-gradient(90deg,#8b5cf6,#ec4899); color: #fff; border: none; border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  .btn-primary:hover { filter: brightness(1.15); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .srv-list { padding: 0 10px 12px; }
+  .srv-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; cursor: pointer;
+    background: var(--panel2); transition: border .15s; }
+  .srv-card:hover { border-color: rgba(139,92,246,.45); }
+  .srv-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(139,92,246,.12); background: #ffffff; }
+  .srv-card .name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .srv-card .url { font-size: 11px; color: var(--dim); margin-top: 3px; word-break: break-all; }
+  .srv-card .ops { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .status-dot.online { background: var(--ok); box-shadow: 0 0 4px rgba(16,185,129,.5); }
+  .status-dot.offline { background: var(--err); }
+  .status-dot.unknown { background: #cbd5e1; }
+  .icon-btn { background: #ffffff; border: 1px solid var(--line); color: var(--dim); border-radius: 7px;
+    padding: 4px 9px; font-size: 11px; cursor: pointer; }
+  .icon-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .icon-btn.danger:hover, .icon-btn.confirm { color: var(--err); border-color: var(--err); }
+  .icon-btn.confirm { background: rgba(239,68,68,.08); }
+
+  .test-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .test-head h2 { font-size: 17px; }
+  .test-head .meta { font-size: 12px; color: var(--dim); }
+  .tool-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .tool-chip { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px 12px;
+    font-size: 12px; cursor: pointer; color: var(--txt); display: flex; align-items: center; gap: 8px; }
+  .tool-chip:hover { border-color: var(--accent); }
+  .tool-chip.active { border-color: var(--accent); background: rgba(139,92,246,.08); color: var(--accent); }
+  .tool-chip .zh { font-weight: 600; white-space: nowrap; }
+  .tool-chip .en { font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tool-chip.active .en { color: var(--accent); opacity: .7; }
+  .tool-chip .cnt { font-size: 10px; color: var(--dim); background: rgba(100,116,139,.12); border-radius: 99px;
+    padding: 0 6px; margin-left: auto; white-space: nowrap; }
+  .call-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .call-dot.ok { background: var(--ok); }
+  .call-dot.warn { background: var(--warn); }
+  .call-dot.bad { background: var(--err); }
+  .call-dot.unknown { background: #cbd5e1; }
+  .tool-zh-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; color: var(--dim); }
+  .tool-zh-row b { color: var(--txt); font-size: 13px; }
+  .scope-bar { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim);
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+  .scope-bar b { color: var(--accent); }
+  .scope-bar .reset { margin-left: auto; background: none; border: none; color: var(--dim); cursor: pointer; font-size: 11px; }
+  .scope-bar .reset:hover { color: var(--accent); }
+  .schema-box { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+    font-size: 11px; color: #475569; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, Consolas, monospace; margin-bottom: 12px; }
+  .params-editor { width: 100%; height: 150px; background: #ffffff; border: 1px solid var(--line);
+    border-radius: 10px; color: var(--txt); padding: 12px; font-size: 12px; outline: none; resize: vertical;
+    font-family: ui-monospace, Consolas, monospace; }
+  .params-editor:focus { border-color: var(--accent); }
+  .test-actions { display: flex; gap: 10px; margin: 12px 0; align-items: center; }
+  .case-name-input { flex: 1; background: #ffffff; border: 1px solid var(--line); border-radius: 8px;
+    color: var(--txt); padding: 8px 12px; font-size: 12px; outline: none; }
+  .result-box { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+    font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, Consolas, monospace; }
+  .result-box.err { border-color: var(--err); }
+  .result-meta { font-size: 11px; color: var(--dim); margin-top: 8px; font-family: inherit; }
+  .section-label { font-size: 12px; color: var(--dim); letter-spacing: 1px; margin: 18px 0 10px; }
+  .case-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid rgba(100,116,139,.18);
+    border-radius: 8px; margin-bottom: 8px; font-size: 12px; background: var(--panel); }
+  .case-row .cname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .case-row .ctool { color: var(--accent); font-size: 11px; }
+  .case-status { font-size: 10px; padding: 1px 7px; border-radius: 99px; }
+  .case-status.success { background: rgba(16,185,129,.12); color: var(--ok); }
+  .case-status.error { background: rgba(239,68,68,.12); color: var(--err); }
+
+  .stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; text-align: center; }
+  .stat-card b { display: block; font-size: 20px; color: var(--accent); }
+  .stat-card span { font-size: 11px; color: var(--dim); }
+  .bar-row { margin-bottom: 10px; }
+  .bar-row .blabel { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-bottom: 3px; }
+  .bar-row .btrack { height: 8px; background: rgba(100,116,139,.2); border-radius: 5px; overflow: hidden; }
+  .bar-row .bfill { height: 100%; background: linear-gradient(90deg,#8b5cf6,#ec4899); border-radius: 5px; }
+  .log-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .log-table th { text-align: left; color: var(--dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .log-table td { padding: 6px 8px; border-bottom: 1px solid rgba(100,116,139,.12); }
+  .log-table .ok { color: var(--ok); }
+  .log-table .bad { color: var(--err); }
+  .empty-tip { color: #94a3b8; font-size: 12px; text-align: center; padding: 26px 0; }
+
+  .modal-mask { position: fixed; inset: 0; background: rgba(15,23,42,.35); backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-mask.show { display: flex; }
+  .modal { width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px;
+    box-shadow: 0 10px 30px rgba(15,23,42,.12); }
+  .modal h3 { font-size: 15px; margin-bottom: 16px; }
+  .form-row { margin-bottom: 13px; }
+  .form-row label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
+  .form-row input { width: 100%; background: #ffffff; border: 1px solid var(--line); border-radius: 8px;
+    color: var(--txt); padding: 9px 12px; font-size: 13px; outline: none; }
+  .form-row input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .btn-ghost { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 8px; padding: 7px 16px; font-size: 13px; cursor: pointer; }
+  .toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: #ffffff;
+    border: 1px solid var(--accent); color: var(--txt); padding: 10px 22px; border-radius: 10px; font-size: 13px; z-index: 200;
+    box-shadow: 0 4px 12px rgba(15,23,42,.1); }
+  .toast.err { border-color: var(--err); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">M</div>
+  <h1>玄圃 · 技链工坊</h1>
+  <div class="spacer"></div>
+  <div class="user-badge">
+    <span>当前用户 <b id="user-name"></b></span>
+    <button class="link-btn" id="btn-logout">退出</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- 左: 服务注册 / IM 通道 -->
+  <div class="col col-srv">
+    <div class="srv-head" style="gap:8px;">
+      <div class="side-tabs">
+        <button class="side-tab active" id="tab-mcp">MCP 服务</button>
+        <button class="side-tab" id="tab-im">IM 通道</button>
+      </div>
+      <button class="btn-primary" id="btn-add-srv">+ 注册</button>
+    </div>
+    <div class="srv-list" id="srv-list"></div>
+    <div class="srv-list" id="im-list" style="display:none;"></div>
+  </div>
+
+  <!-- 中: 工具 + 测试台 -->
+  <div class="col col-test">
+    <div class="test-head">
+      <div>
+        <h2 id="srv-title">请选择 MCP 服务</h2>
+        <div class="meta" id="srv-meta"></div>
+      </div>
+    </div>
+    <div id="test-area" style="display:none;">
+      <div class="section-label" style="margin-top:0;">工具清单</div>
+      <div class="tool-grid" id="tool-grid"></div>
+      <div id="tool-detail" style="display:none;">
+        <div class="tool-zh-row">
+          <span>中文名</span><b id="tool-zh-name"></b>
+          <button class="icon-btn" id="btn-edit-zh">修改</button>
+        </div>
+        <div class="section-label">参数 Schema</div>
+        <div class="schema-box" id="schema-box"></div>
+        <div class="section-label">调用参数 (JSON)</div>
+        <textarea class="params-editor" id="params-editor" spellcheck="false">{}</textarea>
+        <div class="test-actions">
+          <button class="btn-primary" id="btn-call">调用</button>
+          <input class="case-name-input" id="case-name" placeholder="用例名称 (保存后可回放)">
+          <button class="icon-btn" id="btn-save-case">存为用例</button>
+        </div>
+        <div class="result-box" id="result-box" style="display:none;"></div>
+      </div>
+      <div id="cases-area">
+        <div class="section-label">已存用例</div>
+        <div id="case-list"></div>
+      </div>
+    </div>
+    <div class="empty-tip" id="no-srv-tip">← 从左侧选择或注册一个 MCP 服务</div>
+  </div>
+
+  <!-- 右: 统计 -->
+  <div class="col col-stat">
+    <div class="section-label" style="margin-top:0;display:flex;align-items:center;gap:8px;">
+      调用统计
+      <button class="icon-btn" id="btn-inspect" style="margin-left:auto;">运行巡检</button>
+      <span id="inspect-badge" style="display:none;cursor:pointer;font-size:10px;padding:1px 8px;border-radius:99px;"></span>
+    </div>
+    <div class="scope-bar" id="scope-bar">
+      <span>范围: <b id="scope-label">全部服务</b></span>
+      <button class="reset" id="scope-reset" style="display:none;">返回全局</button>
+    </div>
+    <div class="stat-cards" id="stat-cards"></div>
+    <div class="section-label">工具分布 (Top20)</div>
+    <div id="by-tool"></div>
+    <div class="section-label">最近调用</div>
+    <table class="log-table">
+      <thead><tr><th>工具</th><th>状态</th><th>耗时</th><th>时间</th></tr></thead>
+      <tbody id="log-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 注册/编辑服务弹窗 -->
+<div class="modal-mask" id="srv-modal">
+  <div class="modal">
+    <h3 id="srv-modal-title">注册 MCP 服务</h3>
+    <div class="form-row"><label>名称</label><input id="srv-name" placeholder="如 rag-cowork"></div>
+    <div class="form-row"><label>地址 (streamable-HTTP 端点)</label><input id="srv-url" placeholder="http://localhost:8093/mcp"></div>
+    <div class="form-row"><label>描述</label><input id="srv-desc" placeholder="服务用途说明"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('srv-modal')">取消</button>
+      <button class="btn-primary" id="srv-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 调用记录弹窗 -->
+<div class="modal-mask" id="logs-modal">
+  <div class="modal" style="width:720px;max-height:80vh;display:flex;flex-direction:column;">
+    <h3 id="logs-modal-title">调用记录</h3>
+    <div id="logs-list" style="overflow-y:auto;min-height:0;"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('logs-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 巡检报告弹窗 -->
+<div class="modal-mask" id="inspect-modal">
+  <div class="modal" style="width:760px;max-height:82vh;display:flex;flex-direction:column;">
+    <h3 id="inspect-title">工具巡检报告</h3>
+    <div id="inspect-body" style="overflow-y:auto;min-height:0;font-size:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('inspect-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- IM 通道弹窗 -->
+<div class="modal-mask" id="im-modal">
+  <div class="modal">
+    <h3 id="im-modal-title">添加 IM 通道</h3>
+    <div class="form-row">
+      <label>通道类型</label>
+      <select id="im-type" style="width:100%;background:#ffffff;border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:9px 12px;font-size:13px;outline:none;"></select>
+    </div>
+    <div id="im-hint" style="font-size:11px;color:var(--dim);margin:-6px 0 12px;line-height:1.6;"></div>
+    <div class="form-row"><label>通道名称</label><input id="im-name" placeholder="如: 我的飞书群机器人"></div>
+    <div id="im-fields"></div>
+    <div class="form-row" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="im-enabled" checked style="width:auto;">
+      <label for="im-enabled" style="margin:0;color:var(--txt);">启用该通道</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('im-modal')">取消</button>
+      <button class="btn-primary" id="im-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const USER = (localStorage.getItem('mcp_user') || '').trim();
+if (!USER) location.replace('login.html');
+document.getElementById('user-name').textContent = USER;
+
+async function api(path, options = {}) {
+  const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', ...(options.headers || {}) };
+  headers['X-User-Name'] = encodeURIComponent(USER);
+  const resp = await fetch('/api' + path, { ...options, headers });
+  if (resp.status === 401) { location.replace('login.html'); throw new Error('未登录'); }
+  let data = null;
+  const text = await resp.text();
+  if (text) { try { data = JSON.parse(text); } catch (e) {} }
+  if (!resp.ok) throw new Error((data && (data.detail || data.message)) || `请求失败 (${resp.status})`);
+  return data;
+}
+function toast(msg, isErr = false) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (isErr ? ' err' : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const state = { servers: [], current: null, tools: [], currentTool: null };
+
+/* ================= 服务 ================= */
+async function loadServers(keep = true) {
+  const res = await api('/servers');
+  state.servers = (res && res.items) || [];
+  if (keep && state.current) {
+    state.current = state.servers.find(s => s.server_id === state.current.server_id) || null;
+  }
+  renderServers();
+  renderTestArea();
+}
+function renderServers() {
+  const list = document.getElementById('srv-list');
+  if (!state.servers.length) { list.innerHTML = '<div class="empty-tip">暂无注册服务</div>'; return; }
+  list.innerHTML = state.servers.map(s => `
+    <div class="srv-card${state.current && state.current.server_id === s.server_id ? ' active' : ''}" data-id="${s.server_id}">
+      <div class="name"><span class="status-dot ${s.status}"></span>${esc(s.name)}
+        <span style="margin-left:auto;font-size:10px;color:var(--dim);">${s.tool_count || 0} 工具</span></div>
+      <div class="url">${esc(s.base_url)}</div>
+      <div class="ops">
+        <button class="icon-btn" data-op="test">测试</button>
+        <button class="icon-btn" data-op="logs">记录</button>
+        <button class="icon-btn" data-op="health">健康检查</button>
+        <button class="icon-btn" data-op="sync">同步工具</button>
+        <button class="icon-btn" data-op="edit">编辑</button>
+        <button class="icon-btn danger" data-op="del">删除</button>
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('.srv-card').forEach(card => {
+    const id = card.dataset.id;
+    card.addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON') return;
+      selectServer(id);
+    });
+    card.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const op = btn.dataset.op;
+        if (op === 'test') await selectServer(id);
+        if (op === 'logs') openLogsModal(state.servers.find(s => s.server_id === id));
+        if (op === 'health') {
+          btn.textContent = '检查中';
+          try {
+            const r = await api(`/servers/${id}/health`, { method: 'POST' });
+            toast(r.ok ? `在线 · ${r.tool_count} 个工具` : `离线: ${r.error}`, !r.ok);
+          } catch (err) { toast(err.message, true); }
+          await loadServers();
+        }
+        if (op === 'sync') {
+          btn.textContent = '同步中';
+          try {
+            const r = await api(`/servers/${id}/sync`, { method: 'POST' });
+            toast(`已同步 ${r.tool_count} 个工具`);
+          } catch (err) { toast(err.message, true); }
+          await loadServers();
+          if (state.current && state.current.server_id === id) await loadTools();
+        }
+        if (op === 'edit') openSrvModal(state.servers.find(s => s.server_id === id));
+        if (op === 'del') {
+          if (!btn.classList.contains('confirm')) {
+            btn.classList.add('confirm'); btn.textContent = '确认删除?';
+            setTimeout(() => { btn.classList.remove('confirm'); btn.textContent = '删除'; }, 3000);
+            return;
+          }
+          await api('/servers/' + id, { method: 'DELETE' });
+          toast('服务已删除');
+          if (state.current && state.current.server_id === id) state.current = null;
+          await loadServers(false);
+          loadStats();
+        }
+      });
+    });
+  });
+}
+async function selectServer(id) {
+  state.current = state.servers.find(s => s.server_id === id) || null;
+  state.currentTool = null;
+  renderServers();
+  renderTestArea();
+  loadStats();
+  if (state.current) await loadTools();
+}
+function renderTestArea() {
+  const s = state.current;
+  document.getElementById('test-area').style.display = s ? '' : 'none';
+  document.getElementById('no-srv-tip').style.display = s ? 'none' : '';
+  if (!s) return;
+  document.getElementById('srv-title').textContent = s.name;
+  document.getElementById('srv-meta').textContent = `${s.base_url} · ${s.status}`;
+}
+
+/* ================= 工具 ================= */
+async function loadTools() {
+  if (!state.current) return;
+  const res = await api(`/servers/${state.current.server_id}/tools`);
+  state.tools = (res && res.items) || [];
+  renderTools();
+  loadCases();
+}
+function renderTools() {
+  const grid = document.getElementById('tool-grid');
+  if (!state.tools.length) {
+    grid.innerHTML = '<div class="empty-tip">尚未同步工具, 点击左侧服务卡片的 "同步工具"</div>';
+    document.getElementById('tool-detail').style.display = 'none';
+    return;
+  }
+  grid.innerHTML = state.tools.map(t => {
+    const active = state.currentTool && state.currentTool.tool_name === t.tool_name;
+    const label = t.name_zh || t.tool_name;
+    return `<div class="tool-chip${active ? ' active' : ''}" data-name="${esc(t.tool_name)}"
+      title="${esc(t.tool_name)}${t.description ? ' · ' + esc(t.description.slice(0, 80)) : ''}">
+      <span class="call-dot ${t.call_status || 'unknown'}"></span>
+      <span class="zh">${esc(label)}</span>
+      ${t.name_zh ? `<span class="en">${esc(t.tool_name)}</span>` : ''}
+      <span class="cnt">${t.call_total || 0}次</span>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.tool-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.currentTool = state.tools.find(t => t.tool_name === chip.dataset.name);
+      renderTools();
+      renderToolDetail();
+      loadStats();
+    });
+  });
+}
+/* 从 JSON Schema 生成默认调用参数: default > enum[0] > 类型空值 (mcp-4) */
+function schemaDefaults(schema) {
+  if (!schema || typeof schema !== 'object') return {};
+  if (schema.type === 'object' || schema.properties) {
+    const out = {};
+    const props = schema.properties || {};
+    for (const [k, v] of Object.entries(props)) out[k] = schemaDefaults(v);
+    return out;
+  }
+  if (schema.default !== undefined) return schema.default;
+  if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
+  switch (schema.type) {
+    case 'string': return '';
+    case 'integer': case 'number': return 0;
+    case 'boolean': return false;
+    case 'array': return [];
+    default: return null;
+  }
+}
+function renderToolDetail() {
+  const t = state.currentTool;
+  document.getElementById('tool-detail').style.display = t ? '' : 'none';
+  if (!t) return;
+  document.getElementById('tool-zh-name').textContent = t.name_zh || '(未设置)';
+  document.getElementById('schema-box').textContent =
+    (t.description || '') + '\n\n' + JSON.stringify(t.input_schema || {}, null, 2);
+  // mcp-4: 选中工具自动填默认参数, 测试人员只需改值
+  document.getElementById('params-editor').value =
+    JSON.stringify(schemaDefaults(t.input_schema), null, 2);
+  document.getElementById('result-box').style.display = 'none';
+}
+/* 修改工具中文名 */
+document.getElementById('btn-edit-zh').addEventListener('click', async () => {
+  const t = state.currentTool;
+  if (!t || !state.current) return;
+  const name = prompt('设置工具中文名 (留空清除):', t.name_zh || '');
+  if (name === null) return;
+  try {
+    const r = await api(`/servers/${state.current.server_id}/tools/${t.tool_id}`, {
+      method: 'PUT', body: JSON.stringify({ name_zh: name.trim() })
+    });
+    t.name_zh = r.name_zh;
+    renderTools();
+    renderToolDetail();
+    toast('中文名已更新');
+  } catch (e) { toast(e.message, true); }
+});
+
+/* ================= 调用 ================= */
+document.getElementById('btn-call').addEventListener('click', async () => {
+  const t = state.currentTool;
+  if (!t || !state.current) return;
+  let params;
+  try {
+    params = JSON.parse(document.getElementById('params-editor').value || '{}');
+  } catch (e) { toast('参数 JSON 解析失败: ' + e.message, true); return; }
+  const btn = document.getElementById('btn-call');
+  const box = document.getElementById('result-box');
+  btn.disabled = true; btn.textContent = '调用中';
+  box.style.display = '';
+  box.className = 'result-box';
+  box.textContent = '调用中...';
+  try {
+    const r = await api('/testing/call', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: state.current.server_id, tool_name: t.tool_name, params })
+    });
+    box.className = 'result-box' + (r.status === 'error' ? ' err' : '');
+    const pretty = r.data != null ? JSON.stringify(r.data, null, 2) : r.text;
+    box.innerHTML = esc(pretty || '(空结果)') +
+      `<div class="result-meta">状态 ${r.status} · ${r.latency_ms}ms</div>`;
+    loadStats();
+  } catch (e) {
+    box.className = 'result-box err';
+    box.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '调用';
+  }
+});
+
+/* ================= 用例 ================= */
+document.getElementById('btn-save-case').addEventListener('click', async () => {
+  const t = state.currentTool;
+  if (!t || !state.current) return;
+  const name = document.getElementById('case-name').value.trim();
+  if (!name) { toast('请输入用例名称', true); return; }
+  let params;
+  try { params = JSON.parse(document.getElementById('params-editor').value || '{}'); }
+  catch (e) { toast('参数 JSON 解析失败', true); return; }
+  await api('/testing/cases', {
+    method: 'POST',
+    body: JSON.stringify({ server_id: state.current.server_id, tool_name: t.tool_name, case_name: name, params })
+  });
+  document.getElementById('case-name').value = '';
+  toast('用例已保存');
+  loadCases();
+});
+async function loadCases() {
+  if (!state.current) return;
+  const res = await api('/testing/cases?server_id=' + state.current.server_id);
+  const items = (res && res.items) || [];
+  const list = document.getElementById('case-list');
+  list.innerHTML = items.length ? items.map(c => `
+    <div class="case-row">
+      <span class="cname">${esc(c.case_name)}</span>
+      <span class="ctool">${esc(c.tool_name)}</span>
+      ${c.last_status ? `<span class="case-status ${c.last_status}">${c.last_status}</span>` : ''}
+      <button class="icon-btn" data-op="load" data-id="${c.case_id}">载入</button>
+      <button class="icon-btn" data-op="run" data-id="${c.case_id}">回放</button>
+      <button class="icon-btn danger" data-op="del" data-id="${c.case_id}">删除</button>
+    </div>`).join('') : '<div class="empty-tip">暂无用例</div>';
+  list.querySelectorAll('button').forEach(btn => {
+    const c = items.find(x => String(x.case_id) === btn.dataset.id);
+    btn.addEventListener('click', async () => {
+      if (btn.dataset.op === 'load') {
+        const tool = state.tools.find(t => t.tool_name === c.tool_name);
+        if (tool) { state.currentTool = tool; renderTools(); renderToolDetail(); }
+        document.getElementById('params-editor').value = JSON.stringify(c.params, null, 2);
+        document.getElementById('case-name').value = c.case_name;
+      }
+      if (btn.dataset.op === 'run') {
+        btn.textContent = '运行中';
+        try {
+          const r = await api(`/testing/cases/${c.case_id}/run`, { method: 'POST' });
+          toast(`回放${r.status === 'success' ? '成功' : '失败'} · ${r.latency_ms}ms`, r.status !== 'success');
+        } catch (e) { toast(e.message, true); }
+        await loadCases();
+        loadStats();
+      }
+      if (btn.dataset.op === 'del') {
+        if (!btn.classList.contains('confirm')) {
+          btn.classList.add('confirm'); btn.textContent = '确认?';
+          setTimeout(() => { btn.classList.remove('confirm'); btn.textContent = '删除'; }, 3000);
+          return;
+        }
+        await api('/testing/cases/' + c.case_id, { method: 'DELETE' });
+        loadCases();
+      }
+    });
+  });
+}
+
+/* ================= 统计 (两级联动: 服务 → 工具) ================= */
+async function loadStats() {
+  try {
+    const s = state.current, t = state.currentTool;
+    // 范围标签: 全部服务 / 服务名 / 服务名 · 工具中文名
+    const scopeLabel = document.getElementById('scope-label');
+    const scopeReset = document.getElementById('scope-reset');
+    if (t && s) scopeLabel.textContent = `${s.name} · ${t.name_zh || t.tool_name}`;
+    else if (s) scopeLabel.textContent = s.name;
+    else scopeLabel.textContent = '全部服务';
+    scopeReset.style.display = (s || t) ? '' : 'none';
+
+    const qs = [];
+    if (s) qs.push('server_id=' + s.server_id);
+    if (t) qs.push('tool_name=' + encodeURIComponent(t.tool_name));
+    const q = qs.length ? '?' + qs.join('&') : '';
+
+    const ov = await api('/stats/overview' + q);
+    const cards = t
+      ? [['调用量', ov.call_count], ['成功率', ov.success_rate + '%'],
+         ['均延迟', ov.avg_latency_ms + 'ms'], ['最近调用', ov.last_call_at ? ov.last_call_at.replace('T', ' ').slice(5, 16) : '-']]
+      : s
+        ? [['工具数', ov.tool_count], ['调用量', ov.call_count],
+           ['成功率', ov.success_rate + '%'], ['均延迟', ov.avg_latency_ms + 'ms']]
+        : [['服务', ov.server_count], ['调用量', ov.call_count],
+           ['成功率', ov.success_rate + '%'], ['均延迟', ov.avg_latency_ms + 'ms']];
+    document.getElementById('stat-cards').innerHTML = cards
+      .map(([k, v]) => `<div class="stat-card"><b>${v}</b><span>${k}</span></div>`).join('');
+
+    // 工具分布: 工具级范围内无意义, 服务级/全局展示
+    const btQ = s ? '?server_id=' + s.server_id : '';
+    const bt = await api('/stats/by-tool' + btQ);
+    const items = bt.items || [];
+    const max = Math.max(1, ...items.map(i => i.total));
+    document.getElementById('by-tool').innerHTML = items.length ? items.map(i => {
+      const zh = state.tools.find(x => x.tool_name === i.tool_name);
+      return `<div class="bar-row">
+        <div class="blabel"><span>${esc((zh && zh.name_zh) ? zh.name_zh + ' (' + i.tool_name + ')' : i.tool_name)}</span><span>${i.total} 次 · ${i.success_rate}% · ${i.avg_latency_ms}ms</span></div>
+        <div class="btrack"><div class="bfill" style="width:${Math.round(i.total / max * 100)}%"></div></div>
+      </div>`;
+    }).join('') : '<div class="empty-tip">暂无调用记录</div>';
+
+    const logs = await api('/stats/logs' + q);
+    document.getElementById('log-tbody').innerHTML = (logs.items || []).map(l => `
+      <tr><td title="${esc(l.result_excerpt)}">${esc(l.tool_name || '-')}</td>
+      <td class="${l.status === 'success' ? 'ok' : 'bad'}">${l.status}</td>
+      <td>${l.latency_ms}ms</td>
+      <td>${(l.created_at || '').replace('T', ' ').slice(5, 19)}</td></tr>`).join('');
+  } catch (e) { /* 忽略 */ }
+}
+document.getElementById('scope-reset').addEventListener('click', () => {
+  state.current = null;
+  state.currentTool = null;
+  renderServers();
+  renderTestArea();
+  loadStats();
+});
+
+/* ================= 调用记录弹窗 ================= */
+async function openLogsModal(server) {
+  if (!server) return;
+  document.getElementById('logs-modal-title').textContent = `调用记录 · ${server.name}`;
+  const box = document.getElementById('logs-list');
+  box.innerHTML = '<div class="empty-tip">加载中...</div>';
+  document.getElementById('logs-modal').classList.add('show');
+  try {
+    const res = await api('/stats/logs?server_id=' + server.server_id);
+    const items = (res && res.items) || [];
+    if (!items.length) { box.innerHTML = '<div class="empty-tip">暂无调用记录</div>'; return; }
+    box.innerHTML = items.map((l, i) => `
+      <div class="case-row" style="flex-wrap:wrap;cursor:pointer;" data-idx="${i}">
+        <span class="case-status ${l.status}">${l.status}</span>
+        <span class="ctool">${esc(l.tool_name || '(health)')}</span>
+        <span style="color:var(--dim);font-size:11px;">${l.latency_ms}ms · ${(l.created_at || '').replace('T', ' ').slice(0, 19)}</span>
+        <div data-detail style="display:none;width:100%;margin-top:8px;">
+          <div class="schema-box" style="max-height:120px;margin-bottom:6px;">入参: ${esc(JSON.stringify(l.params || {}, null, 2))}</div>
+          <div class="schema-box" style="max-height:160px;margin-bottom:0;">结果: ${esc(l.result_excerpt || '(空)')}</div>
+        </div>
+      </div>`).join('');
+    box.querySelectorAll('.case-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const d = row.querySelector('[data-detail]');
+        d.style.display = d.style.display === 'none' ? '' : 'none';
+      });
+    });
+  } catch (e) {
+    box.innerHTML = `<div class="empty-tip" style="color:var(--err);">${esc(e.message)}</div>`;
+  }
+}
+
+/* ================= 服务弹窗 ================= */
+function openSrvModal(s) {
+  document.getElementById('srv-modal-title').textContent = s ? '编辑 MCP 服务' : '注册 MCP 服务';
+  document.getElementById('srv-name').value = s ? s.name : '';
+  document.getElementById('srv-url').value = s ? s.base_url : '';
+  document.getElementById('srv-desc').value = s ? (s.description || '') : '';
+  document.getElementById('srv-save').onclick = () => saveSrv(s);
+  document.getElementById('srv-modal').classList.add('show');
+}
+document.getElementById('btn-add-srv').addEventListener('click', () => {
+  if (document.getElementById('tab-im').classList.contains('active')) openImModal(null);
+  else openSrvModal(null);
+});
+async function saveSrv(s) {
+  const payload = {
+    name: document.getElementById('srv-name').value.trim(),
+    base_url: document.getElementById('srv-url').value.trim(),
+    description: document.getElementById('srv-desc').value.trim(),
+  };
+  if (!payload.name || !payload.base_url) { toast('名称与地址不能为空', true); return; }
+  try {
+    if (s) await api('/servers/' + s.server_id, { method: 'PUT', body: JSON.stringify(payload) });
+    else await api('/servers', { method: 'POST', body: JSON.stringify(payload) });
+    toast('已保存');
+    closeModal('srv-modal');
+    await loadServers();
+    loadStats();
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ================= IM 通道 ================= */
+state.imTypes = [];
+state.channels = [];
+state.editingChannel = null;
+
+function switchSideTab(tab) {
+  const isMcp = tab === 'mcp';
+  document.getElementById('tab-mcp').classList.toggle('active', isMcp);
+  document.getElementById('tab-im').classList.toggle('active', !isMcp);
+  document.getElementById('srv-list').style.display = isMcp ? '' : 'none';
+  document.getElementById('im-list').style.display = isMcp ? 'none' : '';
+  document.getElementById('btn-add-srv').textContent = isMcp ? '+ 注册' : '+ 添加通道';
+  if (!isMcp && !state.channels.length) loadChannels();
+}
+document.getElementById('tab-mcp').addEventListener('click', () => switchSideTab('mcp'));
+document.getElementById('tab-im').addEventListener('click', () => switchSideTab('im'));
+
+async function loadImTypes() {
+  if (state.imTypes.length) return;
+  const res = await api('/im/types');
+  state.imTypes = (res && res.items) || [];
+}
+async function loadChannels() {
+  const res = await api('/im');
+  state.channels = (res && res.items) || [];
+  renderChannels();
+}
+function renderChannels() {
+  const list = document.getElementById('im-list');
+  if (!state.channels.length) {
+    list.innerHTML = '<div class="empty-tip">暂无 IM 通道<br>配置后数字分身可用 send_im 向你推送消息</div>';
+    return;
+  }
+  list.innerHTML = state.channels.map(c => {
+    let testInfo = '';
+    if (c.last_test_status === 'success') testInfo = `<span class="test-ok">✓ 测试通过 ${(c.last_test_at || '').slice(5, 16).replace('T', ' ')}</span>`;
+    else if (c.last_test_status === 'error') testInfo = `<span class="test-bad" title="${esc(c.last_test_error)}">✗ 测试失败</span>`;
+    return `<div class="srv-card im-card${c.enabled ? '' : ' off'}" data-id="${c.channel_id}">
+      <div class="name"><span class="im-badge ${c.channel_type}">${esc(c.type_name)}</span>${esc(c.name)}</div>
+      <div class="url">${c.enabled ? '已启用' : '已停用'} ${testInfo}</div>
+      <div class="ops">
+        <button class="icon-btn" data-op="test">测试</button>
+        <button class="icon-btn" data-op="toggle">${c.enabled ? '停用' : '启用'}</button>
+        <button class="icon-btn" data-op="edit">编辑</button>
+        <button class="icon-btn danger" data-op="del">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.im-card').forEach(card => {
+    const c = state.channels.find(x => String(x.channel_id) === card.dataset.id);
+    card.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const op = btn.dataset.op;
+        if (op === 'test') {
+          btn.textContent = '发送中';
+          try {
+            const r = await api(`/im/${c.channel_id}/test`, { method: 'POST' });
+            toast(r.ok ? '测试消息已发送' : '测试失败: ' + r.error, !r.ok);
+          } catch (err) { toast(err.message, true); }
+          await loadChannels();
+        }
+        if (op === 'toggle') {
+          await api('/im/' + c.channel_id, {
+            method: 'PUT',
+            body: JSON.stringify({ channel_type: c.channel_type, name: c.name, config: c.config, enabled: !c.enabled })
+          });
+          await loadChannels();
+        }
+        if (op === 'edit') openImModal(c);
+        if (op === 'del') {
+          if (!btn.classList.contains('confirm')) {
+            btn.classList.add('confirm'); btn.textContent = '确认删除?';
+            setTimeout(() => { btn.classList.remove('confirm'); btn.textContent = '删除'; }, 3000);
+            return;
+          }
+          await api('/im/' + c.channel_id, { method: 'DELETE' });
+          toast('通道已删除');
+          await loadChannels();
+        }
+      });
+    });
+  });
+}
+function renderImFields(typeMeta, config) {
+  document.getElementById('im-hint').textContent = typeMeta ? typeMeta.hint : '';
+  document.getElementById('im-fields').innerHTML = (typeMeta ? typeMeta.fields : []).map(f => `
+    <div class="form-row">
+      <label>${esc(f.label)}${f.required ? ' *' : ''}</label>
+      <input data-key="${esc(f.key)}" type="${f.password ? 'password' : 'text'}"
+        placeholder="${esc(f.placeholder || '')}" value="${esc((config && config[f.key]) || '')}">
+    </div>`).join('');
+}
+async function openImModal(c) {
+  await loadImTypes();
+  state.editingChannel = c || null;
+  document.getElementById('im-modal-title').textContent = c ? '编辑 IM 通道' : '添加 IM 通道';
+  const sel = document.getElementById('im-type');
+  sel.innerHTML = state.imTypes.map(t =>
+    `<option value="${t.type}"${c && c.channel_type === t.type ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+  document.getElementById('im-name').value = c ? c.name : '';
+  document.getElementById('im-enabled').checked = c ? c.enabled : true;
+  const cur = state.imTypes.find(t => t.type === (c ? c.channel_type : state.imTypes[0].type));
+  renderImFields(cur, c ? c.config : {});
+  sel.onchange = () => renderImFields(state.imTypes.find(t => t.type === sel.value), {});
+  document.getElementById('im-modal').classList.add('show');
+}
+document.getElementById('im-save').addEventListener('click', async () => {
+  const type = document.getElementById('im-type').value;
+  const name = document.getElementById('im-name').value.trim();
+  if (!name) { toast('请填写通道名称', true); return; }
+  const config = {};
+  let missing = '';
+  const meta = state.imTypes.find(t => t.type === type);
+  document.querySelectorAll('#im-fields input').forEach(inp => {
+    config[inp.dataset.key] = inp.value.trim();
+    const f = meta.fields.find(x => x.key === inp.dataset.key);
+    if (f && f.required && !inp.value.trim()) missing = f.label;
+  });
+  if (missing) { toast(`请填写 ${missing}`, true); return; }
+  const enabled = document.getElementById('im-enabled').checked;
+  try {
+    if (state.editingChannel) {
+      await api('/im/' + state.editingChannel.channel_id, {
+        method: 'PUT', body: JSON.stringify({ channel_type: type, name, config, enabled })
+      });
+    } else {
+      await api('/im', { method: 'POST', body: JSON.stringify({ channel_type: type, name, config, enabled }) });
+    }
+    toast('已保存');
+    closeModal('im-modal');
+    await loadChannels();
+  } catch (e) { toast(e.message, true); }
+});
+
+/* ================= 工具巡检 ================= */
+const VERDICT_STYLE = {
+  pass: ['通过', 'rgba(52,211,153,.15)', 'var(--ok)'],
+  warn: ['有变更', 'rgba(251,191,36,.15)', 'var(--warn)'],
+  fail: ['回归异常', 'rgba(248,113,113,.15)', 'var(--err)'],
+};
+async function refreshInspectBadge() {
+  try {
+    const res = await api('/inspect/latest');
+    const badge = document.getElementById('inspect-badge');
+    if (!res.report) { badge.style.display = 'none'; return; }
+    const [txt, bg, fg] = VERDICT_STYLE[res.report.verdict] || VERDICT_STYLE.pass;
+    badge.textContent = `巡检: ${txt}`;
+    badge.style.cssText += `;background:${bg};color:${fg};`;
+    badge.style.display = '';
+    badge.onclick = () => showInspectReport(res.report);
+  } catch (e) { /* 忽略 */ }
+}
+function showInspectReport(rep) {
+  const s = rep.summary || {}, d = rep.detail || {};
+  document.getElementById('inspect-title').textContent =
+    `工具巡检报告 · ${(rep.created_at || '').replace('T', ' ').slice(0, 19)} (${rep.trigger_type === 'scheduled' ? '定时' : '手动'})`;
+  const [vtxt, vbg, vfg] = VERDICT_STYLE[rep.verdict] || VERDICT_STYLE.pass;
+  let html = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+    <span style="background:${vbg};color:${vfg};padding:2px 12px;border-radius:99px;font-weight:600;">${vtxt}</span>
+    <span style="color:var(--dim);">服务 ${s.servers_online}/${s.servers_total} 在线 · 工具变更 +${s.tools_added}/-${s.tools_removed}/~${s.tools_changed} · 用例 ${s.cases_passed}/${s.cases_total} 通过 · 回归失败 ${s.regressions}</span>
+  </div>`;
+  html += '<div class="section-label" style="margin:6px 0 8px;">服务健康与工具变更</div>';
+  (d.servers || []).forEach(sv => {
+    const diff = [];
+    if (sv.tools_added.length) diff.push(`新增: ${sv.tools_added.join(', ')}`);
+    if (sv.tools_removed.length) diff.push(`下线: ${sv.tools_removed.join(', ')}`);
+    if (sv.tools_changed.length) diff.push(`Schema变更: ${sv.tools_changed.join(', ')}`);
+    html += `<div class="case-row" style="flex-wrap:wrap;">
+      <span class="status-dot ${sv.status === 'online' ? 'online' : 'offline'}"></span>
+      <b>${esc(sv.name)}</b>
+      <span style="color:var(--dim);font-size:11px;">${sv.status === 'online' ? '在线' : '离线 ' + esc(sv.error || '')}</span>
+      ${diff.length ? `<div style="width:100%;color:var(--warn);font-size:11px;margin-top:4px;">${esc(diff.join(' | '))}</div>` : ''}
+    </div>`;
+  });
+  html += '<div class="section-label" style="margin:14px 0 8px;">用例回归 (严格测试门禁)</div>';
+  if (!(d.cases || []).length) html += '<div class="empty-tip">暂无保存的测试用例 — 在测试台保存用例后, 巡检将自动回放做回归验证</div>';
+  (d.cases || []).forEach(c => {
+    const cls = c.status === 'success' ? 'success' : (c.status === 'error' ? 'error' : '');
+    html += `<div class="case-row" style="flex-wrap:wrap;">
+      <span class="case-status ${cls}">${c.status}</span>
+      <span class="cname">${esc(c.case_name)}</span>
+      <span class="ctool">${esc(c.tool_name)}</span>
+      <span style="color:var(--dim);font-size:11px;">${esc(c.server)} · ${c.latency_ms}ms</span>
+      ${c.regression ? '<span style="color:var(--err);font-size:11px;font-weight:600;">← 回归失败 (上次成功)</span>' : ''}
+      ${c.error_excerpt && c.status !== 'skipped' ? `<div class="schema-box" style="width:100%;max-height:80px;margin:6px 0 0;">${esc(c.error_excerpt)}</div>` : ''}
+    </div>`;
+  });
+  document.getElementById('inspect-body').innerHTML = html;
+  document.getElementById('inspect-modal').classList.add('show');
+}
+document.getElementById('btn-inspect').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-inspect');
+  btn.disabled = true; btn.textContent = '巡检中...';
+  try {
+    const res = await api('/inspect/run', { method: 'POST' });
+    showInspectReport(res.report);
+    await loadServers(false);
+    if (state.current) await loadTools();
+    loadStats();
+  } catch (e) { toast(e.message, true); } finally {
+    btn.disabled = false; btn.textContent = '运行巡检';
+    refreshInspectBadge();
+  }
+});
+
+/* ================= 顶栏 ================= */
+document.getElementById('btn-logout').addEventListener('click', () => {
+  localStorage.removeItem('mcp_user');
+  localStorage.removeItem('mcp_user_id');
+  location.replace('login.html');
+});
+
+/* ================= 启动 ================= */
+(async function init() {
+  try {
+    const me = await api('/auth/me');
+    if (!me || !me.ok) { location.replace('login.html'); return; }
+  } catch (e) { location.replace('login.html'); return; }
+  await loadServers(false);
+  loadStats();
+  refreshInspectBadge();
+})();
+</script>
+</body>
+</html>

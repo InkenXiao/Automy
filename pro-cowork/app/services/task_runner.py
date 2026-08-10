@@ -275,6 +275,20 @@ class TaskRunner:
                 message = all_msgs[-1].content if all_msgs else ""
                 history = all_msgs[:-1]
 
+                # ---- 附件确定性预处理: 语音实时转写 (asr_segment)/图片识别/PDF 解析 ----
+                # 解析文本直接注入提示词, 主模型基于解析结果生成 (不依赖模型自愿调技能)
+                if run.file_names:
+                    from app.services.attachment_service import preprocess_attachments
+
+                    async def _pre_emit(etype: str, payload: dict) -> None:
+                        await emit(etype, "", payload)
+
+                    attach_parts = await preprocess_attachments(
+                        run.project_id, run.file_names, _pre_emit
+                    )
+                    if attach_parts:
+                        message = "\n\n".join([message, *attach_parts]) if message else "\n\n".join(attach_parts)
+
                 # 记忆: 任务关联项目 + 通用记忆
                 mem_result = await db.execute(
                     select(AgentMemory)

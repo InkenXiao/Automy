@@ -11,7 +11,7 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class Project(Base, TimestampMixin, SoftDeleteMixin):
     """项目元信息 (一个项目对应一张进度计划执行图)"""
 
-    __tablename__ = "projects"
+    __tablename__ = "pro_projects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(64))  # 项目名, 如 "信投AI2.0"

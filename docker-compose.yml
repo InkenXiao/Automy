@@ -1,5 +1,5 @@
 # ============================================================
-# XIN-AI 四合一容器编排 (开发模式: 源码挂载, 改代码无需 rebuild)
+# XIN-AI N合一容器编排 (开发模式: 源码挂载, 改代码无需 rebuild)
 #
 # 一键启动: docker compose up -d
 # 查看日志: docker compose logs -f
@@ -9,10 +9,10 @@
 #   - 镜像只装运行时 + 依赖 (Python venv / Node node_modules)
 #   - 项目源码通过卷挂载到容器, 修改宿主机代码实时生效
 #   - xin-site: Vite dev HMR 热更新 (浏览器自动刷新)
-#   - pro-site / abs-site / pro-cowork: uvicorn --reload (Python 代码自动重载)
+#   - pro-site / pro-cowork: uvicorn --reload (Python 代码自动重载)
 #
 # 何时需要重新 build:
-#   - 修改了 pro-site / abs-site / pro-cowork 的 requirements.txt
+#   - 修改了 pro-site / pro-cowork 的 requirements.txt
 #   - 修改了 xin-site 的 package.json (新增/删除依赖)
 #   - 修改了 Dockerfile 或 docker-entrypoint.sh
 #   重新 build 后需清理命名卷: docker compose down -v && docker compose up -d --build
@@ -24,10 +24,13 @@ services:
     build: .
     image: xin-ai:latest
     ports:
-      - "8087:8087"   # xin-site   (Vite dev 热更新)
-      - "8088:8088"   # pro-site   (FastAPI + reload)
-      - "8089:8089"   # abs-site   (FastAPI + reload)
-      - "8091:8091"   # pro-cowork (FastAPI 智能体平台 + reload)
+      - "8087:8087"   # xin-site       (Vite dev 热更新)
+      - "8088:8088"   # pro-site       (FastAPI + reload)
+      - "8090:8090"   # cowork-site    (cowork 统一入口静态页)
+      - "8091:8091"   # pro-cowork     (FastAPI 智能体平台 + reload)
+      - "8092:8092"   # rag-cowork     (FastAPI 知识库平台 + reload)
+      - "8093:8093"   # rag-cowork-mcp (FastMCP 知识库 MCP 服务)
+      - "8094:8094"   # mcp-cowork     (FastAPI MCP 维护/测试/统计 + reload)
     env_file:
       - .docker.env
     environment:
@@ -42,9 +45,11 @@ services:
     volumes:
       # ===== 源码挂载 (修改代码无需 rebuild) =====
       - ./pro-site:/app/pro-site
-      - ./abs-site:/app/abs-site
       - ./xin-site:/app/xin-site
+      - ./cowork-site:/app/cowork-site
       - ./pro-cowork:/app/pro-cowork
+      - ./rag-cowork:/app/rag-cowork
+      - ./mcp-cowork:/app/mcp-cowork
       # ===== 命名卷保护依赖 (不被源码挂载覆盖) =====
       # 首次启动从镜像复制; 依赖变更后需 docker compose down -v 清理
       - xin-ai-venv:/app/venv
@@ -68,7 +73,7 @@ services:
         max-file: "5"
 
 volumes:
-  xin-ai-venv:            # Python 虚拟环境 (pro-site + abs-site 共用)
+  xin-ai-venv:            # Python 虚拟环境 (各 Python 服务共用)
   xin-ai-node-modules:    # xin-site 的 node_modules
   xin-ai-logs:            # 应用日志
 

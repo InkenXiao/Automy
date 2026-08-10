@@ -41,7 +41,7 @@ const WeeklyReport = {
     view.innerHTML = `
       <div class="view__header">
         <div>
-          <div class="view__title">📋 周报管理</div>
+          <div class="view__title">📋 项目周报</div>
           <div class="view__subtitle">本周概览、进展、下周计划与风险</div>
         </div>
         <div class="view__actions">

@@ -14,12 +14,14 @@ class TimestampMixin:
         DateTime(timezone=True),
         server_default=func.now(),
         default=lambda: datetime.now(timezone.utc),
+        comment="创建时间",
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+        comment="更新时间",
     )
 
 
@@ -27,5 +29,5 @@ class SoftDeleteMixin:
     """逻辑删除混入: is_delete=True 表示已软删除, 查询时需过滤"""
 
     is_delete: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default="false", nullable=False
+        Boolean, default=False, server_default="false", nullable=False, comment="是否已软删除"
     )

@@ -28,6 +28,7 @@ from app.models.project_member import ProjectMember
 from app.schemas.personal_report import (
     PersonalReportCreate,
     PersonalReportOut,
+    PersonalReportSummaryIn,
     PersonalReportUpdate,
 )
 from app.utils import resolve_project_id
@@ -197,6 +198,44 @@ async def create_personal_report(
     return _to_out(await _load_report(db, report.id))
 
 
+@router.post("/summary")
+async def generate_report_summary(
+    payload: PersonalReportSummaryIn, request: Request, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """AI 生成周报概括 (2-3 段: 本周主要工作内容 + 下周工作计划)
+
+    基于当前表单明细实时生成, 无需先保存周报; 非项目经理仅能为本人生成
+    """
+    name = get_user_name(request)
+    if (payload.member_name or "").strip() != name and not await is_any_project_manager(db, name):
+        raise HTTPException(status_code=403, detail="仅本人或项目经理可生成该周报概括")
+
+    # 明细行项目ID → 项目名 映射 (用于概括材料可读性)
+    pids = {i.project_id for i in (*payload.work_items, *payload.plan_items) if i.project_id}
+    project_names: dict[int, str] = {}
+    if pids:
+        result = await db.execute(
+            select(Project.id, Project.name).where(Project.id.in_(pids))
+        )
+        project_names = {pid: pname for pid, pname in result.all()}
+
+    week_range = ""
+    if payload.week_start and payload.week_end:
+        week_range = f"{payload.week_start} ~ {payload.week_end}"
+
+    from app.services import personal_summary_service
+
+    try:
+        text = await personal_summary_service.generate_personal_summary(
+            payload.member_name, week_range,
+            payload.work_items, payload.plan_items, project_names,
+            user_name=name or "system",
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"summary": text}
+
+
 @router.put("/{report_id}", response_model=PersonalReportOut)
 async def update_personal_report(
     report_id: int, payload: PersonalReportUpdate, request: Request, db: AsyncSession = Depends(get_db)
@@ -208,6 +247,8 @@ async def update_personal_report(
     report = await _load_report(db, report_id)
     await _check_report_visible(db, report, get_user_name(request))
     await _check_member_can_report(db, report.project_id, report.member_name)
+    if payload.summary is not None:
+        report.summary = payload.summary.strip()
     _replace_items(report, payload)
     await db.flush()
     await db.commit()

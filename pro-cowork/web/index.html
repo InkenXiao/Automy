@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智创 - AI项目管理工作台</title>
+  <title>智创 · 智创</title>
   <link rel="icon" type="image/png" href="images/XIN.png">
-  <link rel="stylesheet" href="css/workbench.css?v=20260808a">
-  <link rel="stylesheet" href="css/cowork.css?v=20260806b">
+  <link rel="stylesheet" href="css/workbench.css?v=20260809a">
+  <link rel="stylesheet" href="css/cowork.css?v=20260809a">
 </head>
 <body>
 <div class="app-frame">
@@ -17,65 +17,102 @@
       <span class="brand__text">玄圃 · 智创</span>
     </div>
     <nav class="sidebar__nav">
-      <div class="nav-group__title">智能工作台</div>
-      <a class="nav-item active" data-view="tasks" title="AI驱动的任务自动流转与状态联动">
-        <span class="nav-icon">🔄</span>
-        <span class="nav-text">新任务</span>
-      </a>
-      <a class="nav-item" data-view="agents" title="具备记忆与技能的主动式数字员工">
-        <span class="nav-icon">👤✨</span>
-        <span class="nav-text">数字分身</span>
-      </a>
-      <a class="nav-item" data-view="skills" title="可复用、可编排的项目管理技能模块">
-        <span class="nav-icon">🧩</span>
-        <span class="nav-text">技能库</span>
+      <a class="nav-item active" data-view="home" title="个人工作台: 待办、长任务结果与自定义看板">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">首页</span>
       </a>
 
-      <!-- 项目全景 -->
-      <div class="nav-group__title">项目驾驶舱</div>
-      <a class="nav-item" data-view="progress-plan" title="关键节点交付追踪与风险预警">
-        <span class="nav-icon">🚩</span>
-        <span class="nav-text">里程碑</span>
-      </a>
-      <a class="nav-item" data-view="meeting" title="会议-任务-纪要AI联动协同">
-        <span class="nav-icon">📅</span>
-        <span class="nav-text">项目会议</span>
-      </a>
-      <a class="nav-item" data-view="weekly-report" title="AI自动提炼项目进展与待办">
-        <span class="nav-icon">📝</span>
-        <span class="nav-text">项目周报</span>
-      </a>
-      <a class="nav-item" data-view="work-tasks" title="AI筛选的本周核心目标与优先级">
-        <span class="nav-icon">🎯</span>
-        <span class="nav-text">周任务</span>
-      </a>
-      <a class="nav-item" data-view="project-team" title="项目与项目成员维护">
-        <span class="nav-icon">👥</span>
-        <span class="nav-text">项目成员</span>
-      </a>
-      <a class="nav-item" data-view="personal-report" title="个人周报填写: 本周工作内容与下周工作计划">
-        <span class="nav-icon">✍️</span>
-        <span class="nav-text">个人周报</span>
-      </a>
+      <!-- 智能工作台 (默认展开) -->
+      <div class="nav-group">
+        <div class="nav-group__title" data-group-toggle>
+          <span>智能工作台</span>
+          <span class="nav-group__chevron">▾</span>
+        </div>
+        <div class="nav-group__items">
+          <a class="nav-item" data-view="tasks" title="AI驱动的任务自动流转与状态联动">
+            <span class="nav-icon">🔄</span>
+            <span class="nav-text">新任务</span>
+          </a>
+          <a class="nav-item" data-view="agents" title="具备记忆与技能的主动式数字员工">
+            <span class="nav-icon">👤✨</span>
+            <span class="nav-text">数字分身</span>
+          </a>
+          <a class="nav-item" data-view="skills" title="可复用、可编排的项目管理技能模块">
+            <span class="nav-icon">🧩</span>
+            <span class="nav-text">技能库</span>
+          </a>
+        </div>
+      </div>
 
-      <!-- 创造工坊 -->
-      <div class="nav-group__title">玄圃工坊</div>
-      <a class="nav-item" data-view="builder" title="配置数字员工人设、技能与行为规则">
-        <span class="nav-icon">🎭</span>
-        <span class="nav-text">分身</span>
-      </a>
-      <a class="nav-item" data-view="skill-builder" title="组装、调试并发布项目管理技能">
-        <span class="nav-icon">⚙️🧩</span>
-        <span class="nav-text">技能</span>
-      </a>
-      <a class="nav-item" data-view="memories" title="结构化沉淀项目知识与历史经验">
-        <span class="nav-icon">🕸️🧠</span>
-        <span class="nav-text">知识</span>
-      </a>
-      <a class="nav-item" data-view="usage-logs" title="登录与操作记录、LLM 调用与 token 统计">
-        <span class="nav-icon">📈</span>
-        <span class="nav-text">使用日志</span>
-      </a>
+      <!-- 项目驾驶舱 (默认展开) -->
+      <div class="nav-group">
+        <div class="nav-group__title" data-group-toggle>
+          <span>项目驾驶舱</span>
+          <span class="nav-group__chevron">▾</span>
+        </div>
+        <div class="nav-group__items">
+          <a class="nav-item" data-view="progress-plan" title="关键节点交付追踪与风险预警">
+            <span class="nav-icon">🚩</span>
+            <span class="nav-text">里程碑</span>
+          </a>
+          <a class="nav-item" data-view="meeting" title="会议-任务-纪要AI联动协同">
+            <span class="nav-icon">📅</span>
+            <span class="nav-text">项目会议</span>
+          </a>
+          <a class="nav-item" data-view="weekly-report" title="AI自动提炼项目进展与待办">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text">项目周报</span>
+          </a>
+          <a class="nav-item" data-view="work-tasks" title="AI筛选的本周核心目标与优先级">
+            <span class="nav-icon">🎯</span>
+            <span class="nav-text">周任务</span>
+          </a>
+          <a class="nav-item" data-view="project-team" title="项目与项目成员维护">
+            <span class="nav-icon">👥</span>
+            <span class="nav-text">项目成员</span>
+          </a>
+          <a class="nav-item" data-view="personal-report" title="个人周报填写: 本周工作内容与下周工作计划">
+            <span class="nav-icon">✍️</span>
+            <span class="nav-text">个人周报</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 玄圃工坊 (默认折叠) -->
+      <div class="nav-group nav-group--collapsed">
+        <div class="nav-group__title" data-group-toggle>
+          <span>玄圃工坊</span>
+          <span class="nav-group__chevron">▾</span>
+        </div>
+        <div class="nav-group__items">
+          <a class="nav-item" data-view="builder" title="配置数字员工人设、技能与行为规则">
+            <span class="nav-icon">🎭</span>
+            <span class="nav-text">分身</span>
+          </a>
+          <a class="nav-item" data-view="skill-builder" title="组装、调试并发布项目管理技能">
+            <span class="nav-icon">⚙️🧩</span>
+            <span class="nav-text">技能</span>
+          </a>
+          <a class="nav-item" data-view="memories" title="结构化沉淀项目知识与历史经验">
+            <span class="nav-icon">🕸️🧠</span>
+            <span class="nav-text">知识</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 系统管理 (默认折叠) -->
+      <div class="nav-group nav-group--collapsed">
+        <div class="nav-group__title" data-group-toggle>
+          <span>系统管理</span>
+          <span class="nav-group__chevron">▾</span>
+        </div>
+        <div class="nav-group__items">
+          <a class="nav-item" data-view="usage-logs" title="登录与操作记录、LLM 调用与 token 统计">
+            <span class="nav-icon">📈</span>
+            <span class="nav-text">使用日志</span>
+          </a>
+        </div>
+      </div>
     </nav>
     <div class="sidebar__week-selector">
       <input type="week" id="week-picker">
@@ -85,7 +122,8 @@
 
   <!-- 中栏: 主工作区 -->
   <main class="app-frame__main">
-    <div id="view-tasks" class="view active"></div>
+    <div id="view-home" class="view active"></div>
+    <div id="view-tasks" class="view"></div>
     <div id="view-progress-plan" class="view"></div>
     <div id="view-meeting" class="view"></div>
     <div id="view-weekly-report" class="view"></div>
@@ -108,16 +146,17 @@
 </div>
 <script src="js/lib/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-<script src="js/api.js?v=20260808a"></script>
-<script src="js/auth.js?v=20260808a"></script>
-<script src="js/weekly-report.js?v=20260808a"></script>
-<script src="js/progress-plan.js?v=20260808a"></script>
-<script src="js/work-tasks.js?v=20260808a"></script>
-<script src="js/meeting.js?v=20260808a"></script>
-<script src="js/project-team.js?v=20260808a"></script>
-<script src="js/personal-report.js?v=20260808a"></script>
-<script src="js/cowork.js?v=20260808a"></script>
-<script src="js/usage-logs.js?v=20260808a"></script>
-<script src="js/app.js?v=20260808a"></script>
+<script src="js/api.js?v=20260809a"></script>
+<script src="js/auth.js?v=20260809a"></script>
+<script src="js/home.js?v=20260809a"></script>
+<script src="js/weekly-report.js?v=20260809a"></script>
+<script src="js/progress-plan.js?v=20260809a"></script>
+<script src="js/work-tasks.js?v=20260809a"></script>
+<script src="js/meeting.js?v=20260809a"></script>
+<script src="js/project-team.js?v=20260809a"></script>
+<script src="js/personal-report.js?v=20260809a"></script>
+<script src="js/cowork.js?v=20260809a"></script>
+<script src="js/usage-logs.js?v=20260809a"></script>
+<script src="js/app.js?v=20260809a"></script>
 </body>
 </html>

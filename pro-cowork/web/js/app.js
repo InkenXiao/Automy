@@ -10,7 +10,7 @@ const App = {
     phases: [],      // 阶段列表
     project: null,   // 当前激活项目元信息 (进度计划执行图)
     currentWeek: '', // 当前选择的周次 (格式 YYYY-Www)
-    currentView: 'tasks'
+    currentView: 'home'
   },
 
   /* ------------------------------------------------------------------
@@ -34,6 +34,7 @@ const App = {
     }
 
     // 初始化各模块
+    Home.init();
     WeeklyReport.init();
     ProgressPlan.init();
     WorkTasks.init();
@@ -75,6 +76,13 @@ const App = {
         this.switchView(view);
       });
     });
+
+    // 分组标题点击折叠/展开
+    document.querySelectorAll('.nav-group__title[data-group-toggle]').forEach(title => {
+      title.addEventListener('click', () => {
+        title.closest('.nav-group').classList.toggle('nav-group--collapsed');
+      });
+    });
   },
 
   /** 切换视图 */
@@ -95,6 +103,7 @@ const App = {
 
     // 触发对应模块的 onShow 回调
     const viewModuleMap = {
+      'home': Home,
       'weekly-report': WeeklyReport,
       'progress-plan': ProgressPlan,
       'work-tasks': WorkTasks,
@@ -118,7 +127,7 @@ const App = {
     // CoWork 全屏视图 (对话/构建器) 隐藏右栏详情面板
     const rightPanel = document.querySelector('.app-frame__right');
     if (rightPanel) {
-      const fullWidthViews = ['tasks', 'agents', 'agent-chat', 'builder', 'skills', 'skill-builder', 'memories', 'usage-logs'];
+      const fullWidthViews = ['home', 'tasks', 'agents', 'agent-chat', 'builder', 'skills', 'skill-builder', 'memories', 'usage-logs'];
       rightPanel.style.display = fullWidthViews.includes(viewName) ? 'none' : '';
     }
 

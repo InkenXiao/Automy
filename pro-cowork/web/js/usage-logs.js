@@ -14,9 +14,18 @@ const UsageLogs = {
   drillStack: [],
 
   PERIODS: [
-    { key: 'day', label: '当天' },
-    { key: 'week', label: '当周' },
-    { key: 'month', label: '当月' },
+    { key: 'day', label: '当天', icon: '☀️' },
+    { key: 'week', label: '当周', icon: '📅' },
+    { key: 'month', label: '当月', icon: '🗓' },
+  ],
+
+  // 指标展示配置 (图标 + 主题色)
+  METRICS: [
+    { key: 'login_count', label: '人次', icon: '🔑', cls: 'orange' },
+    { key: 'login_users', label: '人数', icon: '👥', cls: 'blue' },
+    { key: 'write_count', label: '更新', icon: '✏️', cls: 'green' },
+    { key: 'llm_calls',   label: 'LLM 调用', icon: '🤖', cls: 'violet' },
+    { key: 'llm_tokens',  label: 'Token 总数', icon: '🪙', cls: 'gold' },
   ],
 
   ACTION_LABELS: {
@@ -71,6 +80,11 @@ const UsageLogs = {
     }
   },
 
+  /** 数字千分位 */
+  _fmtNum(n) {
+    return Number(n || 0).toLocaleString('en-US');
+  },
+
   /** 顶部三卡片 (点击切换汇总区周期) */
   renderCards() {
     const el = document.getElementById('ul-cards');
@@ -82,13 +96,13 @@ const UsageLogs = {
           const active = this.period === p.key ? ' ul-card--active' : '';
           return `
             <div class="ul-card${active}" data-period="${p.key}">
-              <div class="ul-card__title">${p.label}</div>
+              <div class="ul-card__title"><span class="ul-card__title-icon">${p.icon}</span>${p.label}</div>
               <div class="ul-card__grid">
-                <div class="ul-metric"><div class="ul-metric__v">${s.login_count ?? 0}</div><div class="ul-metric__l">登录人次</div></div>
-                <div class="ul-metric"><div class="ul-metric__v">${s.login_users ?? 0}</div><div class="ul-metric__l">登录人数</div></div>
-                <div class="ul-metric"><div class="ul-metric__v">${s.write_count ?? 0}</div><div class="ul-metric__l">数据更新</div></div>
-                <div class="ul-metric"><div class="ul-metric__v">${s.llm_calls ?? 0}</div><div class="ul-metric__l">LLM 调用</div></div>
-                <div class="ul-metric"><div class="ul-metric__v">${s.llm_tokens ?? 0}</div><div class="ul-metric__l">Token 总数</div></div>
+                ${this.METRICS.map(m => `
+                  <div class="ul-metric ul-metric--${m.cls}">
+                    <div class="ul-metric__v">${this._fmtNum(s[m.key])}</div>
+                    <div class="ul-metric__l">${m.icon} ${m.label}</div>
+                  </div>`).join('')}
               </div>
             </div>
           `;
@@ -156,7 +170,7 @@ const UsageLogs = {
         <div class="card">
           <div class="card__header">
             <div class="card__title">LLM 调用汇总 · ${periodLabel}</div>
-            <span class="badge badge--primary">${s.llm_calls ?? 0} 次 / ${s.llm_tokens ?? 0} tokens</span>
+            <span class="badge badge--primary">${this._fmtNum(s.llm_calls)} 次 / ${this._fmtNum(s.llm_tokens)} tokens</span>
           </div>
           <div class="card__body" style="padding:0;">
             <table class="wr-list-table">

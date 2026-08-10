@@ -13,6 +13,7 @@ from app.models.progress_task import ProgressTask
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.skill import Skill, SkillExecution
+from app.models.sys_file import SysFile
 from app.models.task_run import TaskRun, TaskRunEvent
 from app.models.usage_log import LoginLog, OperationLog
 from app.models.user_credential import UserCredential
@@ -45,6 +46,7 @@ __all__ = [
     "ProgressTask",
     "Skill",
     "SkillExecution",
+    "SysFile",
     "TaskRun",
     "TaskRunEvent",
     "LoginLog",

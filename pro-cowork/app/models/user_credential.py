@@ -13,11 +13,12 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class UserCredential(Base, TimestampMixin, SoftDeleteMixin):
     """成员登录凭据 (姓名唯一; password_hash 格式: salt$hexdigest)"""
 
-    __tablename__ = "user_credentials"
+    __tablename__ = "sys_user_credentials"
+    __table_args__ = {"comment": "成员登录凭据表 (姓名唯一, 同人跨项目共用同一密码)"}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # 成员姓名
-    password_hash: Mapped[str] = mapped_column(String(256), default="")  # salt$pbkdf2 hex
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    name: Mapped[str] = mapped_column(String(64), unique=True, index=True, comment="成员姓名 (唯一)")
+    password_hash: Mapped[str] = mapped_column(String(256), default="", comment="密码哈希 (格式: salt$pbkdf2 hex, 空表示未设置密码)")
 
     def __repr__(self):
         return f"<UserCredential {self.name}>"

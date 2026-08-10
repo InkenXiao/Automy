@@ -243,6 +243,10 @@ const API = {
     return this.del(`/personal-reports/${id}`);
   },
 
+  generatePersonalReportSummary(data) {
+    return this.post('/personal-reports/summary', data);
+  },
+
   /* ------------------------------------------------------------------
      进度计划任务
      ------------------------------------------------------------------ */
@@ -360,9 +364,10 @@ const API = {
   /* ------------------------------------------------------------------
      每周工作任务
      ------------------------------------------------------------------ */
-  getWorkTasks(weekStart, projectId) {
+  getWorkTasks(weekStart, projectId, homeScope) {
     let qs = `?week_start=${weekStart}`;
     if (projectId) qs += `&project_id=${encodeURIComponent(projectId)}`;
+    if (homeScope) qs += '&home_scope=true';
     return this.get(`/work-tasks/${qs}`);
   },
 

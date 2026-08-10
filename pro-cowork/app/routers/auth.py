@@ -3,7 +3,7 @@
 密码逻辑 (需求: 密码设置):
 - 成员未设置密码: 姓名直登
 - 成员已设置密码: 登录需携带 password; 仅姓名登录时返回 need_password=true 由前端弹出密码框
-- 密码加盐 pbkdf2 哈希存储于 user_credentials (按姓名唯一)
+- 密码加盐 pbkdf2 哈希存储于 sys_user_credentials (按姓名唯一)
 """
 import hashlib
 import secrets
@@ -19,6 +19,7 @@ from app.deps import get_memberships, get_user_name
 from app.models.project import Project
 from app.models.usage_log import LoginLog
 from app.models.user_credential import UserCredential
+from app.services.user_sync import sync_sys_user
 
 router = APIRouter(prefix="/auth", tags=["身份确认"])
 
@@ -166,6 +167,8 @@ async def set_password(
         cred.password_hash = f"{salt}${_hash_password(new_password, salt)}"
     else:
         cred.password_hash = ""  # 清除密码
+    # 双写 sys_users: rag/mcp-cowork 同密码登录 (空串=恢复姓名直登)
+    await sync_sys_user(db, name, password_hash=cred.password_hash)
     # 显式提交: 保证紧随的登录请求立刻读到最新凭据 (不等依赖收尾)
     await db.commit()
     return {"ok": True, "has_password": bool(new_password)}

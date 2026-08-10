@@ -85,7 +85,7 @@ const Auth = {
       overlay.innerHTML = `
         <div class="auth-card">
           <img class="auth-card__logo" src="images/XIN.png" alt="XIN">
-          <div class="auth-card__title">玄圃 · 智枢技链</div>
+          <div class="auth-card__title">玄圃 · 智创</div>
           <div class="auth-card__subtitle">项目成员身份确认</div>
           <input class="auth-card__input" id="auth-name-input" type="text"
                  placeholder="请输入项目组中的成员姓名" autocomplete="off">

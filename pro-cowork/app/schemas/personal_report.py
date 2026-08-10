@@ -59,6 +59,7 @@ class PersonalReportBase(BaseModel):
     member_name: str
     week_start: date
     week_end: date
+    summary: str = ""  # 周报概括 (AI 生成/人工编写, 2-3 段话)
 
 
 class PersonalReportCreate(PersonalReportBase):
@@ -73,6 +74,17 @@ class PersonalReportUpdate(BaseModel):
 
     work_items: Optional[list[PersonalReportWorkItemIn]] = None
     plan_items: Optional[list[PersonalReportPlanItemIn]] = None
+    summary: Optional[str] = None  # 传值即更新概括 (不影响子表)
+
+
+class PersonalReportSummaryIn(BaseModel):
+    """周报概括生成入参 (取当前表单内容实时生成, 无需先保存周报)"""
+
+    member_name: str
+    week_start: Optional[date] = None
+    week_end: Optional[date] = None
+    work_items: list[PersonalReportWorkItemIn] = []
+    plan_items: list[PersonalReportPlanItemIn] = []
 
 
 class PersonalReportOut(PersonalReportBase):

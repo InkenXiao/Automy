@@ -11,11 +11,11 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class Phase(Base, TimestampMixin, SoftDeleteMixin):
     """项目阶段字典 (第一阶段/第二阶段/第三阶段, 按项目隔离)"""
 
-    __tablename__ = "phases"
+    __tablename__ = "pro_phases"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("pro_projects.id", ondelete="CASCADE"), nullable=False, index=True
     )  # ★所属项目ID
     name: Mapped[str] = mapped_column(String(32))  # 第一阶段/第二阶段/第三阶段
     subtitle: Mapped[str] = mapped_column(String(32), default="")  # 有得用/用起来/用得好

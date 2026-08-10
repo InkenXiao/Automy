@@ -11,16 +11,16 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class ProgressTask(Base, TimestampMixin, SoftDeleteMixin):
     """项目进度计划任务"""
 
-    __tablename__ = "progress_tasks"
+    __tablename__ = "pro_progress_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("pro_projects.id", ondelete="CASCADE"), nullable=False, index=True
     )  # ★所属项目ID
     task_uid: Mapped[str] = mapped_column(String(16), unique=True)  # '1-1','M1'
     name: Mapped[str] = mapped_column(String(256))
     phase_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("phases.id"), nullable=True
+        Integer, ForeignKey("pro_phases.id"), nullable=True
     )
     start_date: Mapped[date] = mapped_column(Date, nullable=True)
     end_date: Mapped[date] = mapped_column(Date, nullable=True)

@@ -55,7 +55,7 @@ class AgentEngine:
             }
             return
 
-        tool_executor = ToolExecutor(self.db, agent_id=agent.id, session_id=session.id)
+        tool_executor = ToolExecutor(self.db, agent_id=agent.id, session_id=session.id, user_name=user_name)
         messages = await self._build_messages(agent, history, memories, user_message)
         tools = self._get_tools(agent)
         total_tokens_all = 0
@@ -186,7 +186,7 @@ class AgentEngine:
                 "model": self.model,
             }
 
-        tool_executor = ToolExecutor(self.db, agent_id=agent.id, session_id=None)
+        tool_executor = ToolExecutor(self.db, agent_id=agent.id, session_id=None, user_name=user_name)
         messages = await self._build_messages(agent, history, memories, user_message)
         tools = self._get_tools(agent)
         trace: list[dict] = []

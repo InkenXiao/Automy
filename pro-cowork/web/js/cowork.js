@@ -32,7 +32,7 @@ const ChatAttach = {
     btn.type = 'button';
     btn.className = 'cw-btn cw-btn--sm attach-btn';
     btn.title = '上传附件 (支持 Ctrl+V 黏贴图片/文件)';
-    btn.textContent = '＋';
+    btn.textContent = '➕';
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.multiple = true;
@@ -224,7 +224,7 @@ const TaskCenter = {
               <label>任务附件</label>
               <div class="chip-box" id="tc-files"></div>
               <div style="margin-top:6px">
-                <button class="cw-btn cw-btn--sm tc-plus" id="tc-upload" title="上传文件">＋ 上传文件</button>
+                <button class="cw-btn cw-btn--sm tc-plus" id="tc-upload" title="上传文件"> ➕ </button>
                 <input type="file" id="tc-file-input" style="display:none">
               </div>
             </div>
@@ -495,6 +495,7 @@ const TaskCenter = {
     let minutesBlock = null;  // 流式纪要块 (minutes_delta 事件聚合)
     let digestBlock = null;   // 流式周工作小结块 (digest_delta 事件聚合)
     let intentTrace = null;   // 意图识别块 (start/done 合并更新)
+    let preBlock = null;      // 附件预处理块 (vision/doc_parse)
 
     const ensureReply = () => {
       if (!replyBody) {
@@ -510,7 +511,7 @@ const TaskCenter = {
         if (event.type === 'user') {
           if (replyText) this._lastReply = replyText; // 新一轮开始前冻结上一条完整回复
           replyBody = null; replyText = ''; lastTrace = null;
-          asrBlock = null; minutesBlock = null; digestBlock = null; intentTrace = null;
+          asrBlock = null; minutesBlock = null; digestBlock = null; intentTrace = null; preBlock = null;
           this.appendChatMsg(out, 'user', this.displayUserHtml(event.payload.content));
         } else if (event.type === 'intent') {
           // 意图识别过程: 项目/数字分身/技能 自动识别结果 (start/done 合并为同一块)
@@ -596,6 +597,36 @@ const TaskCenter = {
             if (head) head.textContent = head.textContent.replace(' (实时)', '');
             const badge = asrBlock.querySelector('.chat-trace__badge');
             if (badge) badge.textContent = `转写完成 · ${event.payload.segments} 段 · ${event.payload.chars} 字`;
+          }
+        } else if (event.type === 'vision_start' || event.type === 'doc_parse_start') {
+          // 附件确定性预处理: 图片识别 / 文档解析开始
+          replyBody = null; replyText = '';
+          const title = event.type === 'vision_start'
+            ? `图像识别 · ${event.payload.file || ''}` : `文档解析 · ${event.payload.file || ''}`;
+          preBlock = this.appendTrace(out, title, '解析中');
+          if (preBlock) {
+            preBlock.querySelector('.chat-trace__head span:first-child').textContent =
+              event.type === 'vision_start' ? '🖼' : '📄';
+          }
+        } else if (event.type === 'vision_done' || event.type === 'doc_parse_done') {
+          if (preBlock) {
+            const badge = preBlock.querySelector('.chat-trace__badge');
+            if (badge) {
+              badge.textContent = event.type === 'vision_done'
+                ? `识别完成 · ${event.payload.chars} 字`
+                : `解析完成 · ${event.payload.pages || 0} 页 · ${event.payload.chars} 字`;
+              badge.classList.add('chat-trace__badge--ok');
+            }
+            preBlock = null;
+          }
+        } else if (event.type === 'audio_error' || event.type === 'image_error' || event.type === 'pdf_error') {
+          // 附件预处理失败提示
+          replyBody = null; replyText = '';
+          const errTrace = this.appendTrace(out, `附件预处理失败 · ${event.payload.file || ''}`, '失败');
+          if (errTrace) {
+            errTrace.querySelector('.chat-trace__head span:first-child').textContent = '⚠️';
+            errTrace.querySelector('.chat-trace__body').innerHTML =
+              `<pre>${App.escapeHtml(event.payload.error || '')}</pre>`;
           }
         } else if (event.type === 'minutes_delta') {
           // 会议纪要流式增量输出 (不影响工具轨迹状态)
@@ -1384,6 +1415,39 @@ const MentionBox = {
     });
     this.host.appendChild(popup);
     this.popup = popup;
+    this._placePopup();
+  },
+
+  /** 浮层定位: 默认向上展开; 上方空间不足时翻转向下, 并按可用空间收紧最大高度
+   *  (浮层绝对定位在宿主内, 向上超出最近滚动祖先/视口的部分会被裁掉, 需按边界实测)
+   */
+  _placePopup() {
+    const popup = this.popup;
+    if (!popup || !this.host) return;
+    const rect = this.host.getBoundingClientRect();
+    // 裁切边界: 全部 overflow 非 visible 祖先与视口的交集
+    // (overflow:auto/scroll/hidden 的祖先即使未出现滚动条, 同样会裁切绝对定位浮层)
+    let boundaryTop = 0, boundaryBottom = window.innerHeight;
+    let el = this.host.parentElement;
+    while (el && el !== document.body) {
+      if (getComputedStyle(el).overflowY !== 'visible') {
+        const r = el.getBoundingClientRect();
+        boundaryTop = Math.max(boundaryTop, r.top);
+        boundaryBottom = Math.min(boundaryBottom, r.bottom);
+      }
+      el = el.parentElement;
+    }
+    const GAP = 6, MARGIN = 8, MAX_H = 260, MIN_H = 120;
+    const upSpace = rect.top - boundaryTop - GAP - MARGIN;
+    const downSpace = boundaryBottom - rect.bottom - GAP - MARGIN;
+    // 上方放得下(或比下方宽裕) → 向上; 否则翻转向下
+    if (upSpace >= popup.offsetHeight || upSpace >= downSpace) {
+      popup.classList.remove('mention-popup--below');
+      popup.style.maxHeight = `${Math.max(MIN_H, Math.min(MAX_H, upSpace))}px`;
+    } else {
+      popup.classList.add('mention-popup--below');
+      popup.style.maxHeight = `${Math.max(MIN_H, Math.min(MAX_H, downSpace))}px`;
+    }
   },
 
   setActive(i) {
@@ -1823,6 +1887,9 @@ const AgentChat = {
     const replyBody = this.appendMessage('assistant', '');
     let replyText = '';
     let lastTrace = null;
+    let intentTrace = null;  // 意图识别块
+    let asrBlock = null;     // 实时转写块 (asr_segment 聚合)
+    let preBlock = null;     // 图片识别/文档解析块
     this.sending = true;
     const sendBtn = document.getElementById('chat-send');
     if (sendBtn) sendBtn.disabled = true;
@@ -1831,7 +1898,96 @@ const AgentChat = {
       await API.stream(`/agents/${this.agent.id}/chat`, {
         message, session_id: this.session.id, file_names: fileNames,
       }, (event) => {
-        if (event.type === 'content') {
+        if (event.type === 'intent') {
+          // 意图识别 (附件场景: start/done 合并为同一块)
+          if (event.stage === 'start') {
+            intentTrace = this.appendTrace('意图识别', '进行中');
+            if (intentTrace) {
+              intentTrace.querySelector('.chat-trace__head span:first-child').textContent = '🧭';
+              intentTrace.classList.add('open');
+              intentTrace.querySelector('.chat-trace__body').innerHTML =
+                `<div style="font-size:12px;">${App.escapeHtml(event.content || '')}</div>`;
+            }
+          } else if (intentTrace) {
+            const badge = intentTrace.querySelector('.chat-trace__badge');
+            badge.textContent = '完成';
+            badge.classList.add('chat-trace__badge--ok');
+            if (event.reason) {
+              intentTrace.querySelector('.chat-trace__body').innerHTML =
+                `<div style="font-size:12px;">识别依据: ${App.escapeHtml(event.reason)}</div>`;
+            }
+          }
+          this.scrollBottom();
+        } else if (event.type === 'asr_start') {
+          // 语音转写开始: 创建实时转写块
+          asrBlock = this.appendTrace(`录音转写文字 · ${event.file || ''} (实时)`, '转写中');
+          if (asrBlock) {
+            asrBlock.querySelector('.chat-trace__head span:first-child').textContent = '🗣';
+            asrBlock.classList.add('open');
+            asrBlock.querySelector('.chat-trace__body').innerHTML =
+              '<pre style="white-space:pre-wrap;max-height:220px;overflow-y:auto;font-size:12px;"></pre>';
+          }
+          this.scrollBottom();
+        } else if (event.type === 'asr_segment') {
+          // 每段转写文字实时追加
+          if (!asrBlock) {
+            asrBlock = this.appendTrace('录音转写文字 (实时)', '转写中');
+            if (asrBlock) {
+              asrBlock.querySelector('.chat-trace__head span:first-child').textContent = '🗣';
+              asrBlock.classList.add('open');
+              asrBlock.querySelector('.chat-trace__body').innerHTML =
+                '<pre style="white-space:pre-wrap;max-height:220px;overflow-y:auto;font-size:12px;"></pre>';
+            }
+          }
+          if (asrBlock) {
+            const pre = asrBlock.querySelector('pre');
+            pre.textContent += `${event.ts} ${event.text}\n`;
+            const badge = asrBlock.querySelector('.chat-trace__badge');
+            if (badge) badge.textContent = `${event.index} 段 · 切片 ${event.chunk}/${event.chunks}`;
+            pre.scrollTop = pre.scrollHeight;
+          }
+          this.scrollBottom();
+        } else if (event.type === 'asr_done') {
+          if (asrBlock) {
+            const head = asrBlock.querySelector('.chat-trace__head span:nth-child(2)');
+            if (head) head.textContent = head.textContent.replace(' (实时)', '');
+            const badge = asrBlock.querySelector('.chat-trace__badge');
+            if (badge) {
+              badge.textContent = `转写完成 · ${event.segments} 段 · ${event.chars} 字`;
+              badge.classList.add('chat-trace__badge--ok');
+            }
+          }
+          this.scrollBottom();
+        } else if (event.type === 'vision_start' || event.type === 'doc_parse_start') {
+          const title = event.type === 'vision_start'
+            ? `图像识别 · ${event.file || ''}` : `文档解析 · ${event.file || ''}`;
+          preBlock = this.appendTrace(title, '解析中');
+          if (preBlock) {
+            preBlock.querySelector('.chat-trace__head span:first-child').textContent =
+              event.type === 'vision_start' ? '🖼' : '📄';
+          }
+          this.scrollBottom();
+        } else if (event.type === 'vision_done' || event.type === 'doc_parse_done') {
+          if (preBlock) {
+            const badge = preBlock.querySelector('.chat-trace__badge');
+            if (badge) {
+              badge.textContent = event.type === 'vision_done'
+                ? `识别完成 · ${event.chars} 字`
+                : `解析完成 · ${event.pages || 0} 页 · ${event.chars} 字`;
+              badge.classList.add('chat-trace__badge--ok');
+            }
+            preBlock = null;
+          }
+          this.scrollBottom();
+        } else if (event.type === 'audio_error' || event.type === 'image_error' || event.type === 'pdf_error') {
+          const errTrace = this.appendTrace(`附件预处理失败 · ${event.file || ''}`, '失败');
+          if (errTrace) {
+            errTrace.querySelector('.chat-trace__head span:first-child').textContent = '⚠️';
+            errTrace.querySelector('.chat-trace__body').innerHTML =
+              `<div style="font-size:12px;color:var(--color-danger,#e53935);">${App.escapeHtml(event.error || '')}</div>`;
+          }
+          this.scrollBottom();
+        } else if (event.type === 'content') {
           replyText += event.content;
           replyBody.innerHTML = App.renderMarkdown(replyText);
           this.scrollBottom();
@@ -1941,10 +2097,25 @@ const CoworkBuilder = {
     ['update_work_task', '更新每周工作任务 (状态/工时/优先级)'],
     ['run_skill', '执行技能 (按名称或ID调用技能工作流)'],
     ['save_memory', '保存长期记忆 (事实/偏好/决策)'],
+    ['list_personal_reports', '列出某周个人周报填报情况 (已填/未填名单)'],
+    ['get_personal_report', '获取成员个人周报详情 (明细/计划/概括)'],
+    ['save_personal_report', '创建或更新成员个人周报 (明细全量替换)'],
+    ['generate_personal_summary', 'AI 生成个人周报概括并写回'],
+    ['kb_list', '列出当前用户可见知识库 (可按级别过滤)'],
+    ['kb_create', '创建知识库 (五级: company/department/project/personal/external)'],
+    ['kb_files', '知识库文件清单 (含解析状态/分块数, 巡检用)'],
+    ['kb_file_add', '上传文件到知识库并解析入库 (base64, 适合小文本)'],
+    ['kb_file_parse', '重跑文档解析入库流水线 (pending/error 适用)'],
+    ['kb_file_delete', '删除知识库文件 (清理向量库/图谱/对象存储)'],
+    ['kb_rag_search', '知识库纯检索 (验证入库效果, 不生成答案)'],
+    ['kb_rag_query', '知识库 RAG 问答 (混合检索+生成含引用答案)'],
+    ['send_im', '向我的个人 IM 通道推送消息 (飞书/企微/钉钉/邮箱/OA/Obsidian, 技链工坊配置)'],
+    ['run_tool_inspection', '触发技链工坊工具巡检 (健康检查+工具变更diff+用例回归门禁)'],
   ],
   AGENT_TYPES: [
     ['progress', '进度管理'], ['meeting', '会议管理'],
-    ['weekly_report', '周报编写'], ['work_plan', '工作计划'], ['custom', '自定义'],
+    ['weekly_report', '周报编写'], ['work_plan', '工作计划'],
+    ['knowledge', '知识库'], ['custom', '自定义'],
   ],
 
   init() {},

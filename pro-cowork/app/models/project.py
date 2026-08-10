@@ -11,18 +11,19 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class Project(Base, TimestampMixin, SoftDeleteMixin):
     """项目元信息 (一个项目对应一张进度计划执行图)"""
 
-    __tablename__ = "projects"
+    __tablename__ = "pro_projects"
+    __table_args__ = {"comment": "项目元信息表 (一个项目对应一张进度计划执行图)"}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(64))  # 项目名, 如 "信投AI2.0"
-    title: Mapped[str] = mapped_column(String(256))  # 执行图标题
-    based_doc: Mapped[str] = mapped_column(String(256), default="")  # 基于文档
-    manager: Mapped[str] = mapped_column(String(64), default="")  # 项目经理
-    status: Mapped[str] = mapped_column(String(16), default="进行中")  # 项目状态: 进行中/已停止/已完成
-    start_date: Mapped[date] = mapped_column(Date)  # 项目开始日期
-    end_date: Mapped[date] = mapped_column(Date)  # 项目结束日期
-    is_active: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否当前项目
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    name: Mapped[str] = mapped_column(String(64), comment="项目名, 如 \"信投AI2.0\"")
+    title: Mapped[str] = mapped_column(String(256), comment="执行图标题")
+    based_doc: Mapped[str] = mapped_column(String(256), default="", comment="基于文档")
+    manager: Mapped[str] = mapped_column(String(64), default="", comment="项目经理")
+    status: Mapped[str] = mapped_column(String(16), default="进行中", comment="项目状态: 进行中/已停止/已完成")
+    start_date: Mapped[date] = mapped_column(Date, comment="项目开始日期")
+    end_date: Mapped[date] = mapped_column(Date, comment="项目结束日期")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否当前项目")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, comment="排序序号")
 
     # 反向关联 (lazy="raise" 避免异步懒加载, 需要时用 selectinload)
     meetings: Mapped[List["Meeting"]] = relationship(

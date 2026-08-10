@@ -10,11 +10,11 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class Module(Base, TimestampMixin, SoftDeleteMixin):
     """项目模块字典 (底座/数据/智能体/应用/需求/协调, 按项目隔离)"""
 
-    __tablename__ = "modules"
+    __tablename__ = "pro_modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("pro_projects.id", ondelete="CASCADE"), nullable=False, index=True
     )  # ★所属项目ID
     idx: Mapped[str] = mapped_column(String(4))  # '01','02'...
     tag: Mapped[str] = mapped_column(String(16))  # 底座/数据/智能体/应用/需求/协调

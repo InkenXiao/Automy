@@ -1,9 +1,12 @@
 # ============================================================
-# XIN-AI 四合一容器镜像 (开发模式: 源码挂载, 改代码无需 rebuild)
-#   xin-site  : 8087  (Vite dev 热更新)
-#   pro-site  : 8088  (FastAPI + uvicorn --reload)
-#   abs-site  : 8089  (FastAPI + uvicorn --reload)
-#   pro-cowork: 8091  (FastAPI + uvicorn --reload, 智能体平台)
+# XIN-AI 多合一容器镜像 (开发模式: 源码挂载, 改代码无需 rebuild)
+#   xin-site      : 8087  (Vite dev 热更新)
+#   pro-site      : 8088  (FastAPI + uvicorn --reload)
+#   cowork-site   : 8090  (cowork 统一入口静态页, python http.server)
+#   pro-cowork    : 8091  (FastAPI + uvicorn --reload, 智能体平台)
+#   rag-cowork    : 8092  (FastAPI + uvicorn --reload, 知识库平台)
+#   rag-cowork-mcp: 8093  (FastMCP streamable-HTTP, 知识库 MCP 服务)
+#   mcp-cowork    : 8094  (FastAPI + uvicorn --reload, MCP 维护/测试/统计)
 #
 # 镜像只安装运行时和依赖, 源码通过 docker-compose 卷挂载
 # 仅当依赖变更 (requirements.txt / package.json) 时才需重新 build
@@ -48,16 +51,19 @@ RUN npm config set registry https://registry.npmmirror.com
 WORKDIR /app
 
 # ---------- 1. 安装 Python 依赖 (只 COPY requirements.txt, 源码运行时挂载) ----------
-# abs-site 共用 pro-site 的依赖 (均为 FastAPI + SQLAlchemy + Pydantic)
 # pro-cowork 额外依赖 openai (智能体 LLM 调用), 单独安装
 # 显式指定清华镜像, 避免 pip.conf 在某些版本不生效
 COPY pro-site/requirements.txt /tmp/requirements.txt
 COPY pro-cowork/requirements.txt /tmp/requirements-cowork.txt
+COPY rag-cowork/requirements.txt /tmp/requirements-rag.txt
+COPY mcp-cowork/requirements.txt /tmp/requirements-mcp.txt
 RUN python -m venv /app/venv \
     && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip \
     && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements.txt \
     && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements-cowork.txt \
-    && rm /tmp/requirements.txt /tmp/requirements-cowork.txt
+    && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements-rag.txt \
+    && /app/venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements-mcp.txt \
+    && rm /tmp/requirements.txt /tmp/requirements-cowork.txt /tmp/requirements-rag.txt /tmp/requirements-mcp.txt
 
 ENV PATH="/app/venv/bin:$PATH"
 
@@ -70,7 +76,7 @@ RUN cd /app/xin-site && npm install
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-EXPOSE 8087 8088 8089 8091
+EXPOSE 8087 8088 8090 8091 8092 8093 8094
 RUN mkdir -p /app/logs
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

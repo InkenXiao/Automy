@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
 
+    # 雪花 ID 工作节点 (sys_users 双写主键用; rag-cowork=1, mcp-cowork=2, 本工程=3)
+    SNOWFLAKE_WORKER_ID: int = 3
+
     # 主推理模型 (智能体对话/会议纪要等主力生成)
     MAIN_API_URL: str = ""
     MAIN_API_KEY: str = ""
@@ -67,6 +70,15 @@ class Settings(BaseSettings):
 
     # mineru 算力网关 (扫描件 PDF 深度布局分析; 宿主机 mineru 容器, 留空则跳过该级)
     MINERU_API_URL: str = ""
+
+    # 知识库 MCP 服务 (rag-cowork FastMCP streamable-HTTP; 知识库维护分身经此管理知识库)
+    KB_MCP_URL: str = "http://localhost:8093/mcp"
+
+    # 技链工坊 IM 推送接口 (mcp-cowork; send_im 工具经此向用户个人 IM 通道发消息)
+    MCP_IM_URL: str = "http://localhost:8094/api/im/send"
+
+    # 技链工坊工具巡检接口 (mcp-cowork; run_tool_inspection 工具经此触发巡检)
+    MCP_INSPECT_URL: str = "http://localhost:8094/api/inspect"
 
     # MinIO 对象存储 (上传文件同步归档; 路径: {分身}/{成员}/{yyyymm}/{文件名})
     MINIO_ENDPOINT: str = ""

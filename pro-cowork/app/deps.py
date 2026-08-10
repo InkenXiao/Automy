@@ -83,6 +83,14 @@ async def is_any_project_manager(db: AsyncSession, name: str) -> bool:
     return result.scalars().first() is not None
 
 
+async def is_manager_of_project(db: AsyncSession, project_id: int, name: str) -> bool:
+    """是否指定项目的项目经理 (首页看板等读场景的全量数据判定)"""
+    if not name or not project_id:
+        return False
+    project = await db.get(Project, project_id)
+    return is_project_manager(project, name)
+
+
 async def resolve_visible_project_id(
     db: AsyncSession, name: str, project_id: int | None
 ) -> int | None:

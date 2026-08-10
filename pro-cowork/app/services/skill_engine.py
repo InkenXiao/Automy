@@ -44,7 +44,8 @@ def _find_task_file(project_id: Optional[int], file_name: str) -> Optional[Path]
 async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Optional[int] = None, user_name: str = "system") -> dict:
     """内置能力: 会议纪要生成
 
-    入参: file_name (任务附件中的录音文件名), project_id (可选, 默认当前激活项目)
+    入参: file_name (任务附件中的录音文件名) 或 audio_transcript (已转写文本, 跳过 ASR),
+         project_id (可选, 默认当前激活项目)
     过程: 每段转写文字实时推送 asr_segment 事件; 转写完成后流式推送 minutes_delta
     返回: {file, duration_s, transcript, minutes}
     """
@@ -52,35 +53,42 @@ async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Opt
     from app.services.minutes_service import generate_minutes_stream
     from app.services.task_runner import emit_run_event
 
-    file_name = args.get("file_name")
-    if not file_name:
+    file_name = Path(str(args.get("file_name") or "transcript")).name  # 防目录穿越
+    preset_transcript = (args.get("audio_transcript") or "").strip()
+    if not args.get("file_name") and not preset_transcript:
         return {"error": "缺少参数 file_name (录音文件名)"}
-    file_name = Path(str(file_name)).name  # 防目录穿越
 
     project_id = args.get("project_id")
     if project_id in (None, "", 0):
         project_id = await get_active_project_id(db)
-    audio_path = _find_task_file(project_id, file_name)
-    if not audio_path:
-        return {"error": f"录音文件不存在: {file_name} (项目#{project_id}), 请先在任务中上传"}
 
-    await emit_run_event(session_id, "asr_start", {"file": file_name})
+    duration_s = 0.0
+    if preset_transcript:
+        # 调用方已完成转写 (附件确定性预处理注入), 跳过 ASR 直接生成纪要, 避免二次转写
+        transcript = preset_transcript
+    else:
+        audio_path = _find_task_file(project_id, file_name)
+        if not audio_path:
+            return {"error": f"录音文件不存在: {file_name} (项目#{project_id}), 请先在任务中上传"}
 
-    async def on_segment(seg: dict) -> None:
-        await emit_run_event(session_id, "asr_segment", seg)
+        await emit_run_event(session_id, "asr_start", {"file": file_name})
 
-    try:
-        asr_result = await transcribe_audio(audio_path, on_segment=on_segment)
-    except RuntimeError as e:
-        return {"error": f"转录失败: {e}"}
+        async def on_segment(seg: dict) -> None:
+            await emit_run_event(session_id, "asr_segment", seg)
 
-    transcript = asr_result["text"]
-    await emit_run_event(session_id, "asr_done", {
-        "file": file_name,
-        "duration_s": asr_result["duration_s"],
-        "segments": len(asr_result.get("segments") or []),
-        "chars": len(transcript),
-    })
+        try:
+            asr_result = await transcribe_audio(audio_path, on_segment=on_segment)
+        except RuntimeError as e:
+            return {"error": f"转录失败: {e}"}
+
+        transcript = asr_result["text"]
+        duration_s = asr_result["duration_s"]
+        await emit_run_event(session_id, "asr_done", {
+            "file": file_name,
+            "duration_s": duration_s,
+            "segments": len(asr_result.get("segments") or []),
+            "chars": len(transcript),
+        })
 
     minutes_parts: list[str] = []
     try:
@@ -93,7 +101,7 @@ async def _builtin_meeting_minutes(db: AsyncSession, args: dict, session_id: Opt
 
     return {
         "file": file_name,
-        "duration_s": asr_result["duration_s"],
+        "duration_s": duration_s,
         "transcript": transcript,
         "minutes": minutes,
     }
@@ -273,7 +281,7 @@ class SkillEngine:
         self.db = db
         self.session_id = session_id
         self.user_name = user_name
-        self.tool_executor = ToolExecutor(db)
+        self.tool_executor = ToolExecutor(db, user_name=user_name)
 
     async def execute(self, skill: Skill, input_data: dict, prior_results: list | None = None) -> dict:
         """

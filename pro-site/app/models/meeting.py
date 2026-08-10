@@ -10,11 +10,11 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 class Meeting(Base, TimestampMixin, SoftDeleteMixin):
     """会议主记录"""
 
-    __tablename__ = "meetings"
+    __tablename__ = "pro_meetings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("pro_projects.id", ondelete="CASCADE"), nullable=False, index=True
     )  # ★所属项目ID
     title: Mapped[str] = mapped_column(String(256), default="项目周例会")  # 会议主题
     meet_date: Mapped[str] = mapped_column(String(32), default="")  # 日期, 如 '2026-07-21'
@@ -39,11 +39,11 @@ class Meeting(Base, TimestampMixin, SoftDeleteMixin):
 class MeetingItem(Base, TimestampMixin, SoftDeleteMixin):
     """会议议程项"""
 
-    __tablename__ = "meeting_items"
+    __tablename__ = "pro_meeting_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     meeting_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("meetings.id", ondelete="CASCADE")
+        Integer, ForeignKey("pro_meetings.id", ondelete="CASCADE")
     )
     item_time: Mapped[str] = mapped_column(String(32), default="")  # 时间段, 如 '09:00-09:10'
     theme: Mapped[str] = mapped_column(String(256), default="")  # 议程主题

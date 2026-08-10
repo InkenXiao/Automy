@@ -335,6 +335,236 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    # ---------- 个人周报 (pro_personal_reports: 每人每周一份, 本周工作明细 + 下周计划 + 概括) ----------
+    {
+        "type": "function",
+        "function": {
+            "name": "list_personal_reports",
+            "description": "列出当前项目某周个人周报填报情况: 已填报成员(工时/行数/有无概括)与未填报成员名单, 用于催报与汇总",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "week_start": {"type": "string", "description": "周起始日期 YYYY-MM-DD (周一), 默认本周"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_personal_report",
+            "description": "获取指定成员某周个人周报详情 (本周工作内容明细/下周工作计划/周报概括)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "member_name": {"type": "string", "description": "成员姓名 (必填)"},
+                    "week_start": {"type": "string", "description": "周起始日期 YYYY-MM-DD (周一), 默认本周"},
+                },
+                "required": ["member_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_personal_report",
+            "description": "创建或更新指定成员的个人周报: 子表按传入列表全量替换 (不传则保持原值), summary 传值即更新概括; 同项目同成员同周仅一份",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "member_name": {"type": "string", "description": "成员姓名 (必填)"},
+                    "week_start": {"type": "string", "description": "周起始日期 YYYY-MM-DD (周一), 默认本周"},
+                    "work_items": {
+                        "type": "array",
+                        "description": "本周工作内容行 (全量替换): 每行一天",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "day_of_week": {"type": "integer", "description": "周几: 1=周一~7=周日"},
+                                "content": {"type": "string", "description": "当天工作内容"},
+                                "participants": {"type": "string", "description": "参与人员"},
+                                "deliverable": {"type": "string", "description": "交付物"},
+                                "hours": {"type": "number", "description": "工时(H)"},
+                            },
+                            "required": ["day_of_week", "content"],
+                        },
+                    },
+                    "plan_items": {
+                        "type": "array",
+                        "description": "下周工作计划行 (全量替换)",
+                        "items": {
+                            "type": "object",
+                            "properties": {"content": {"type": "string", "description": "计划内容"}},
+                            "required": ["content"],
+                        },
+                    },
+                    "summary": {"type": "string", "description": "周报概括 (2-3 段: 本周主要工作内容 + 下周工作计划)"},
+                },
+                "required": ["member_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_personal_summary",
+            "description": "基于已保存的个人周报明细 AI 生成周报概括 (2-3 段) 并写回该周报, 返回概括文本; 明细为空时报错",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "member_name": {"type": "string", "description": "成员姓名 (必填)"},
+                    "week_start": {"type": "string", "description": "周起始日期 YYYY-MM-DD (周一), 默认本周"},
+                },
+                "required": ["member_name"],
+            },
+        },
+    },
+    # ---------- 知识库维护 (经 MCP 协议调 rag-cowork 知识库服务, 按当前用户身份做权限过滤) ----------
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_list",
+            "description": "列出当前用户可见的知识库 (可按级别过滤)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "level": {"type": "string", "description": "级别过滤: company/department/project/personal/external, 不传为全部"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_create",
+            "description": "创建知识库",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "知识库名称"},
+                    "level": {"type": "string", "description": "级别: company/department/project/personal/external"},
+                    "description": {"type": "string", "description": "知识库描述"},
+                    "project_id": {"type": "integer", "description": "项目ID (level=project 时必填)"},
+                    "department": {"type": "string", "description": "部门名 (level=department 时必填)"},
+                },
+                "required": ["name", "level"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_files",
+            "description": "列出知识库文件清单 (含解析状态 pending/parsing/done/error 与分块数), 用于巡检入库情况",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kb_id": {"type": "integer", "description": "知识库ID"},
+                },
+                "required": ["kb_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_file_add",
+            "description": "上传文件到知识库并触发解析入库 (内容 base64 编码; 适合小文本文件, 大文件建议走知识库网页上传)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kb_id": {"type": "integer", "description": "知识库ID"},
+                    "file_name": {"type": "string", "description": "文件名 (含扩展名, 如 规范.md)"},
+                    "content_base64": {"type": "string", "description": "文件内容 base64 编码"},
+                },
+                "required": ["kb_id", "file_name", "content_base64"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_file_parse",
+            "description": "触发知识库文档解析入库流水线 (分块/向量化/实体关系抽取, 异步入库), 用于 pending/error 文档重跑",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "doc_id": {"type": "integer", "description": "文档ID"},
+                },
+                "required": ["doc_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_file_delete",
+            "description": "删除知识库文件 (逻辑删除并清理向量库/图谱/对象存储)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "doc_id": {"type": "integer", "description": "文档ID"},
+                },
+                "required": ["doc_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_rag_search",
+            "description": "知识库纯检索: 返回分块/实体命中, 不生成答案 (验证入库效果)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kb_ids": {"type": "array", "items": {"type": "integer"}, "description": "知识库ID列表"},
+                    "query": {"type": "string", "description": "检索问题"},
+                    "top_k": {"type": "integer", "description": "返回条数, 默认 10"},
+                },
+                "required": ["kb_ids", "query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "kb_rag_query",
+            "description": "知识库 RAG 问答: 向量+图谱混合检索后生成含引用的答案 (验证问答效果)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kb_ids": {"type": "array", "items": {"type": "integer"}, "description": "知识库ID列表"},
+                    "query": {"type": "string", "description": "问题"},
+                    "mode": {"type": "string", "description": "检索模式: hybrid/local/global, 默认 hybrid"},
+                    "top_k": {"type": "integer", "description": "参考材料条数, 默认 8"},
+                },
+                "required": ["kb_ids", "query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_im",
+            "description": "向当前用户的个人 IM 通道 (飞书/企微/钉钉/邮箱/OA/Obsidian, 在技链工坊配置) 推送消息通知",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "要推送的消息内容"},
+                    "channel_id": {"type": "integer", "description": "指定通道ID, 留空则发到本人全部启用通道"},
+                },
+                "required": ["message"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_tool_inspection",
+            "description": "触发技链工坊工具巡检: 健康检查全部 MCP 服务、同步工具快照并diff变更、回放已存测试用例做回归门禁, 返回巡检报告摘要",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 
@@ -352,17 +582,29 @@ class ToolExecutor:
         db: AsyncSession,
         agent_id: Optional[int] = None,
         session_id: Optional[int] = None,
+        user_name: str = "",
     ):
         self.db = db
         self.agent_id = agent_id
         self.session_id = session_id
+        # 当前对话用户姓名: 知识库 MCP 工具经 X-User-Name 透传给 rag 侧做权限过滤
+        self.user_name = user_name
 
     async def execute(self, tool_name: str, arguments: dict) -> Any:
-        """分发执行工具"""
+        """分发执行工具 (多余入参按 handler 签名过滤, 容忍模型幻觉参数)"""
         handler = getattr(self, f"_tool_{tool_name}", None)
         if not handler:
             return {"error": f"未知工具: {tool_name}"}
         try:
+            import inspect
+
+            sig = inspect.signature(handler)
+            if not any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            ):
+                arguments = {
+                    k: v for k, v in (arguments or {}).items() if k in sig.parameters
+                }
             return await handler(**(arguments or {}))
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
@@ -808,7 +1050,7 @@ class ToolExecutor:
         self.db.add(execution)
         await self.db.flush()
 
-        engine = SkillEngine(self.db, session_id=self.session_id)
+        engine = SkillEngine(self.db, session_id=self.session_id, user_name=self.user_name or "system")
         try:
             output = await engine.execute(skill, input_data or {})
             execution.output_data = output
@@ -848,3 +1090,374 @@ class ToolExecutor:
         await self.db.flush()
         await self.db.refresh(memory)
         return {"id": memory.id, "key": memory.key, "saved": True}
+
+    # ---- 个人周报 ----
+
+    @staticmethod
+    def _personal_week(week_start: Optional[str]) -> date:
+        """解析周起始; 默认本周一"""
+        return _parse_date(week_start) or (date.today() - timedelta(days=date.today().weekday()))
+
+    async def _load_personal_report(self, member_name: str, ws: date):
+        """按 项目+成员+周 加载个人周报 (含子表); 未找到返回 None"""
+        from app.models.personal_report import PersonalReport
+
+        pid = await get_active_project_id(self.db)
+        result = await self.db.execute(
+            select(PersonalReport)
+            .options(
+                selectinload(PersonalReport.work_items),
+                selectinload(PersonalReport.plan_items),
+            )
+            .where(
+                PersonalReport.is_delete.is_(False),
+                PersonalReport.project_id == pid,
+                PersonalReport.member_name == member_name.strip(),
+                PersonalReport.week_start == ws,
+            )
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    def _personal_report_dict(report) -> dict:
+        works = [w for w in report.work_items if not w.is_delete]
+        plans = [p for p in report.plan_items if not p.is_delete]
+        return {
+            "id": report.id,
+            "member_name": report.member_name,
+            "week_start": str(report.week_start),
+            "week_end": str(report.week_end),
+            "summary": report.summary or "",
+            "total_hours": round(sum(w.hours or 0 for w in works), 2),
+            "work_items": [
+                {
+                    "day_of_week": w.day_of_week, "content": w.content,
+                    "participants": w.participants, "deliverable": w.deliverable,
+                    "hours": w.hours,
+                }
+                for w in works
+            ],
+            "plan_items": [{"content": p.content} for p in plans],
+        }
+
+    async def _tool_list_personal_reports(self, week_start: Optional[str] = None) -> dict:
+        from app.models.personal_report import PersonalReport
+        from app.models.project_member import ProjectMember
+
+        pid = await get_active_project_id(self.db)
+        ws = self._personal_week(week_start)
+        result = await self.db.execute(
+            select(PersonalReport)
+            .options(
+                selectinload(PersonalReport.work_items),
+                selectinload(PersonalReport.plan_items),
+            )
+            .where(
+                PersonalReport.is_delete.is_(False),
+                PersonalReport.project_id == pid,
+                PersonalReport.week_start == ws,
+            )
+            .order_by(PersonalReport.member_name)
+        )
+        reports = result.scalars().all()
+        filled = []
+        for r in reports:
+            works = [w for w in r.work_items if not w.is_delete]
+            plans = [p for p in r.plan_items if not p.is_delete]
+            filled.append({
+                "id": r.id,
+                "member_name": r.member_name,
+                "total_hours": round(sum(w.hours or 0 for w in works), 2),
+                "work_rows": len(works),
+                "plan_rows": len(plans),
+                "has_summary": bool((r.summary or "").strip()),
+            })
+        # 在职成员中未填报者 (退出成员不计)
+        members = await self.db.execute(
+            select(ProjectMember.name).where(
+                ProjectMember.is_delete.is_(False),
+                ProjectMember.project_id == pid,
+                ProjectMember.status != "退出",
+            )
+        )
+        filled_names = {r.member_name for r in reports}
+        missing = sorted(n for (n,) in members.all() if n and n not in filled_names)
+        return {
+            "week_start": str(ws),
+            "week_end": str(ws + timedelta(days=6)),
+            "filled_count": len(filled),
+            "missing_count": len(missing),
+            "filled": filled,
+            "missing_members": missing,
+        }
+
+    async def _tool_get_personal_report(
+        self, member_name: str, week_start: Optional[str] = None
+    ) -> dict:
+        if not (member_name or "").strip():
+            return {"error": "member_name 必填"}
+        ws = self._personal_week(week_start)
+        report = await self._load_personal_report(member_name, ws)
+        if not report:
+            return {"error": f"{member_name} {ws} 所在周暂无个人周报"}
+        return self._personal_report_dict(report)
+
+    async def _tool_save_personal_report(
+        self,
+        member_name: str,
+        week_start: Optional[str] = None,
+        work_items: Optional[list] = None,
+        plan_items: Optional[list] = None,
+        summary: Optional[str] = None,
+    ) -> dict:
+        from app.models.personal_report import (
+            PersonalReport,
+            PersonalReportPlanItem,
+            PersonalReportWorkItem,
+        )
+
+        if not (member_name or "").strip():
+            return {"error": "member_name 必填"}
+        member_name = member_name.strip()
+        pid = await get_active_project_id(self.db)
+        ws = self._personal_week(week_start)
+        we = ws + timedelta(days=6)
+
+        report = await self._load_personal_report(member_name, ws)
+        created = False
+        if not report:
+            report = PersonalReport(
+                project_id=pid, member_name=member_name,
+                week_start=ws, week_end=we, summary="",
+                work_items=[], plan_items=[],
+            )
+            self.db.add(report)
+            await self.db.flush()
+            created = True
+
+        if work_items is not None:
+            for w in report.work_items:
+                w.is_delete = True
+            for i, item in enumerate(work_items):
+                report.work_items.append(PersonalReportWorkItem(
+                    project_id=pid,
+                    day_of_week=int(item.get("day_of_week") or 1),
+                    content=(item.get("content") or "").strip(),
+                    participants=(item.get("participants") or "").strip(),
+                    deliverable=(item.get("deliverable") or "").strip(),
+                    hours=float(item.get("hours") or 0),
+                    sort_order=i,
+                ))
+        if plan_items is not None:
+            for p in report.plan_items:
+                p.is_delete = True
+            for i, item in enumerate(plan_items):
+                report.plan_items.append(PersonalReportPlanItem(
+                    project_id=pid,
+                    content=(item.get("content") or "").strip(),
+                    sort_order=i,
+                ))
+        if summary is not None:
+            report.summary = summary.strip()
+        await self.db.flush()
+
+        return {
+            "id": report.id,
+            "created": created,
+            "member_name": member_name,
+            "week_start": str(ws),
+            "week_end": str(we),
+            "work_rows": len(work_items) if work_items is not None else None,
+            "plan_rows": len(plan_items) if plan_items is not None else None,
+            "summary_saved": summary is not None,
+        }
+
+    async def _tool_generate_personal_summary(
+        self, member_name: str, week_start: Optional[str] = None
+    ) -> dict:
+        if not (member_name or "").strip():
+            return {"error": "member_name 必填"}
+        member_name = member_name.strip()
+        ws = self._personal_week(week_start)
+        report = await self._load_personal_report(member_name, ws)
+        if not report:
+            return {"error": f"{member_name} {ws} 所在周暂无个人周报, 请先保存明细再生成概括"}
+
+        works = [w for w in report.work_items if not w.is_delete]
+        plans = [p for p in report.plan_items if not p.is_delete]
+        # 明细行项目ID → 项目名 (当前项目上下文, 直接用激活项目名)
+        project = await self.db.get(Project, report.project_id)
+        project_names = {report.project_id: project.name} if project else {}
+
+        from app.services import personal_summary_service
+
+        try:
+            text = await personal_summary_service.generate_personal_summary(
+                member_name, f"{report.week_start} ~ {report.week_end}",
+                works, plans, project_names,
+                user_name=self.user_name or "system",
+            )
+        except RuntimeError as e:
+            return {"error": str(e)}
+        report.summary = text
+        await self.db.flush()
+        return {"id": report.id, "member_name": member_name, "summary": text}
+
+    # ---- 知识库维护 (MCP) ----
+
+    async def _call_kb(self, tool_name: str, arguments: dict) -> Any:
+        """统一入口: 经 MCP 调 rag-cowork 知识库工具, 异常转 error 返回"""
+        from app.services import mcp_client
+
+        try:
+            return await mcp_client.call_kb_tool(
+                tool_name, arguments, user_name=self.user_name
+            )
+        except RuntimeError as e:
+            return {"error": str(e)}
+
+    async def _tool_kb_list(self, level: Optional[str] = None) -> Any:
+        return await self._call_kb("kb_list", {"level": level or ""})
+
+    async def _tool_kb_create(
+        self,
+        name: str,
+        level: str,
+        description: Optional[str] = None,
+        project_id: Optional[int] = None,
+        department: Optional[str] = None,
+    ) -> Any:
+        args: dict[str, Any] = {"name": name, "level": level}
+        if description:
+            args["description"] = description
+        if project_id:
+            args["project_id"] = project_id
+        if department:
+            args["department"] = department
+        return await self._call_kb("kb_create", args)
+
+    async def _tool_kb_files(self, kb_id: int) -> Any:
+        return await self._call_kb("kb_files", {"kb_id": kb_id})
+
+    async def _tool_kb_file_add(self, kb_id: int, file_name: str, content_base64: str) -> Any:
+        return await self._call_kb("kb_file_add", {
+            "kb_id": kb_id, "file_name": file_name, "content_base64": content_base64,
+        })
+
+    async def _tool_kb_file_parse(self, doc_id: int) -> Any:
+        return await self._call_kb("kb_file_parse", {"doc_id": doc_id})
+
+    async def _tool_kb_file_delete(self, doc_id: int) -> Any:
+        return await self._call_kb("kb_file_delete", {"doc_id": doc_id})
+
+    async def _tool_kb_rag_search(
+        self, kb_ids: list, query: str, top_k: Optional[int] = None
+    ) -> Any:
+        args: dict[str, Any] = {"kb_ids": kb_ids, "query": query}
+        if top_k:
+            args["top_k"] = top_k
+        return await self._call_kb("rag_search", args)
+
+    async def _tool_kb_rag_query(
+        self, kb_ids: list, query: str, mode: Optional[str] = None,
+        top_k: Optional[int] = None,
+    ) -> Any:
+        args: dict[str, Any] = {"kb_ids": kb_ids, "query": query}
+        if mode:
+            args["mode"] = mode
+        if top_k:
+            args["top_k"] = top_k
+        return await self._call_kb("rag_query", args)
+
+    # ---- IM 推送 (技链工坊个人通道) ----
+
+    async def _tool_send_im(self, message: str, channel_id: Optional[int] = None) -> Any:
+        """经 mcp-cowork 向当前用户个人 IM 通道推送消息"""
+        from urllib.parse import quote
+
+        import httpx
+
+        from app.config import settings
+
+        if not self.user_name:
+            return {"error": "无法识别当前用户, 未发送"}
+        url = (settings.MCP_IM_URL or "").strip()
+        if not url:
+            return {"error": "IM 推送接口未配置 (MCP_IM_URL)"}
+        payload: dict[str, Any] = {"message": message}
+        if channel_id:
+            payload["channel_id"] = channel_id
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    url, json=payload,
+                    headers={"X-User-Name": quote(self.user_name)},
+                )
+            data = resp.json() if resp.content else {}
+        except Exception as e:  # noqa: BLE001
+            return {"error": f"IM 推送请求失败: {type(e).__name__}: {e}"}
+        if resp.status_code >= 400:
+            return {"error": (data or {}).get("detail") or f"HTTP {resp.status_code}"}
+        if not data.get("ok"):
+            return {"error": data.get("error") or "发送失败", **data}
+        fails = [r for r in data.get("results", []) if not r.get("ok")]
+        out: dict[str, Any] = {"sent": data.get("sent", 0), "total": data.get("total", 0)}
+        if fails:
+            out["failures"] = [
+                {"name": f.get("name"), "error": f.get("error")} for f in fails
+            ]
+        return out
+
+    async def _tool_run_tool_inspection(self) -> Any:
+        """经 mcp-cowork 触发工具巡检 (健康+diff+用例回归门禁), 返回报告摘要"""
+        from urllib.parse import quote
+
+        import httpx
+
+        from app.config import settings
+
+        if not self.user_name:
+            return {"error": "无法识别当前用户, 未执行"}
+        base = (settings.MCP_INSPECT_URL or "").strip().rstrip("/")
+        if not base:
+            return {"error": "巡检接口未配置 (MCP_INSPECT_URL)"}
+        try:
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                resp = await client.post(
+                    f"{base}/run", headers={"X-User-Name": quote(self.user_name)},
+                )
+            data = resp.json() if resp.content else {}
+        except Exception as e:  # noqa: BLE001
+            return {"error": f"巡检请求失败: {type(e).__name__}: {e}"}
+        if resp.status_code >= 400:
+            return {"error": (data or {}).get("detail") or f"HTTP {resp.status_code}"}
+        rep = data.get("report") or {}
+        s = rep.get("summary") or {}
+        verdict_zh = {"pass": "通过", "warn": "有变更", "fail": "回归异常"}.get(
+            rep.get("verdict"), rep.get("verdict"))
+        out: dict[str, Any] = {
+            "verdict": rep.get("verdict"), "verdict_zh": verdict_zh,
+            "report_id": rep.get("report_id"),
+            "servers_online": s.get("servers_online"), "servers_total": s.get("servers_total"),
+            "tools_added": s.get("tools_added"), "tools_removed": s.get("tools_removed"),
+            "tools_changed": s.get("tools_changed"),
+            "cases_passed": s.get("cases_passed"), "cases_total": s.get("cases_total"),
+            "regressions": s.get("regressions"),
+        }
+        # 回归失败/服务离线明细带给分身, 便于向用户解释
+        detail = rep.get("detail") or {}
+        bad_cases = [
+            {"case_name": c.get("case_name"), "tool_name": c.get("tool_name"),
+             "status": c.get("status"), "regression": c.get("regression"),
+             "error": c.get("error_excerpt", "")[:150]}
+            for c in detail.get("cases", []) if c.get("status") == "error" or c.get("regression")
+        ]
+        off_servers = [
+            {"name": sv.get("name"), "error": (sv.get("error") or "")[:150]}
+            for sv in detail.get("servers", []) if sv.get("status") == "offline"
+        ]
+        if bad_cases:
+            out["failed_cases"] = bad_cases
+        if off_servers:
+            out["offline_servers"] = off_servers
+        return out

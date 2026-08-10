@@ -17,6 +17,8 @@ const PersonalReport = {
   // 当前选择
   currentMember: '',
   currentWeekStart: '',   // YYYY-MM-DD (周一)
+  // 当前激活项目ID (新增工作行默认项目)
+  activeProjectId: null,
   // 已存在的周报 (null = 未填报)
   currentReport: null,
   // 非项目经理锁定本人 (人员选择器禁用)
@@ -98,6 +100,7 @@ const PersonalReport = {
 
     // 无所属项目: 直接展示空状态 (需求: 看不到内容而不是报错)
     if (!Auth.projects || Auth.projects.length === 0) {
+      App.clearDetail();
       view.innerHTML = `
         <div class="view__header">
           <div>
@@ -133,6 +136,7 @@ const PersonalReport = {
       ]);
       this.projects = (projects || []).filter(p => (p.status || '进行中') !== '已停止');
       const activeId = activeProject ? activeProject.id : null;
+      this.activeProjectId = activeId;
 
       // 各项目成员 (构建 姓名 -> 项目 归属映射, 跳过已退出成员)
       const memberLists = await Promise.all(
@@ -197,6 +201,7 @@ const PersonalReport = {
     if (!body) return;
 
     if (this.members.length === 0) {
+      App.clearDetail();
       body.innerHTML = this.lockSelf
         ? App.renderEmpty('您不是当前项目的成员', '切换到您的所属项目后可填写周报', '👤')
         : App.renderEmpty(
@@ -239,13 +244,13 @@ const PersonalReport = {
           <table class="pr-table" id="pr-work-table">
             <thead>
               <tr>
-                <th style="min-width:130px;">项目名称</th>
-                <th style="width:76px;">周几</th>
-                <th style="min-width:220px;">工作内容</th>
-                <th style="min-width:90px;">参与人员</th>
-                <th style="min-width:90px;">交付物</th>
-                <th style="width:64px;">工时(H)</th>
-                <th style="width:40px;"></th>
+                <th style="width:17%;">项目名称</th>
+                <th style="width:9%;">周几</th>
+                <th>工作内容</th>
+                <th style="width:13%;">参与人员</th>
+                <th style="width:14%;">交付物</th>
+                <th style="width:76px;">工时(H)</th>
+                <th style="width:44px;"></th>
               </tr>
             </thead>
             <tbody id="pr-work-tbody"></tbody>
@@ -265,9 +270,9 @@ const PersonalReport = {
           <table class="pr-table" id="pr-plan-table">
             <thead>
               <tr>
-                <th style="width:200px;">项目名称</th>
+                <th style="width:24%;">项目名称</th>
                 <th>计划内容</th>
-                <th style="width:40px;"></th>
+                <th style="width:44px;"></th>
               </tr>
             </thead>
             <tbody id="pr-plan-tbody"></tbody>
@@ -363,6 +368,91 @@ const PersonalReport = {
 
     this.renderStatus();
     this.recalcTotal();
+    this.renderSummaryPanel();
+  },
+
+  /* ------------------------------------------------------------------
+   * 周报概括 (右栏 关联详情 面板: AI 生成 2-3 段, 支持编写/修改/保存)
+   * ---------------------------------------------------------------- */
+  /** 渲染右栏概括面板 (加载周报后调用; 概括随周报持久化) */
+  renderSummaryPanel() {
+    const summary = this.currentReport ? (this.currentReport.summary || '') : '';
+    App.showDetail(`
+      <div class="detail-section">
+        <div class="detail-section__label">📝 周报概括</div>
+        <div class="text-xs text-tertiary" style="margin-bottom:8px;">
+          ${App.escapeHtml(this.currentMember || '')} · ${App.escapeHtml(this.weekLabel(this.currentWeekStart))}
+        </div>
+        <textarea id="pr-summary-text" class="pr-summary-text" rows="12"
+          placeholder="点击「AI 生成概括」按本周工作内容与下周计划自动归纳, 也可直接编写…">${App.escapeHtml(summary)}</textarea>
+        <div class="pr-summary-actions">
+          <button class="btn btn-primary btn-sm" id="pr-summary-gen">✨ AI 生成概括</button>
+          <button class="btn btn-ghost btn-sm" id="pr-summary-save">💾 保存概括</button>
+        </div>
+        <div class="text-xs text-tertiary" id="pr-summary-status" style="margin-top:6px;">
+          ${summary ? '已保存的概括, 可修改后重新保存' : '生成后可自由修改, 保存后随周报归档'}
+        </div>
+      </div>
+    `);
+    document.getElementById('pr-summary-gen')
+      .addEventListener('click', () => this.generateSummary());
+    document.getElementById('pr-summary-save')
+      .addEventListener('click', () => this.saveSummary());
+  },
+
+  /** 面板状态行提示 */
+  _summaryStatus(text) {
+    const el = document.getElementById('pr-summary-status');
+    if (el) el.textContent = text;
+  },
+
+  /** AI 生成概括: 收集当前表单明细调后端, 结果填入面板 (不自动保存) */
+  async generateSummary() {
+    if (!this.currentMember) {
+      App.showToast('请选择人员', 'warning');
+      return;
+    }
+    const payload = this.collectPayload();
+    const start = new Date(`${this.currentWeekStart}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+
+    const btn = document.getElementById('pr-summary-gen');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 生成中…'; }
+    this._summaryStatus('正在根据本周明细生成概括…');
+    try {
+      const res = await API.generatePersonalReportSummary({
+        member_name: this.currentMember,
+        week_start: this.currentWeekStart,
+        week_end: this.fmt(end),
+        ...payload,
+      });
+      const ta = document.getElementById('pr-summary-text');
+      if (ta) ta.value = res.summary || '';
+      this._summaryStatus('已生成, 可修改后点击「保存概括」');
+    } catch (err) {
+      this._summaryStatus('生成失败');
+      App.showToast(`生成概括失败: ${err.message}`, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✨ AI 生成概括'; }
+    }
+  },
+
+  /** 保存概括: 已有周报仅更新概括; 尚未保存则走整体保存 (携带概括) */
+  async saveSummary() {
+    const ta = document.getElementById('pr-summary-text');
+    const summary = ta ? ta.value.trim() : '';
+    if (!this.currentReport) {
+      await this.save();
+      return;
+    }
+    try {
+      this.currentReport = await API.updatePersonalReport(this.currentReport.id, { summary });
+      App.showToast('概括已保存', 'success');
+      this._summaryStatus(`已保存 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
+    } catch (err) {
+      App.showToast(`保存概括失败: ${err.message}`, 'error');
+    }
   },
 
   /* ------------------------------------------------------------------
@@ -395,14 +485,20 @@ const PersonalReport = {
     ).join('');
   },
 
-  /** 添加本周工作行 (每行一天) */
+  /** 添加本周工作行 (每行一天); 新行项目默认取上一条工作行的项目, 否则当前激活项目 */
   addWorkRow(item = null) {
     const tbody = document.getElementById('pr-work-tbody');
     if (!tbody) return;
     const w = item || {};
+    let defaultPid = w.project_id;
+    if (!defaultPid) {
+      const rows = tbody.querySelectorAll('tr');
+      const lastSel = rows.length ? rows[rows.length - 1].querySelector('[data-f="project_id"]') : null;
+      defaultPid = (lastSel && lastSel.value) ? lastSel.value : (this.activeProjectId || '');
+    }
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><select data-f="project_id">${this.projectOptionsHtml(w.project_id)}</select></td>
+      <td><select data-f="project_id">${this.projectOptionsHtml(defaultPid)}</select></td>
       <td><select data-f="day_of_week">${this.dayOptionsHtml(w.day_of_week)}</select></td>
       <td><textarea data-f="content" rows="2" placeholder="输入 / 可选择本周工作任务">${App.escapeHtml(w.content || '')}</textarea></td>
       <td><input type="text" data-f="participants" value="${App.escapeHtml(w.participants || '')}"></td>
@@ -642,11 +738,17 @@ const PersonalReport = {
       App.showToast('请至少填写一行工作内容或工作计划', 'warning');
       return;
     }
+    // 概括随周报一并持久化 (右栏概括面板内容)
+    const summaryEl = document.getElementById('pr-summary-text');
+    payload.summary = summaryEl
+      ? summaryEl.value.trim()
+      : (this.currentReport ? (this.currentReport.summary || '') : '');
 
     try {
       if (this.currentReport) {
         this.currentReport = await API.updatePersonalReport(this.currentReport.id, payload);
         App.showToast('周报已保存', 'success');
+        this._summaryStatus(`已随周报保存 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
       } else {
         const start = new Date(`${this.currentWeekStart}T00:00:00`);
         const end = new Date(start);

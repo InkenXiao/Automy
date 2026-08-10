@@ -89,10 +89,49 @@ async def upload_bytes(
     try:
         result = await asyncio.to_thread(_put)
         logger.info("MinIO 归档成功: %s (%d bytes)", result, len(data))
+        await _register_upload(
+            filename=filename,
+            content_type=content_type,
+            size=len(data),
+            object_name=_safe_part(agent_name, "通用"),
+            member_name=_safe_part(member_name, "匿名"),
+            key=key,
+        )
         return result
     except Exception as e:  # noqa: BLE001 - 对象存储失败不阻断本地上传
         logger.warning("MinIO 归档失败 %s: %s", key, e)
         return None
+
+
+async def _register_upload(
+    *, filename: str, content_type: str, size: int,
+    object_name: str, member_name: str, key: str,
+) -> None:
+    """上传成功登记 sys_files (bucket+object_key 幂等 upsert; 失败仅告警不阻断)"""
+    try:
+        from sqlalchemy import text
+
+        from app.database import AsyncSessionLocal
+
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                text(
+                    "INSERT INTO sys_files (file_name, file_type, file_size, app, object_name,"
+                    " member_name, bucket, object_key, content_type, uploaded_at) "
+                    "VALUES (:fn, :ft, :fs, 'pro-cowork', :obj, :mem, :bk, :key, :ct, now()) "
+                    "ON CONFLICT (bucket, object_key) DO UPDATE SET "
+                    "file_size = EXCLUDED.file_size, content_type = EXCLUDED.content_type, "
+                    "uploaded_at = EXCLUDED.uploaded_at, is_delete = false, updated_at = now()"
+                ),
+                {
+                    "fn": filename, "ft": ext, "fs": size, "obj": object_name,
+                    "mem": member_name, "bk": settings.MINIO_BUCKET, "key": key, "ct": content_type,
+                },
+            )
+            await db.commit()
+    except Exception as e:  # noqa: BLE001 - 登记失败不阻断上传
+        logger.warning("sys_files 登记失败 %s: %s", key, e)
 
 
 async def restore_by_filename(filename: str, dest) -> Optional[str]:

@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # ============================================================
-# XIN-AI 四合一容器入口脚本 (开发模式: 代码改动实时生效)
-#   xin-site  : 8087  vite dev (HMR 热更新)
-#   pro-site  : 8088  uvicorn --reload (Python 代码自动重载)
-#   abs-site  : 8089  uvicorn --reload (Python 代码自动重载)
-#   pro-cowork: 8091  uvicorn --reload (智能体平台)
+# XIN-AI 多合一容器入口脚本 (开发模式: 代码改动实时生效)
+#   xin-site      : 8087  vite dev (HMR 热更新)
+#   pro-site      : 8088  uvicorn --reload (Python 代码自动重载)
+#   cowork-site   : 8090  python http.server (cowork 统一入口静态页)
+#   pro-cowork    : 8091  uvicorn --reload (智能体平台)
+#   rag-cowork    : 8092  uvicorn --reload (知识库平台)
+#   rag-cowork-mcp: 8093  FastMCP streamable-HTTP (知识库 MCP 服务)
+#   mcp-cowork    : 8094  uvicorn --reload (MCP 维护/测试/统计)
 #
 # 源码通过 docker-compose 卷挂载, 修改宿主机代码后:
 #   - xin-site: 浏览器自动刷新 (HMR)
-#   - pro-site / abs-site / pro-cowork: uvicorn 自动重载 (无需重启容器)
+#   - pro-site / pro-cowork / rag-cowork / mcp-cowork: uvicorn 自动重载 (无需重启容器)
 # ============================================================
 set -u
 
@@ -99,11 +102,14 @@ ensure_node_modules() {
 
 echo ""
 echo "============================================================"
-echo "  XIN-AI 四合一容器启动 (开发模式, 代码改动实时生效)"
-echo "    xin-site  : 8087  (Vite dev 热更新 HMR)"
-echo "    pro-site  : 8088  (FastAPI + uvicorn --reload)"
-echo "    abs-site  : 8089  (FastAPI + uvicorn --reload)"
-echo "    pro-cowork: 8091  (FastAPI 智能体平台 + uvicorn --reload)"
+echo "  XIN-AI 多合一容器启动 (开发模式, 代码改动实时生效)"
+echo "    xin-site      : 8087  (Vite dev 热更新 HMR)"
+echo "    pro-site      : 8088  (FastAPI + uvicorn --reload)"
+echo "    cowork-site   : 8090  (cowork 统一入口静态页, python http.server)"
+echo "    pro-cowork    : 8091  (FastAPI 智能体平台 + uvicorn --reload)"
+echo "    rag-cowork    : 8092  (FastAPI 知识库平台 + uvicorn --reload)"
+echo "    rag-cowork-mcp: 8093  (FastMCP 知识库 MCP 服务)"
+echo "    mcp-cowork    : 8094  (FastAPI MCP 维护/测试/统计 + uvicorn --reload)"
 echo "============================================================"
 echo ""
 
@@ -115,25 +121,40 @@ wait_for_postgres
 start_service "pro-site" 8088 "${APP_ROOT}/pro-site" \
     python -m uvicorn app.main:app --host 0.0.0.0 --port 8088 --reload --reload-dir app
 
-# ---------- 启动 abs-site (uvicorn --reload) ----------
-start_service "abs-site" 8089 "${APP_ROOT}/abs-site" \
-    python -m uvicorn app.main:app --host 0.0.0.0 --port 8089 --reload --reload-dir app
-
 # ---------- 启动 xin-site (vite dev 热更新) ----------
 # vite.config.js 已配置 server.port=8087, host=0.0.0.0
 start_service "xin-site" 8087 "${APP_ROOT}/xin-site" \
     npx vite --port 8087 --host 0.0.0.0 --strictPort
 
+# ---------- 启动 cowork-site (cowork 统一入口静态页) ----------
+start_service "cowork-site" 8090 "${APP_ROOT}/cowork-site" \
+    python -m http.server 8090 --bind 0.0.0.0
+
 # ---------- 启动 pro-cowork (FastAPI 智能体平台, uvicorn --reload) ----------
 start_service "pro-cowork" 8091 "${APP_ROOT}/pro-cowork" \
     python -m uvicorn app.main:app --host 0.0.0.0 --port 8091 --reload --reload-dir app
 
+# ---------- 启动 rag-cowork (FastAPI 知识库平台, uvicorn --reload) ----------
+start_service "rag-cowork" 8092 "${APP_ROOT}/rag-cowork" \
+    python -m uvicorn app.main:app --host 0.0.0.0 --port 8092 --reload --reload-dir app
+
+# ---------- 启动 rag-cowork-mcp (FastMCP streamable-HTTP, 独立进程) ----------
+start_service "rag-cowork-mcp" 8093 "${APP_ROOT}/rag-cowork" \
+    python -m app.mcp_server
+
+# ---------- 启动 mcp-cowork (FastAPI MCP 维护/测试/统计, uvicorn --reload) ----------
+start_service "mcp-cowork" 8094 "${APP_ROOT}/mcp-cowork" \
+    python -m uvicorn app.main:app --host 0.0.0.0 --port 8094 --reload --reload-dir app
+
 echo ""
 ok "全部服务已启动. 日志目录: ${LOG_DIR}/"
-echo "  xin-site:   ${LOG_DIR}/xin-site.log"
-echo "  pro-site:   ${LOG_DIR}/pro-site.log"
-echo "  abs-site:   ${LOG_DIR}/abs-site.log"
-echo "  pro-cowork: ${LOG_DIR}/pro-cowork.log"
+echo "  xin-site:       ${LOG_DIR}/xin-site.log"
+echo "  pro-site:       ${LOG_DIR}/pro-site.log"
+echo "  cowork-site:    ${LOG_DIR}/cowork-site.log"
+echo "  pro-cowork:     ${LOG_DIR}/pro-cowork.log"
+echo "  rag-cowork:     ${LOG_DIR}/rag-cowork.log"
+echo "  rag-cowork-mcp: ${LOG_DIR}/rag-cowork-mcp.log"
+echo "  mcp-cowork:     ${LOG_DIR}/mcp-cowork.log"
 echo ""
 log "提示: 修改宿主机源码后, 容器内服务会自动重载/热更新, 无需重启容器"
 

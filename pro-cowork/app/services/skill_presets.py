@@ -26,7 +26,7 @@ PRESET_SKILLS = [
     },
     {
         "name": "周报草稿生成",
-        "description": "获取当前周次、历史周报与模块列表, 辅助生成周报草稿",
+        "description": "获取当前周次、历史周报、模块列表与成员个人周报填报情况, 辅助生成周报草稿",
         "category": "workflow",
         "trigger_type": "manual",
         "config": {"icon": "📝", "color": "#10B981"},
@@ -35,6 +35,20 @@ PRESET_SKILLS = [
                 {"tool": "get_today", "arguments": {}},
                 {"tool": "get_weekly_reports", "arguments": {}},
                 {"tool": "get_modules", "arguments": {}},
+                {"tool": "list_personal_reports", "arguments": {}},
+            ]
+        }, ensure_ascii=False),
+    },
+    {
+        "name": "个人周报填报扫描",
+        "description": "扫描本周个人周报填报情况: 已填报成员(工时/行数/有无概括)与未填报成员名单, 供催报与周报汇总",
+        "category": "data",
+        "trigger_type": "manual",
+        "config": {"icon": "🧾", "color": "#14B8A6"},
+        "code": json.dumps({
+            "steps": [
+                {"tool": "get_today", "arguments": {}},
+                {"tool": "list_personal_reports", "arguments": {}},
             ]
         }, ensure_ascii=False),
     },
@@ -108,6 +122,18 @@ PRESET_SKILLS = [
                     "project_id": "{{input.project_id}}",
                     "question": "{{input.question}}",
                 }},
+            ]
+        }, ensure_ascii=False),
+    },
+    {
+        "name": "工具健康巡检",
+        "description": "触发技链工坊工具巡检: 健康检查全部 MCP 服务、diff 工具快照变更(新增/下线/Schema变更)、回放已存测试用例做回归门禁, 输出巡检报告摘要 (pass/warn/fail)",
+        "category": "data",
+        "trigger_type": "manual",
+        "config": {"icon": "🩺", "color": "#6366F1"},
+        "code": json.dumps({
+            "steps": [
+                {"tool": "run_tool_inspection", "arguments": {}},
             ]
         }, ensure_ascii=False),
     },

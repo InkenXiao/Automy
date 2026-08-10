@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # ============================================================
-# 三工程统一启动脚本
-#   xin-site  : 8087  (Vite 静态站点)
-#   pro-site  : 8088  (FastAPI 项目管理工作台)
-#   abs-site  : 8089  (FastAPI 艾宾浩斯背单词)
+# XIN-AI 本地开发统一启动脚本 (非 Docker 方式)
+#   xin-site    : 8087  (Vite 静态站点)
+#   pro-site    : 8088  (FastAPI 项目管理工作台)
+#   cowork-site : 8090  (玄圃·智创统一入口, 纯静态)
+#   pro-cowork  : 8091  (FastAPI 智能体工作平台)
+#
+# 说明: rag-cowork (8092) / rag-cowork-mcp (8093) / mcp-cowork (8094)
+#       仅在 Docker 容器中运行 (见 docker-compose.yml),
+#       本地启动会占用 8087/8088/8090 端口, 启动容器前请先 ./start.sh stop
 # ============================================================
 set -u
 
@@ -16,13 +21,16 @@ mkdir -p "$LOG_DIR"
 # ---------- 路径与端口 ----------
 XIN_SITE_DIR="${ROOT_DIR}/xin-site"
 PRO_SITE_DIR="${ROOT_DIR}/pro-site"
-ABS_SITE_DIR="${ROOT_DIR}/abs-site"
+COWORK_SITE_DIR="${ROOT_DIR}/cowork-site"
+PRO_COWORK_DIR="${ROOT_DIR}/pro-cowork"
 
 PRO_VENV_PY="${PRO_SITE_DIR}/venv/bin/python"
+PRO_COWORK_VENV_PY="${PRO_COWORK_DIR}/venv/bin/python"
 
 XIN_PORT=8087
 PRO_PORT=8088
-ABS_PORT=8089
+COWORK_PORT=8090
+PRO_COWORK_PORT=8091
 
 # ---------- 颜色 ----------
 RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'
@@ -37,9 +45,11 @@ err()  { echo -e "${RED}✗${NC} $1"; }
 preflight() {
   command -v npx >/dev/null 2>&1 || { err "未找到 npx，请先安装 Node.js"; exit 1; }
   [ -x "$PRO_VENV_PY" ]          || { err "未找到 pro-site venv: $PRO_VENV_PY"; exit 1; }
-  [ -f "${XIN_SITE_DIR}/package.json" ] || { err "未找到 xin-site/package.json"; exit 1; }
-  [ -f "${PRO_SITE_DIR}/run.py" ]       || { err "未找到 pro-site/run.py"; exit 1; }
-  [ -f "${ABS_SITE_DIR}/run.py" ]       || { err "未找到 abs-site/run.py"; exit 1; }
+  [ -x "$PRO_COWORK_VENV_PY" ]   || { err "未找到 pro-cowork venv: $PRO_COWORK_VENV_PY"; exit 1; }
+  [ -f "${XIN_SITE_DIR}/package.json" ]    || { err "未找到 xin-site/package.json"; exit 1; }
+  [ -f "${PRO_SITE_DIR}/run.py" ]          || { err "未找到 pro-site/run.py"; exit 1; }
+  [ -f "${PRO_COWORK_DIR}/run.py" ]        || { err "未找到 pro-cowork/run.py"; exit 1; }
+  [ -f "${COWORK_SITE_DIR}/index.html" ]   || { err "未找到 cowork-site/index.html"; exit 1; }
 }
 
 # ---------- 停止占用指定端口的进程 ----------
@@ -88,7 +98,7 @@ start_service() {
 # ---------- 启动全部 ----------
 start_all() {
   echo -e "\n${BLUE}══════════════════════════════════════════════════${NC}"
-  echo -e "${BLUE}  启动三个工程  (8087 / 8088 / 8089)${NC}"
+  echo -e "${BLUE}  启动本地开发服务  (8087 / 8088 / 8090 / 8091)${NC}"
   echo -e "${BLUE}══════════════════════════════════════════════════${NC}\n"
 
   : > "$PID_FILE"
@@ -101,26 +111,32 @@ start_all() {
   start_service "pro-site" "$PRO_PORT" "$PRO_SITE_DIR" \
     "$PRO_VENV_PY" run.py
 
-  # abs-site : FastAPI (复用 pro-site venv)
-  start_service "abs-site" "$ABS_PORT" "$ABS_SITE_DIR" \
-    "$PRO_VENV_PY" run.py
+  # cowork-site : 纯静态入口页 (python http.server, 无需依赖)
+  start_service "cowork-site" "$COWORK_PORT" "$COWORK_SITE_DIR" \
+    "$PRO_VENV_PY" -m http.server "$COWORK_PORT" --bind 0.0.0.0
+
+  # pro-cowork : FastAPI 智能体平台 (使用自身 venv)
+  start_service "pro-cowork" "$PRO_COWORK_PORT" "$PRO_COWORK_DIR" \
+    "$PRO_COWORK_VENV_PY" run.py
 
   echo
   log "INFO" "全部已后台启动（nohup 托管，关闭终端不影响运行）"
   echo -e "  ${YELLOW}查看状态:${NC} ./start.sh status"
   echo -e "  ${YELLOW}查看日志:${NC} tail -f .logs/*.log"
   echo -e "  ${YELLOW}停止服务:${NC} ./start.sh stop"
+  echo -e "  ${YELLOW}知识库/MCP:${NC} rag-cowork(8092)/mcp-cowork(8094) 请使用 docker compose 启动"
   echo
 }
 
 # ---------- 停止全部（基于端口，最可靠）----------
 stop_all() {
-  log "STOP" "正在停止所有服务..."
+  log "STOP" "正在停止所有本地服务..."
   stop_port "$XIN_PORT" "xin-site"
   stop_port "$PRO_PORT" "pro-site"
-  stop_port "$ABS_PORT" "abs-site"
+  stop_port "$COWORK_PORT" "cowork-site"
+  stop_port "$PRO_COWORK_PORT" "pro-cowork"
   [ -f "$PID_FILE" ] && : > "$PID_FILE"
-  ok "所有服务已停止"
+  ok "所有本地服务已停止"
 }
 
 # ---------- 状态查看 ----------
@@ -129,7 +145,7 @@ show_status() {
   echo -e "${BLUE}  服务状态${NC}"
   echo -e "${BLUE}══════════════════════════════════════════════════${NC}"
   local all_running=true
-  for svc in "xin-site:$XIN_PORT" "pro-site:$PRO_PORT" "abs-site:$ABS_PORT"; do
+  for svc in "xin-site:$XIN_PORT" "pro-site:$PRO_PORT" "cowork-site:$COWORK_PORT" "pro-cowork:$PRO_COWORK_PORT"; do
     local name="${svc%%:*}" port="${svc##*:}"
     if ss -tln 2>/dev/null | grep -q ":${port} "; then
       ok "${name} (port ${port})  运行中  http://localhost:${port}"
@@ -138,6 +154,7 @@ show_status() {
       all_running=false
     fi
   done
+  echo -e "  ${CYAN}Docker 服务 (rag-cowork:8092 / rag-cowork-mcp:8093 / mcp-cowork:8094) 请用 docker ps 查看${NC}"
   echo
 }
 
@@ -147,11 +164,22 @@ usage() {
 ${BLUE}用法:${NC} ./start.sh [命令]
 
 ${BLUE}命令:${NC}
-  start     后台启动三个工程（nohup 托管，先停后启，幂等）  ${YELLOW}[默认]${NC}
-  stop      停止三个工程（按端口清理）
+  start     后台启动本地开发服务（nohup 托管，先停后启，幂等）  ${YELLOW}[默认]${NC}
+  stop      停止本地服务（按端口清理）
   restart   先停止再后台启动
   status    查看各服务运行状态
   help      显示本帮助
+
+${BLUE}本地服务:${NC}
+  xin-site    : 8087  (Vite 静态站点)
+  pro-site    : 8088  (FastAPI 项目管理工作台)
+  cowork-site : 8090  (玄圃·智创统一入口, 纯静态)
+  pro-cowork  : 8091  (FastAPI 智能体工作平台)
+
+${BLUE}Docker 服务 (不在本脚本管理范围):${NC}
+  rag-cowork    : 8092  (知识库平台)
+  rag-cowork-mcp: 8093  (知识库 MCP 服务)
+  mcp-cowork    : 8094  (MCP 维护/测试/统计)
 
 ${BLUE}示例:${NC}
   ./start.sh            # 后台启动（脚本立即返回，关闭终端不影响服务）

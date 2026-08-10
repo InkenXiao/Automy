@@ -1,13 +1,15 @@
 # XIN · CoWork 项目管理智能体工作平台
 
-> 由 pro-site 升级而来的项目管理智能体工作平台,基于 FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL。在完整保留「进度计划、项目会议、项目周报、每周工作任务」四大协同模块的基础上,新增「构建、调试、执行 Agent、Skill」平台能力,内置项目进度管理、项目会议管理、项目周报编写、周工作计划制作四大智能体,每个智能体具备感知、记忆、决策、交互、执行五大能力。
+> 由 pro-site 升级而来的项目管理智能体工作平台,基于 FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL。在完整保留「进度计划、项目会议、项目周报、每周工作任务」四大协同模块的基础上,新增「构建、调试、执行 Agent、Skill」平台能力,内置项目进度管理、项目会议管理、项目周报编写、周工作计划制作、知识库管理五大预置智能体,每个智能体具备感知、记忆、决策、交互、执行五大能力。
 >
 > - 界面导航分为三组:**工作台**(任务/智能体/技能)、**项目台**(进度计划/项目会议/项目周报/每周任务/项目成员/个人周报/操作日志)、**设计台**(智能体设计/技能设计/记忆维护)。
-> - **登录认证**: 登录页 + 修改密码; 登录/操作日志统一落库 (`login_logs` / `operation_logs`), 提供操作日志看板与 LLM token 消耗统计。
+> - **登录认证**: 登录页 + 修改密码; 登录/操作日志统一落库 (`sys_login_logs` / `sys_operation_logs`), 提供操作日志看板与 LLM token 消耗统计。
 > - **工作台任务**: 描述任务即自动意图识别 (项目/数字分身/技能), 未命中时执行窗口内交互式选择; 执行输出与补充对话上下布局, 可在同一任务会话中持续补充内容 (可追加文件/技能) 驱动 AI 继续执行。
 > - **多模态附件**: 所有 AI 对话窗口 (任务补充区/数字分身对话/构建器调试/记忆测试) 统一支持「＋上传文件」与「Ctrl+V 黏贴图片/文件」; 图片走**图像识别**技能 (视觉多模态模型), PDF 走**文档解析**技能 (PyMuPDF 文本层 → mineru 算力网关 → paddleocr 逐级降级), 录音走**会议纪要生成**技能 (ASR 转写 + 纪要流式生成)。
 > - **记忆按项目隔离**: `agent_memories.project_id` 关联项目,每个项目拥有独立记忆空间,对话/任务执行时自动注入当前项目记忆 + 通用记忆。
 > - **权限控制**: 项目经理可维护项目成员与查看全部操作日志; 非经理仅查看/填写本人周报与本人操作日志; 未分配项目的用户在项目类视图中不可见业务数据。
+> - **知识库维护分身**: 「知识库管理助手」经 MCP 协议 (streamable-HTTP) 调用 rag-cowork 知识库服务, 在对话中完成建库、传文、解析入库、状态巡检与检索验证; 用户身份经 `X-User-Name` 透传, 知识库五级可见性权限在 rag 侧统一生效。
+> - **个人周报 AI 辅助**: 周报编写助手支持查看填报情况 (催报)、代填/更新个人周报、AI 生成周报概括 (2-3 段, 可人工修改)。
 > - 与 pro-site **共用 XIN 数据库**,12 张业务表结构零变更,数据实时互通;智能体相关新表仅增量添加。
 > - 本服务运行在 **8091** 端口(pro-site 为 8088,互不影响)。
 
@@ -55,22 +57,22 @@ pro-cowork/
     ├── config.py               # pydantic-settings 读取 .env (PG/系统/八通道模型配置)
     ├── database.py             # 异步引擎/会话工厂/Base/get_db/init_db
     ├── deps.py                 # 登录态/角色依赖 (HTTP 头中文名 latin-1 编码处理)
-    ├── middleware.py           # 操作日志中间件 (写操作自动落 operation_logs)
+    ├── middleware.py           # 操作日志中间件 (写操作自动落 sys_operation_logs)
     ├── utils.py                # get_active_project_id 等公共工具
     ├── seed.py                 # 种子脚本: 模块/阶段/进度计划任务
     ├── seed_weekly_reports.py  # 种子脚本: 从 SQLite 解析周报写入 PG
     ├── seed_weekly_from_json.py# 种子脚本: 从 JSON 同步周报
     ├── models/                 # SQLAlchemy ORM 模型
     │   ├── base.py             # Base + TimestampMixin (created_at/updated_at)
-    │   ├── project.py          # projects 表: 项目元信息 (含 manager/status)
-    │   ├── project_member.py   # project_members 表: 项目成员
+    │   ├── project.py          # pro_projects 表: 项目元信息 (含 manager/status)
+    │   ├── project_member.py   # pro_project_members 表: 项目成员
     │   ├── module.py / phase.py / progress_task.py / meeting.py / weekly_report.py / work_task.py
     │   ├── agent.py            # agents/agent_sessions/agent_messages/agent_memories
     │   ├── skill.py            # skills/skill_executions
     │   ├── task_run.py         # task_runs/task_run_events (执行事件持久化, SSE 重放)
-    │   ├── personal_report.py  # personal_reports + 工作内容/下周计划子表
-    │   ├── user_credential.py  # user_credentials 登录账号
-    │   └── usage_log.py        # login_logs / operation_logs
+    │   ├── personal_report.py  # pro_personal_reports + 工作内容/下周计划子表
+    │   ├── user_credential.py  # sys_user_credentials 登录账号
+    │   └── usage_log.py        # sys_login_logs / sys_operation_logs
     ├── routers/                # API 路由 (统一前缀 /api)
     │   ├── auth.py             # 登录/改密/成员身份确认
     │   ├── projects.py / modules.py / phases.py / progress_tasks.py / meetings.py
@@ -84,15 +86,17 @@ pro-cowork/
     ├── services/               # 业务服务层
     │   ├── llm.py              # ★模型客户端工厂: MAIN/SMALL/CODER/EMBEDDING/RERANKER/VISION 六通道
     │   ├── agent_engine.py     # function calling 主循环 (MAIN 模型)
-    │   ├── agent_tools.py      # 17+ 业务工具定义与执行
+    │   ├── agent_tools.py      # 32 个业务工具定义与执行 (含 8 个知识库 MCP 工具)
     │   ├── agent_context.py    # 项目快照感知注入
-    │   ├── agent_presets.py    # 四大预置智能体播种
+    │   ├── agent_presets.py    # 五大预置智能体播种
+    │   ├── mcp_client.py       # ★知识库 MCP 客户端 (rag-cowork FastMCP streamable-HTTP, X-User-Name 透传)
     │   ├── intent_service.py   # 意图识别 (SMALL 模型: 项目/分身/技能自动选择)
     │   ├── skill_engine.py     # 技能工作流引擎 (内置能力: 会议纪要/周小结/图像识别/文档解析)
     │   ├── skill_presets.py    # 预置技能播种
     │   ├── task_runner.py      # 任务后台执行器 (事件总线 + 持久化)
     │   ├── minutes_service.py  # 会议纪要流式生成 (MAIN 模型)
     │   ├── digest_service.py   # 周工作小结概括 (SMALL 模型)
+    │   ├── personal_summary_service.py # 个人周报概括 (SMALL 模型, 2-3 段)
     │   ├── asr_service.py      # 录音转写 (ASR_API_URL, 分片上传, 分段回调)
     │   ├── vision_service.py   # 图像识别 (VISION 视觉多模态模型, base64 内联)
     │   ├── doc_parse_service.py# PDF 文档解析 (PyMuPDF → mineru 算力网关 → paddleocr 逐级降级)
@@ -136,20 +140,20 @@ pro-cowork/
 
 | 模型类 | 表名 | 文件 | 关键字段 |
 |--------|------|------|----------|
-| `Project` | `projects` | `app/models/project.py` | `id`, `name`, `title`, `based_doc`, `start_date`, `end_date`, `is_active`, `sort_order` |
-| `Module` | `modules` | `app/models/module.py` | `id`, **`project_id`(FK→projects)**, `idx`, `tag`, `title`, `owner`, `color`, `color_bg`, `sort_order` |
-| `Phase` | `phases` | `app/models/phase.py` | `id`, **`project_id`(FK→projects)**, `name`, `subtitle`, `description`, `start_date`, `end_date` |
-| `ProgressTask` | `progress_tasks` | `app/models/progress_task.py` | `id`, **`project_id`(FK→projects)**, `task_uid`(unique), `name`, `phase_id`(FK→phases), `start_date`, `end_date`, `status`, `full_desc`, `owner`, `is_milestone` |
-| `Meeting` | `meetings` | `app/models/meeting.py` | `id`, **`project_id`(FK→projects)**, `title`, `meet_date`, `meet_time`, `place`, `host`, `attendees`, `description`, `sort_order` |
-| `MeetingItem` | `meeting_items` | `app/models/meeting.py` | `id`, `meeting_id`(FK→meetings, CASCADE), `item_time`, `theme`, `speaker`, `duration`, `note`, `description`, `sort_order` |
-| `WeeklyReport` | `weekly_reports` | `app/models/weekly_report.py` | `id`, **`project_id`(FK→projects)**, `title`, `week_range`, `week_start`, `week_end`, `overview_summary`, `status`(draft/submitted) |
-| `WeeklyKpi` | `weekly_kpis` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_pct`, `status`；唯一约束 `uq_kpi_report_module(report_id, module_id)` |
-| `WeeklyProgressItem` | `weekly_progress_items` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `content`, `detail`, `sort_order` |
-| `WeeklyPlanTask` | `weekly_plan_tasks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_task_id`(FK→progress_tasks, 可空), `name`, `is_key`, `owner`, `plan_period`, `status`, `remark`, `sort_order` |
-| `WeeklyRisk` | `weekly_risks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `seq`, `title`, `coordination`, `urgency`, `sort_order` |
-| `WeeklyWorkTask` | `weekly_work_tasks` | `app/models/work_task.py` | `id`, **`project_id`(FK→projects)**, `week_start`, `week_end`, `plan_task_id`(FK→weekly_plan_tasks, 可空), `name`, `module_id`(FK, 可空), `owner`, `is_temporary`, `priority`, `status`, `planned_hours`, `actual_hours`, `remark`, `sort_order` |
+| `Project` | `pro_projects` | `app/models/project.py` | `id`, `name`, `title`, `based_doc`, `start_date`, `end_date`, `is_active`, `sort_order` |
+| `Module` | `pro_modules` | `app/models/module.py` | `id`, **`project_id`(FK→pro_projects)**, `idx`, `tag`, `title`, `owner`, `color`, `color_bg`, `sort_order` |
+| `Phase` | `pro_phases` | `app/models/phase.py` | `id`, **`project_id`(FK→pro_projects)**, `name`, `subtitle`, `description`, `start_date`, `end_date` |
+| `ProgressTask` | `pro_progress_tasks` | `app/models/progress_task.py` | `id`, **`project_id`(FK→pro_projects)**, `task_uid`(unique), `name`, `phase_id`(FK→pro_phases), `start_date`, `end_date`, `status`, `full_desc`, `owner`, `is_milestone` |
+| `Meeting` | `pro_meetings` | `app/models/meeting.py` | `id`, **`project_id`(FK→pro_projects)**, `title`, `meet_date`, `meet_time`, `place`, `host`, `attendees`, `description`, `sort_order` |
+| `MeetingItem` | `pro_meeting_items` | `app/models/meeting.py` | `id`, `meeting_id`(FK→pro_meetings, CASCADE), `item_time`, `theme`, `speaker`, `duration`, `note`, `description`, `sort_order` |
+| `WeeklyReport` | `pro_weekly_reports` | `app/models/weekly_report.py` | `id`, **`project_id`(FK→pro_projects)**, `title`, `week_range`, `week_start`, `week_end`, `overview_summary`, `status`(draft/submitted) |
+| `WeeklyKpi` | `pro_weekly_kpis` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_pct`, `status`；唯一约束 `uq_kpi_report_module(report_id, module_id)` |
+| `WeeklyProgressItem` | `pro_weekly_progress_items` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `content`, `detail`, `sort_order` |
+| `WeeklyPlanTask` | `pro_weekly_plan_tasks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `module_id`(FK), `progress_task_id`(FK→pro_progress_tasks, 可空), `name`, `is_key`, `owner`, `plan_period`, `status`, `remark`, `sort_order` |
+| `WeeklyRisk` | `pro_weekly_risks` | `app/models/weekly_report.py` | `id`, `report_id`(FK, CASCADE), `seq`, `title`, `coordination`, `urgency`, `sort_order` |
+| `WeeklyWorkTask` | `pro_weekly_work_tasks` | `app/models/work_task.py` | `id`, **`project_id`(FK→pro_projects)**, `week_start`, `week_end`, `plan_task_id`(FK→pro_weekly_plan_tasks, 可空), `name`, `module_id`(FK, 可空), `owner`, `is_temporary`, `priority`, `status`, `planned_hours`, `actual_hours`, `remark`, `sort_order` |
 
-> ★ **多项目隔离**：`modules` / `phases` / `progress_tasks` / `meetings` / `weekly_reports` / `weekly_work_tasks` 6 张顶级业务表均含 `project_id` 外键（关联 `projects.id`，ON DELETE CASCADE）。子表（`meeting_items` / `weekly_kpis` / `weekly_progress_items` / `weekly_plan_tasks` / `weekly_risks`）通过父表的 `project_id` 间接隔离，无需冗余字段。所有 list 接口支持 `?project_id=N` 查询参数，不传时默认用当前激活项目（`is_active=true`）。
+> ★ **多项目隔离**：`pro_modules` / `pro_phases` / `pro_progress_tasks` / `pro_meetings` / `pro_weekly_reports` / `pro_weekly_work_tasks` 6 张顶级业务表均含 `project_id` 外键（关联 `pro_projects.id`，ON DELETE CASCADE）。子表（`pro_meeting_items` / `pro_weekly_kpis` / `pro_weekly_progress_items` / `pro_weekly_plan_tasks` / `pro_weekly_risks`）通过父表的 `project_id` 间接隔离，无需冗余字段。所有 list 接口支持 `?project_id=N` 查询参数，不传时默认用当前激活项目（`is_active=true`）。
 
 > 除 `WeeklyKpi` / `WeeklyProgressItem` / `WeeklyRisk` 外，其余模型均混入 `TimestampMixin`，自动维护 `created_at` / `updated_at`（带时区）。
 
@@ -194,9 +198,9 @@ docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql
 | 脚本 | 作用 | 执行方式 |
 |------|------|----------|
 | `scripts/pro-site.sql` | pro-site 完整建表 + 初始数据 | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/pro-site.sql` |
-| `scripts/abs-site.sql` | abs-site 完整建表 | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/abs-site.sql` |
+| `scripts/pro-cowork.sql` | pro-cowork 智能体平台增量 16 表 (ORM 元数据生成) | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/pro-cowork.sql` |
 | `scripts/add_project_id.sql` | 多项目支持迁移 (加 project_id) | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql` |
-| `scripts/db_comments.sql` | 全部表与字段备注 | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/db_comments.sql` |
+| `scripts/db_comments.sql` | 全部表与字段备注 (43 表/515 条, 由三工程 ORM 元数据生成) | `docker exec -i pg_db psql -U dbuser -d XIN < scripts/db_comments.sql` |
 
 ### 5.5 种子脚本
 
@@ -337,6 +341,7 @@ docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql
 |------|------|------|
 | GET | `/api/personal-reports/?week_start=...&user_name=...` | 列表 (非项目经理仅见本人) |
 | POST | `/api/personal-reports/` | 新建 (工作内容行 + 下周计划, 实时汇总工时) |
+| POST | `/api/personal-reports/summary` | ★AI 生成周报概括 (SMALL 模型 2-3 段: 本周工作 + 下周计划, 写回 summary 字段) |
 | PUT | `/api/personal-reports/{id}` | 更新 |
 | DELETE | `/api/personal-reports/{id}` | 删除 (逻辑删除) |
 | GET | `/api/personal-reports/{id}/export` | 导出 Excel (与参考格式一致) |
@@ -393,7 +398,13 @@ docker exec -i pg_db psql -U dbuser -d XIN < scripts/add_project_id.sql
 
 > 当前部署经 new-api 网关 (model-api 容器, `:8000`) 按模型名路由: `LLM`→智科 vLLM 主推理, `VLM`→视觉模型, `EMBEDDING`/`RERANKER`→向量/重排; ASR 直连 `192.168.1.13:18888` (paraformer-large)。
 
-### 7.4 平台预留变量（本工程未引用，仅 .env 占位）
+### 7.4 知识库 MCP 服务（知识库维护分身使用）
+
+| 变量名 | 含义 |
+|--------|------|
+| `KB_MCP_URL` | rag-cowork FastMCP streamable-HTTP 端点 (默认 `http://localhost:8093/mcp`); 「知识库管理助手」的 kb_* 工具经 `app/services/mcp_client.py` 调用, 用户身份以 `X-User-Name` 请求头透传给 rag 侧做五级可见性权限过滤 |
+
+### 7.5 平台预留变量（本工程未引用，仅 .env 占位）
 
 | 分组 | 变量名 |
 |------|--------|
@@ -430,7 +441,9 @@ cd /mnt/data0/ai_deployment/proj/src/xin-ai/pro-cowork
 
 ### 8.2 Docker 容器部署 (推荐)
 
-本工程与 `xin-site` / `abs-site` 共同打包到单一 Docker 容器，详见仓库根目录 `Dockerfile` 与 `docker-compose.yml`。
+本工程与 `xin-site` / `cowork-site` / `rag-cowork` / `mcp-cowork` 共同打包到单一 Docker 容器，详见仓库根目录 `Dockerfile` 与 `docker-compose.yml`。
+
+> **统一入口**：`cowork-site`（8090 端口）是「玄圃 · 智创」统一入口静态页，三张卡片分别跳转 pro-cowork(8091) / rag-cowork(8092) / mcp-cowork(8094)。
 
 ```bash
 # 在仓库根目录执行
@@ -480,6 +493,8 @@ httpx>=0.27.0
 pydub>=0.25.1
 openpyxl>=3.1.0
 PyMuPDF>=1.24.0
+minio>=7.2.0
+mcp>=1.29.0
 ```
 
 > 注：`app/seed_weekly_reports.py` 使用了 `beautifulsoup4`（`from bs4 import BeautifulSoup`），但该依赖**未在 `requirements.txt` 中声明**，运行该种子脚本前需手动 `pip install beautifulsoup4`。
@@ -528,19 +543,23 @@ PyMuPDF>=1.24.0
 | 执行 Agent | `POST /api/agents/{id}/chat` SSE 流式对话 + function calling 工具执行 |
 | Skill 能力 | `POST/PUT /api/skills` 构建 JSON 工作流技能, `POST /api/skills/{id}/execute` 试运行并留痕 (`skill_executions` 表) |
 
-### 11.2 四大预置智能体与五大能力
+### 11.2 五大预置智能体与五大能力
 
-启动时幂等播种四大智能体 (`app/services/agent_presets.py`):进度管理助手 / 会议管理助手 / 周报编写助手 / 工作计划助手。每个智能体具备:
+启动时幂等播种五大智能体 (`app/services/agent_presets.py`):进度管理助手 / 会议管理助手 / 周报编写助手 / 工作计划助手 / 知识库管理助手。每个智能体具备:
 
 - **感知**: 对话前注入项目快照 (`app/services/agent_context.py`: 激活项目/进度统计/逾期任务/最近会议/最新周报/本周任务) + 当前日期;
 - **记忆**: `agent_memories` 表,支持 Agent 通过 `save_memory` 工具主动沉淀,对话时自动注入最近 20 条;
 - **决策**: OpenAI 兼容 function calling 循环 (max 5 轮),SSE 输出结构化 `tool_call`/`tool_result` 事件;
 - **交互**: SSE 流式对话 + 会话管理 (新建/列表/改名/归档);
-- **执行**: 17 个业务工具 (`app/services/agent_tools.py`) + `run_skill` 调用技能工作流。
+- **执行**: 32 个业务工具 (`app/services/agent_tools.py`) + `run_skill` 调用技能工作流。
+
+**知识库管理助手 (type=knowledge)**: 8 个 kb_* 工具经 MCP 协议调用 rag-cowork 知识库服务 (`KB_MCP_URL`), 覆盖建库 (五级)、文本上传解析、解析状态巡检、幂等重跑、删除清理 (PG+Milvus+Neo4j+MinIO) 与检索/问答验证; 预置 5 条操作规范记忆 (入库闭环核验/五级库体系/巡检口径/删除确认/重跑幂等), 对话时自动注入。
+
+**周报编写助手增强**: 新增 4 个个人周报工具 (填报情况 list_personal_reports / 读取 get_personal_report / 保存 save_personal_report / 生成概括 generate_personal_summary), 配合「个人周报填报口径」预置记忆, 支持催报统计、代填周报与 AI 概括生成。
 
 ### 11.3 新增数据表 (仅增量, 业务表零变更)
 
-智能体平台: `agents` / `agent_sessions` / `agent_messages` / `agent_memories` / `skills` / `skill_executions` / `task_runs` / `task_run_events`; 认证与协作: `user_credentials` / `project_members` / `personal_reports` + 2 张子表 / `login_logs` / `operation_logs`。建表见 `scripts/pro-cowork.sql` (幂等),开发期由 `init_db()` 自动创建。
+智能体平台: `agents` / `agent_sessions` / `agent_messages` / `agent_memories` / `skills` / `skill_executions` / `task_runs` / `task_run_events`; 认证与协作: `sys_user_credentials` / `pro_project_members` / `pro_personal_reports` + 2 张子表 / `sys_login_logs` / `sys_operation_logs`。建表见 `scripts/pro-cowork.sql` (幂等),开发期由 `init_db()` 自动创建。
 
 - `agent_memories.project_id`: 记忆按项目隔离, 对话/调试/任务执行时注入「当前项目记忆 + 通用记忆(project_id 为空)」;存量记忆已幂等回填到首个项目
 - `task_runs`: 工作台任务记录 (project_id/agent_id/skill_ids/file_names/status/result_text/session_id), 附件落盘 `data/task_files/<project_id>/`

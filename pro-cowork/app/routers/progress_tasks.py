@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.database import get_db
-from app.deps import get_user_name, require_project_manager, resolve_visible_project_id
+from app.deps import get_user_name, is_manager_of_project, require_project_manager, resolve_visible_project_id
 from app.models.phase import Phase
 from app.models.progress_task import ProgressTask
 from app.schemas.progress_task import (
@@ -51,13 +51,16 @@ async def list_progress_tasks(
     project_id: Optional[int] = None,
     phase_id: Optional[int] = None,
     status: Optional[str] = None,
+    home_scope: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[ProgressTaskOut]:
     """获取进度计划任务列表 (支持按 project_id / phase_id / status 筛选; project_id 不传则用当前激活项目)
 
-    可见性: 无所属项目者返回空列表
+    可见性: 无所属项目者返回空列表;
+    home_scope=true (首页看板) 时非项目经理仅看自己负责的任务
     """
-    pid = await resolve_visible_project_id(db, get_user_name(request), project_id)
+    name = get_user_name(request)
+    pid = await resolve_visible_project_id(db, name, project_id)
     if pid is None:
         return []
     stmt = select(ProgressTask).options(
@@ -69,6 +72,8 @@ async def list_progress_tasks(
         stmt = stmt.where(ProgressTask.phase_id == phase_id)
     if status:
         stmt = stmt.where(ProgressTask.status == status)
+    if home_scope and not await is_manager_of_project(db, pid, name):
+        stmt = stmt.where(ProgressTask.owner == name)
     stmt = stmt.where(ProgressTask.is_delete.is_(False))
     stmt = stmt.order_by(ProgressTask.start_date, ProgressTask.id)
     result = await db.execute(stmt)

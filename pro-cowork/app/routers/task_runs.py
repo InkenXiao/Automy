@@ -16,7 +16,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps import get_user_name
+from app.deps import get_user_name, is_manager_of_project, resolve_visible_project_id
 from app.models.agent import Agent, AgentMessage, AgentSession
 from app.models.task_run import TaskRun, TaskRunEvent
 from app.schemas.task_run import TaskRunChoice, TaskRunContinue, TaskRunCreate, TaskRunOut
@@ -155,12 +155,25 @@ async def delete_file(
 
 @router.get("/", response_model=list[TaskRunOut])
 async def list_task_runs(
+    request: Request,
     project_id: Optional[int] = None,
     status: Optional[str] = None,
+    home_scope: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[TaskRunOut]:
+    """任务列表; home_scope=true 时按首页看板口径过滤:
+    限定当前用户可见项目, 且非项目经理仅看自己创建的任务
+    """
     q = select(TaskRun).where(TaskRun.is_delete.is_(False))
-    if project_id is not None:
+    if home_scope:
+        name = get_user_name(request)
+        pid = await resolve_visible_project_id(db, name, project_id)
+        if pid is None:
+            return []
+        q = q.where(TaskRun.project_id == pid)
+        if not await is_manager_of_project(db, pid, name):
+            q = q.where(TaskRun.user_name == name)
+    elif project_id is not None:
         q = q.where(TaskRun.project_id == project_id)
     if status:
         q = q.where(TaskRun.status == status)
@@ -171,7 +184,7 @@ async def list_task_runs(
 
 @router.post("/", response_model=TaskRunOut)
 async def create_task_run(
-    payload: TaskRunCreate, db: AsyncSession = Depends(get_db)
+    payload: TaskRunCreate, request: Request, db: AsyncSession = Depends(get_db)
 ) -> TaskRunOut:
     # agent_id 可不传: 执行时由意图识别自动选择, 识别不了由用户在执行窗口选择
     if payload.agent_id is not None:
@@ -187,6 +200,7 @@ async def create_task_run(
         skill_ids=payload.skill_ids,
         file_names=[_safe_filename(f) for f in payload.file_names],
         status="draft",
+        user_name=get_user_name(request),
     )
     db.add(run)
     await db.flush()
@@ -249,7 +263,8 @@ async def _build_prompt(
     prompt_parts: list[str] = []
     if input_text:
         prompt_parts.append(input_text)
-    prompt_parts.extend(build_file_prompt_parts(project_id, file_names))
+    # 音频/图片/PDF 由 TaskRunner 执行前确定性预处理注入 (skill_guidance=False 不再给技能指引)
+    prompt_parts.extend(build_file_prompt_parts(project_id, file_names, skill_guidance=False))
     if skill_ids:
         skill_result = await db.execute(select(Skill).where(Skill.id.in_(skill_ids)))
         skills = skill_result.scalars().all()
