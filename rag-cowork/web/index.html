@@ -18,7 +18,7 @@
 
   /* ---------- 顶栏 ---------- */
   .topbar { height: 54px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 18px;
-    background: #fff; border-bottom: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+    background: #e6f1ff; border-bottom: 1px solid rgba(14,165,233,.16); box-shadow: none; }
   .topbar .logo { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg,#0ea5e9,#6366f1);
     display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
   .topbar h1 { font-size: 16px; letter-spacing: 1px; background: linear-gradient(90deg,#0ea5e9,#6366f1);
@@ -33,13 +33,13 @@
   /* ---------- 三栏布局 ---------- */
   .main { flex: 1; display: grid; grid-template-columns: 270px 1fr 380px; min-height: 0; }
   .col { min-height: 0; overflow-y: auto; }
-  .col-kb { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
+  .col-kb { border-right: 1px solid rgba(14,165,233,.16); background: linear-gradient(180deg,#eaf3ff 0%,#f6faff 100%); display: flex; flex-direction: column; }
   .col-file { padding: 16px 20px; background: var(--bg); }
   .col-rag { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
 
   /* ---------- KB 树 ---------- */
   .kb-head { padding: 14px 14px 10px; display: flex; align-items: center; justify-content: space-between; }
-  .kb-head .title { font-size: 13px; font-weight: 600; color: var(--dim); letter-spacing: 1px; }
+  .kb-head .title { font-size: 13px; font-weight: 600; color: #0a7cc2; letter-spacing: 1px; }
   .btn-primary { background: linear-gradient(90deg,#0ea5e9,#6366f1); color: #fff; border: none; border-radius: 8px;
     padding: 6px 12px; font-size: 12px; cursor: pointer; transition: filter .15s; }
   .btn-primary:hover { filter: brightness(1.1); }
@@ -48,17 +48,17 @@
 
   /* 侧栏左下角用户区 (与 pro/mcp 一致) */
   .side-user { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 14px;
-    border-top: 1px solid var(--line); background: var(--panel); font-size: 13px; color: var(--dim); }
+    border-top: 1px solid rgba(14,165,233,.16); background: #edf6ff; font-size: 13px; color: var(--dim); }
   .side-user__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
   .side-user__btn { flex: none; background: var(--panel2); border: 1px solid var(--line); color: var(--dim);
     border-radius: 7px; padding: 4px 11px; font-size: 11px; cursor: pointer; transition: all .15s ease; }
   .side-user__btn:hover { color: var(--accent); border-color: var(--accent); }
   .side-user__btn.danger:hover { color: var(--err); border-color: var(--err); }
   .kb-group { margin-top: 8px; }
-  .kb-group-title { font-size: 11px; color: var(--dim); padding: 4px 8px; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+  .kb-group-title { font-size: 11px; color: #5b93c2; padding: 4px 8px; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
   .kb-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;
     color: var(--txt); border: 1px solid transparent; transition: all .15s; }
-  .kb-item:hover { background: var(--hover-bg); }
+  .kb-item:hover { background: rgba(14,165,233,.08); }
   .kb-item.active { background: var(--active-bg); border-color: rgba(14,165,233,.35); }
   .kb-item .cnt { margin-left: auto; font-size: 11px; color: var(--dim); background: rgba(100,116,139,.08); padding: 1px 6px; border-radius: 99px; }
   .kb-item .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
