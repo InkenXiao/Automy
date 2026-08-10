@@ -9,45 +9,45 @@
   body {
     font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: radial-gradient(ellipse at 20% 30%, #16213e 0%, #0a0f1e 60%, #050810 100%);
-    color: #e2e8f0; overflow: hidden;
+    background: radial-gradient(ellipse at 20% 30%, #ecfdf5 0%, #f5f7fa 55%, #eef2f7 100%);
+    color: #2d3748; overflow: hidden;
   }
-  .glow { position: fixed; border-radius: 50%; filter: blur(120px); opacity: .35; pointer-events: none; }
-  .glow-1 { width: 480px; height: 480px; background: #0ea5e9; top: -120px; left: -120px; animation: drift 14s ease-in-out infinite alternate; }
-  .glow-2 { width: 420px; height: 420px; background: #8b5cf6; bottom: -140px; right: -100px; animation: drift 18s ease-in-out infinite alternate-reverse; }
+  .glow { position: fixed; border-radius: 50%; filter: blur(120px); opacity: .3; pointer-events: none; }
+  .glow-1 { width: 480px; height: 480px; background: #6ee7b7; top: -120px; left: -120px; animation: drift 14s ease-in-out infinite alternate; }
+  .glow-2 { width: 420px; height: 420px; background: #a7f3d0; bottom: -140px; right: -100px; animation: drift 18s ease-in-out infinite alternate-reverse; }
   @keyframes drift { from { transform: translate(0,0) scale(1); } to { transform: translate(60px,40px) scale(1.15); } }
   .card {
     position: relative; z-index: 1; width: 400px; padding: 44px 40px 36px;
-    background: rgba(15, 23, 42, .78); border: 1px solid rgba(56, 189, 248, .25);
+    background: rgba(255, 255, 255, .9); border: 1px solid rgba(16, 185, 129, .2);
     border-radius: 18px; backdrop-filter: blur(14px);
-    box-shadow: 0 0 60px rgba(14, 165, 233, .15), inset 0 1px 0 rgba(255,255,255,.06);
+    box-shadow: 0 10px 40px rgba(15, 23, 42, .1);
   }
   .logo {
     width: 64px; height: 64px; margin: 0 auto 18px; border-radius: 16px;
-    background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+    background: linear-gradient(135deg, #10b981, #059669);
     display: flex; align-items: center; justify-content: center;
     font-size: 30px; font-weight: 800; color: #fff;
-    box-shadow: 0 0 30px rgba(14,165,233,.5);
+    box-shadow: 0 6px 20px rgba(16,185,129,.35);
   }
   h1 { text-align: center; font-size: 22px; letter-spacing: 2px;
-       background: linear-gradient(90deg, #38bdf8, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .sub { text-align: center; font-size: 13px; color: #7d8aa5; margin: 8px 0 30px; letter-spacing: 1px; }
+       background: linear-gradient(90deg, #10b981, #059669); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { text-align: center; font-size: 13px; color: #64748b; margin: 8px 0 30px; letter-spacing: 1px; }
   .input {
     width: 100%; padding: 13px 16px; margin-bottom: 14px; font-size: 14px;
-    background: rgba(2, 6, 23, .6); border: 1px solid rgba(100, 116, 139, .35);
-    border-radius: 10px; color: #e2e8f0; outline: none; transition: border .2s, box-shadow .2s;
+    background: #ffffff; border: 1px solid rgba(100, 116, 139, .3);
+    border-radius: 10px; color: #2d3748; outline: none; transition: border .2s, box-shadow .2s;
   }
-  .input:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.15); }
+  .input:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.14); }
   .btn {
     width: 100%; padding: 13px; font-size: 15px; font-weight: 600; letter-spacing: 4px;
     border: none; border-radius: 10px; cursor: pointer; color: #fff;
-    background: linear-gradient(90deg, #0ea5e9, #6366f1); transition: transform .15s, box-shadow .2s;
+    background: linear-gradient(90deg, #10b981, #059669); transition: transform .15s, box-shadow .2s;
   }
-  .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(14,165,233,.45); }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(16,185,129,.35); }
   .btn:disabled { opacity: .55; cursor: not-allowed; }
-  .hint { min-height: 20px; margin-top: 12px; font-size: 12px; color: #f87171; text-align: center; }
+  .hint { min-height: 20px; margin-top: 12px; font-size: 12px; color: #ef4444; text-align: center; }
   .back { display: block; text-align: center; margin-top: 18px; font-size: 12px; color: #64748b; text-decoration: none; }
-  .back:hover { color: #38bdf8; }
+  .back:hover { color: #10b981; }
 </style>
 </head>
 <body>
