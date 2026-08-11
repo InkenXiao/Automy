@@ -256,10 +256,8 @@ const Auth = {
       sidebar.insertBefore(el, footer || null);
     }
     const name = this.user();
-    const pm = this.isAnyPm();
     el.innerHTML = `
       <span class="sidebar__user-name" title="${App.escapeHtml(name)}">👤 ${App.escapeHtml(name || '未登录')}</span>
-      ${pm ? '<span class="badge badge--primary" style="font-size:10px;">经理</span>' : ''}
       <button class="sidebar__user-logout" id="auth-password-btn" title="设置/修改本人登录密码">密码</button>
       <button class="sidebar__user-logout" id="auth-logout-btn" title="退出登录">退出</button>
     `;

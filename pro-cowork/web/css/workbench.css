@@ -198,27 +198,27 @@ input, textarea, select { font-family: inherit; font-size: 14px; }
   width: 100%;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 140, 0, 0.32);
-  background: #fff5ea;
-  color: #c05a00;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  color: #1f2937;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   outline: none;
 }
 
 .sidebar__week-selector input[type="week"]:focus {
   border-color: var(--color-primary);
-  background: #ffefdd;
-  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.16);
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.14);
 }
 
 .sidebar__week-selector input[type="week"]::-webkit-datetime-edit {
-  color: #c05a00;
+  color: #1f2937;
 }
 
 .sidebar__week-selector input[type="week"]::-webkit-datetime-edit-year-field,
 .sidebar__week-selector input[type="week"]::-webkit-datetime-edit-week-field {
-  color: #c05a00;
+  color: #1f2937;
 }
 
 .sidebar__week-selector input[type="week"]::-webkit-inner-spin-button {

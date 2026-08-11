@@ -2458,9 +2458,9 @@ const CoworkSkills = {
           <div class="skill-card__desc">${App.escapeHtml(s.description || '暂无描述')}</div>
           <div class="skill-card__footer">
             <button class="cw-btn cw-btn--primary cw-btn--sm" data-action="run">▶ 执行</button>
-            <button class="cw-btn cw-btn--sm" data-action="history">📜 记录</button>
-            <button class="cw-btn cw-btn--sm" data-action="copy">📋 复制</button>
-            <button class="cw-btn cw-btn--sm" data-action="edit">✏️</button>
+            <button class="cw-btn cw-btn--sm" data-action="history">记录</button>
+            <button class="cw-btn cw-btn--sm" data-action="copy">复制</button>
+            <button class="cw-btn cw-btn--sm" data-action="edit">编辑</button>
             <button class="cw-btn cw-btn--sm cw-btn--danger" data-action="delete">🗑</button>
           </div>
         </div>`;
